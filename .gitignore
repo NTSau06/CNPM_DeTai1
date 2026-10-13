@@ -1,0 +1,96 @@
+# ==========================================
+# 1. Node.js & Front-end (React, Vite, TS)
+# ==========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build artifacts
+dist/
+dist-ssr/
+build/
+out/
+.vite/
+*.tsbuildinfo
+.next/
+.nuxt/
+.cache/
+
+# Coverage & testing
+coverage/
+.nyc_output/
+*.lcov
+
+# ==========================================
+# 2. Python & Môi trường ảo (nếu có backend Python)
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+env.bak/
+venv.bak/
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.coverage
+
+# ==========================================
+# 4. Biến môi trường & Bí mật (Secrets)
+# ==========================================
+.env
+.env.*
+!.env.example
+!.env.template
+*.local
+
+# ==========================================
+# 5. Database & Tệp tạm thời
+# ==========================================
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# ==========================================
+# 6. IDEs & Editors
+# ==========================================
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.project
+.classpath
+.settings/
+
+# ==========================================
+# 7. Hệ điều hành (OS Files)
+# ==========================================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
