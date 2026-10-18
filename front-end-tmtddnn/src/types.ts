@@ -7,6 +7,17 @@ export interface LocalizedCopy {
   narration: string
 }
 
+export interface PlaceDetailSection {
+  heading: string
+  body: string
+}
+
+export interface PlaceDetailImage {
+  src: string
+  alt: string
+  caption: string
+}
+
 export interface Place {
   id: string
   category: Category
@@ -14,6 +25,8 @@ export interface Place {
   duration: number
   image: string
   copy: Record<Language, LocalizedCopy>
+  detailSections: PlaceDetailSection[]
+  detailImage: PlaceDetailImage
 }
 
 export interface SavedTour {
@@ -22,6 +35,15 @@ export interface SavedTour {
   createdAt: number
   distanceKm: number
   durationMinutes: number
+}
+
+export interface UserProfile {
+  fullName: string
+  email: string
+  phone: string
+  birthDate: string
+  gender: 'female' | 'male' | 'other' | 'prefer-not-to-say' | ''
+  address: string
 }
 
 export interface OfflineMapPack {

@@ -9,11 +9,13 @@ import { AppShell } from './components/AppShell'
 const ExplorePage = lazy(() => import('./pages/ExplorePage').then((module) => ({ default: module.ExplorePage })))
 const SavedPage = lazy(() => import('./pages/SavedPage').then((module) => ({ default: module.SavedPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })))
+const UserPage = lazy(() => import('./pages/UserPage').then((module) => ({ default: module.UserPage })))
 
 export default function App() {
   const language = useAppStore((state) => state.language)
   const savedTourCount = useAppStore((state) => state.savedTours.length)
   const online = useAppStore((state) => state.online)
+  const currentUser = useAppStore((state) => state.currentUser)
   const storageError = useAppStore((state) => state.storageError)
   const clearStorageError = useAppStore((state) => state.clearStorageError)
 
@@ -48,7 +50,9 @@ export default function App() {
             {translate(language, online ? 'online' : 'offlineStatus')}
           </span>
           <LanguagePicker />
-          <NavLink className="avatar-link" to="/settings" aria-label={translate(language, 'settings')}>A</NavLink>
+          <NavLink className="avatar-link" to={currentUser ? '/profile' : '/login'} aria-label={currentUser ? 'Hồ sơ người dùng' : 'Đăng nhập'}>
+            {currentUser ? getInitials(currentUser.fullName) : 'A'}
+          </NavLink>
         </div>
       </header>
 
@@ -83,6 +87,9 @@ export default function App() {
             <Route path="/saved" element={<SavedPage />} />
             <Route path="/offline" element={<SettingsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/login" element={<UserPage />} />
+            <Route path="/register" element={<UserPage />} />
+            <Route path="/profile" element={<UserPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
@@ -97,6 +104,10 @@ export default function App() {
       </nav>
     </AppShell>
   )
+}
+
+function getInitials(name: string) {
+  return name.trim().split(/\s+/).slice(-2).map((part) => part[0]?.toUpperCase() ?? '').join('')
 }
 
 function LanguagePicker() {

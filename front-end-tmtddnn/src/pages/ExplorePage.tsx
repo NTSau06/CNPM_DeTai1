@@ -182,6 +182,27 @@ export function ExplorePage() {
             <p className="place-language-subtitle">{selectedPlace.copy[language].subtitle}</p>
             <p>{selectedPlace.copy[language].narration}</p>
           </section>
+          <section className="place-story" lang="vi">
+            <div className="place-story-heading">
+              <span className="eyebrow"><span className="eyebrow-line" /> KHÁM PHÁ ĐỊA ĐIỂM</span>
+              <h2>Câu chuyện của nơi này</h2>
+              <p>Nội dung được biên tập trực tiếp trong dữ liệu mã nguồn của từng địa điểm.</p>
+            </div>
+            <div className="place-story-layout">
+              <div className="place-story-sections">
+                {selectedPlace.detailSections.map((section, index) => (
+                  <section className="place-story-section" key={`${selectedPlace.id}-${index}`}>
+                    <span className="place-story-number">{String(index + 1).padStart(2, '0')}</span>
+                    <div><h3>{section.heading}</h3><p>{section.body}</p></div>
+                  </section>
+                ))}
+              </div>
+              <figure className="place-story-image">
+                <img src={selectedPlace.detailImage.src} alt={selectedPlace.detailImage.alt} loading="lazy" />
+                <figcaption>{selectedPlace.detailImage.caption}</figcaption>
+              </figure>
+            </div>
+          </section>
         </article>
         </details>
         <NarrationCard place={selectedPlace} language={language} distanceMeters={distanceMeters} onStartWalk={startWalk} onStopWalk={stopWalk} />

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { cachePlaces, deleteOfflineMap, deleteTour, getCachedPlaces, getOfflineMap, getSavedTours, readSetting, saveOfflineMap, saveTour, writeSetting } from './db'
 import { languages, places as bundledPlaces } from './data/places'
-import type { Language, OfflineMapPack, Place, SavedTour } from './types'
+import type { Language, OfflineMapPack, Place, SavedTour, UserProfile } from './types'
 
 const placeOrder = new Map(bundledPlaces.map((place, index) => [place.id, index]))
 
@@ -18,12 +18,16 @@ interface AppState {
   autoNarration: boolean
   location: [number, number] | null
   online: boolean
+  currentUser: UserProfile | null
   storageError: AppErrorKey | null
   bootstrapped: boolean
   setLanguage: (language: Language) => void
   setSelectedPlace: (id: string) => void
   setLocation: (location: [number, number] | null) => void
   setOnline: (online: boolean) => void
+  setCurrentUser: (user: UserProfile) => void
+  updateCurrentUser: (user: UserProfile) => void
+  signOut: () => void
   toggleRoutePlace: (id: string) => void
   saveCurrentTour: () => Promise<boolean>
   removeTour: (id: string) => Promise<void>
@@ -46,6 +50,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   autoNarration: false,
   location: null,
   online: typeof navigator === 'undefined' ? true : navigator.onLine,
+  currentUser: null,
   storageError: null,
   bootstrapped: false,
   setLanguage: (language) => {
@@ -55,6 +60,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSelectedPlace: (selectedPlaceId) => set({ selectedPlaceId }),
   setLocation: (location) => set({ location }),
   setOnline: (online) => set({ online }),
+  setCurrentUser: (currentUser) => set({ currentUser }),
+  updateCurrentUser: (currentUser) => set({ currentUser }),
+  signOut: () => set({ currentUser: null }),
   toggleRoutePlace: (id) => set((state) => ({
     routeIds: state.routeIds.includes(id)
       ? state.routeIds.filter((placeId) => placeId !== id)

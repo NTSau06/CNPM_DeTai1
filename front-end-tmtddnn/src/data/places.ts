@@ -1,4 +1,5 @@
 import type { Category, Language, Place } from '../types'
+import { placeDetails } from './placeDetails'
 
 export const languages: { code: Language; label: string; native: string; speech: string; flag: string }[] = [
   { code: 'vi', label: 'Tiếng Việt', native: 'VI', speech: 'vi-VN', flag: '🇻🇳' },
@@ -24,7 +25,7 @@ export const categoryLabels: Record<Language, Record<Category, string>> = {
 
 type ExistingLanguage = 'vi' | 'en' | 'ja' | 'fr'
 type AddedLanguage = 'zh-CN' | 'ko-KR' | 'es'
-type BasePlace = Omit<Place, 'copy'> & { copy: Record<ExistingLanguage, Place['copy'][Language]> }
+type BasePlace = Omit<Place, 'copy' | 'detailSections' | 'detailImage'> & { copy: Record<ExistingLanguage, Place['copy'][Language]> }
 
 const basePlaces: BasePlace[] = [
   {
@@ -587,8 +588,10 @@ const additionalCopies: Record<string, Record<AddedLanguage, Place['copy'][Langu
 export const places: Place[] = basePlaces.map((place) => {
   const addedCopy = additionalCopies[place.id]
   if (!addedCopy) throw new Error(`Missing added-language content for place "${place.id}".`)
+  const details = placeDetails[place.id]
+  if (!details) throw new Error(`Missing detail content for place "${place.id}".`)
 
-  return { ...place, copy: { ...place.copy, ...addedCopy } }
+  return { ...place, copy: { ...place.copy, ...addedCopy }, detailSections: details.sections, detailImage: details.image }
 })
 
 export const findPlace = (id: string) => places.find((place) => place.id === id)

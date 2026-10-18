@@ -44,7 +44,7 @@ export function SettingsPage() {
     }
   }
 
-  const mapPage = window.location.pathname === '/offline'
+  const mapPage = window.location.pathname === `${import.meta.env.BASE_URL}offline`
   return (
     <div className="subpage settings-page">
       <div className="subpage-heading">

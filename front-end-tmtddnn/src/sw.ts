@@ -23,7 +23,7 @@ registerRoute(
 registerRoute(
   ({ url }) => url.pathname.startsWith('/api/'),
   new NetworkFirst({
-    cacheName: 'hoi-an-api-v1',
+    cacheName: 'quang-tri-api-v1',
     networkTimeoutSeconds: 4,
     plugins: [new ExpirationPlugin({ maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 7 })],
   }),
