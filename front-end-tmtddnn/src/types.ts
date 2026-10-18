@@ -1,4 +1,4 @@
-export type Language = 'vi' | 'en' | 'ja' | 'fr'
+export type Language = 'vi' | 'en' | 'ja' | 'fr' | 'zh-CN' | 'ko-KR' | 'es'
 export type Category = 'landmark' | 'food' | 'craft' | 'rest'
 
 export interface LocalizedCopy {

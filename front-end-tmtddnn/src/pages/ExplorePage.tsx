@@ -3,7 +3,7 @@ import { ArrowDownRight, ArrowRight, BookmarkPlus, ChevronRight, Clock3, Compass
 import { distance, point } from '@turf/turf'
 import { NavLink } from 'react-router-dom'
 import { NarrationCard } from '../components/NarrationCard'
-import { categoryKeys, categoryLabels, findPlace, localizedTitle, places as bundledPlaces } from '../data/places'
+import { categoryKeys, categoryLabels, findPlace, languages, localizedTitle, places as bundledPlaces } from '../data/places'
 import { translate } from '../i18n'
 import { speak, speechAvailable } from '../speech'
 import { useAppStore } from '../store'
@@ -29,6 +29,7 @@ export function ExplorePage() {
   const spokenPlaces = useRef(new Set<string>())
   const watchId = useRef<number | null>(null)
   const selectedPlace = findPlace(selectedPlaceId) ?? places[0] ?? bundledPlaces[0]
+  const selectedLanguage = languages.find((item) => item.code === language)
 
   const filteredPlaces = useMemo(() => places.filter((place) => {
     const title = localizedTitle(place, language).toLowerCase()
@@ -154,7 +155,8 @@ export function ExplorePage() {
       </div>
 
       <div className="detail-grid">
-        <div className="selected-place-panel">
+        <details className="place-detail-page">
+        <summary className="selected-place-panel">
           <div className={`place-illustration illustration-${selectedPlace.image}`}>
             <span className="illustration-flag">A SMALL STORY</span>
             <div className="illustration-number">0{places.findIndex((place) => place.id === selectedPlace.id) + 1}</div>
@@ -166,7 +168,22 @@ export function ExplorePage() {
             <p>{selectedPlace.copy[language].subtitle}</p>
             <span className="selected-location"><MapPin size={13} /> QUẢNG TRỊ · QUẢNG BÌNH</span>
           </div>
-        </div>
+        </summary>
+        <article className="place-detail-content">
+          <div className="place-detail-heading">
+            <span className="eyebrow"><span className="eyebrow-line" /> {categoryLabels[language][selectedPlace.category]} · {selectedPlace.duration} {translate(language, 'minute')}</span>
+            <h1>{localizedTitle(selectedPlace, language)}</h1>
+            <p>{selectedPlace.copy[language].subtitle}</p>
+            <span className="selected-location"><MapPin size={13} /> QUẢNG TRỊ · QUẢNG BÌNH</span>
+          </div>
+          <section className="place-language-card" lang={language}>
+            <h2>{selectedLanguage?.label ?? language}</h2>
+            <h3>{selectedPlace.copy[language].title}</h3>
+            <p className="place-language-subtitle">{selectedPlace.copy[language].subtitle}</p>
+            <p>{selectedPlace.copy[language].narration}</p>
+          </section>
+        </article>
+        </details>
         <NarrationCard place={selectedPlace} language={language} distanceMeters={distanceMeters} onStartWalk={startWalk} onStopWalk={stopWalk} />
       </div>
 

@@ -1,10 +1,13 @@
 import type { Category, Language, Place } from '../types'
 
-export const languages: { code: Language; label: string; native: string; speech: string }[] = [
-  { code: 'vi', label: 'Tiếng Việt', native: 'VI', speech: 'vi-VN' },
-  { code: 'en', label: 'English', native: 'EN', speech: 'en-US' },
-  { code: 'ja', label: '日本語', native: '日本', speech: 'ja-JP' },
-  { code: 'fr', label: 'Français', native: 'FR', speech: 'fr-FR' },
+export const languages: { code: Language; label: string; native: string; speech: string; flag: string }[] = [
+  { code: 'vi', label: 'Tiếng Việt', native: 'VI', speech: 'vi-VN', flag: '🇻🇳' },
+  { code: 'en', label: 'English', native: 'EN', speech: 'en-US', flag: '🇬🇧' },
+  { code: 'ja', label: '日本語', native: '日本', speech: 'ja-JP', flag: '🇯🇵' },
+  { code: 'fr', label: 'Français', native: 'FR', speech: 'fr-FR', flag: '🇫🇷' },
+  { code: 'zh-CN', label: '中文（简体）', native: '中文', speech: 'zh-CN', flag: '🇨🇳' },
+  { code: 'ko-KR', label: '한국어', native: '한국', speech: 'ko-KR', flag: '🇰🇷' },
+  { code: 'es', label: 'Español', native: 'ES', speech: 'es-ES', flag: '🇪🇸' },
 ]
 
 export const categoryKeys: Category[] = ['landmark', 'food', 'craft', 'rest']
@@ -14,15 +17,22 @@ export const categoryLabels: Record<Language, Record<Category, string>> = {
   en: { landmark: 'Heritage', food: 'Food', craft: 'Local life', rest: 'Slow moments' },
   ja: { landmark: '歴史', food: '食文化', craft: '地域の暮らし', rest: 'ひと休み' },
   fr: { landmark: 'Patrimoine', food: 'Cuisine', craft: 'Vie locale', rest: 'Pause douce' },
+  'zh-CN': { landmark: '文化遗产', food: '美食', craft: '当地生活', rest: '休憩之处' },
+  'ko-KR': { landmark: '문화유산', food: '음식', craft: '현지 생활', rest: '휴식 장소' },
+  es: { landmark: 'Patrimonio', food: 'Gastronomía', craft: 'Vida local', rest: 'Pausa' },
 }
 
-export const places: Place[] = [
+type ExistingLanguage = 'vi' | 'en' | 'ja' | 'fr'
+type AddedLanguage = 'zh-CN' | 'ko-KR' | 'es'
+type BasePlace = Omit<Place, 'copy'> & { copy: Record<ExistingLanguage, Place['copy'][Language]> }
+
+const basePlaces: BasePlace[] = [
   {
     id: 'phong-nha-cave',
     category: 'landmark',
     coordinates: [106.283, 17.59],
     duration: 6,
-    image: 'cave',
+    image: 'phong-nha',
     copy: {
       vi: {
         title: 'Động Phong Nha',
@@ -254,7 +264,7 @@ export const places: Place[] = [
     category: 'landmark',
     coordinates: [106.97, 16.89],
     duration: 5,
-    image: 'house',
+    image: 'truong-son',
     copy: {
       vi: {
         title: 'Nghĩa trang Liệt sĩ Trường Sơn',
@@ -283,7 +293,7 @@ export const places: Place[] = [
     category: 'rest',
     coordinates: [107.095, 17.055],
     duration: 4,
-    image: 'river',
+    image: 'cua-tung-beach',
     copy: {
       vi: {
         title: 'Bãi biển Cửa Tùng',
@@ -312,7 +322,7 @@ export const places: Place[] = [
     category: 'rest',
     coordinates: [106.235, 17.56],
     duration: 5,
-    image: 'river',
+    image: 'spring',
     copy: {
       vi: {
         title: 'Suối nước Moọc',
@@ -341,7 +351,7 @@ export const places: Place[] = [
     category: 'rest',
     coordinates: [106.53, 17.65],
     duration: 4,
-    image: 'river',
+    image: 'da-nhay',
     copy: {
       vi: {
         title: 'Bãi Đá Nhảy',
@@ -366,6 +376,220 @@ export const places: Place[] = [
     },
   },
 ]
+
+const additionalCopies: Record<string, Record<AddedLanguage, Place['copy'][Language]>> = {
+  'phong-nha-cave': {
+    'zh-CN': {
+      title: '峰牙洞',
+      subtitle: '沿着山孙河走进群山深处',
+      narration: '从码头出发，乘船沿着山孙河前往峰牙洞，两岸是苍翠的石灰岩山。洞内有地下河和历经漫长岁月形成的钟乳石，环境清凉而宁静。请沿指定路线参观，共同保护自然景观。',
+    },
+    'ko-KR': {
+      title: '퐁냐 동굴',
+      subtitle: '손강을 따라 산속으로',
+      narration: '선착장에서 손강을 따라 푸른 석회암 산 사이로 들어가면 퐁냐 동굴에 도착합니다. 동굴 안에는 지하강과 오랜 세월에 걸쳐 형성된 종유석이 있어 시원하고 고요한 풍경을 만날 수 있습니다. 지정된 관람로를 이용하고 자연을 보호해 주세요.',
+    },
+    es: {
+      title: 'Cueva de Phong Nha',
+      subtitle: 'Un viaje por el río Son hacia la montaña',
+      narration: 'Desde el embarcadero, el recorrido hacia la cueva de Phong Nha sigue el río Son entre montañas de piedra caliza. En el interior, un río subterráneo y formaciones rocosas modeladas durante mucho tiempo crean un ambiente fresco y silencioso. Siga el recorrido indicado y ayude a proteger el entorno natural.',
+    },
+  },
+  'thien-duong-cave': {
+    'zh-CN': {
+      title: '天堂洞',
+      subtitle: '记录亿万年时光的岩层',
+      narration: '天堂洞展现出宽阔的洞厅、石拱和形态各异的钟乳石帘。木栈道让游客可以观赏洞穴，同时避免踩踏天然地面。请放慢脚步，留意光线变化和周围森林的声音。',
+    },
+    'ko-KR': {
+      title: '티엔드엉 동굴',
+      subtitle: '오랜 세월이 빚어낸 바위 풍경',
+      narration: '티엔드엉 동굴에는 넓은 공간과 바위 아치, 다양한 모양의 종유석이 펼쳐집니다. 나무 산책로를 이용하면 자연 그대로의 동굴 바닥을 밟지 않고 둘러볼 수 있습니다. 천천히 걸으며 빛의 변화와 숲의 소리에 귀 기울여 보세요.',
+    },
+    es: {
+      title: 'Cueva del Paraíso',
+      subtitle: 'Formaciones de piedra creadas a lo largo del tiempo',
+      narration: 'La cueva del Paraíso se abre en amplias salas con arcos de piedra y cortinas de estalactitas. La pasarela de madera permite recorrerla sin pisar el suelo natural. Camine despacio y observe la luz y los sonidos del bosque que la rodea.',
+    },
+  },
+  'nhat-le-beach': {
+    'zh-CN': {
+      title: '日丽海滩',
+      subtitle: '在河海交汇处放慢脚步',
+      narration: '日丽海滩靠近日丽河入海口。清晨，沙滩较为宁静，海滨城市的一天刚刚开始。请只在安全区域下水，留意警示旗，并在离开时带走垃圾。',
+    },
+    'ko-KR': {
+      title: '녓레 해변',
+      subtitle: '바닷가에서 잠시 쉬어 가기',
+      narration: '녓레 해변은 같은 이름의 강이 바다와 만나는 곳 가까이에 있습니다. 아침이면 해변은 한적하고 해안 도시의 하루가 막 시작됩니다. 안전한 구역에서만 물에 들어가고 안내 깃발을 확인하며 쓰레기는 가져가 주세요.',
+    },
+    es: {
+      title: 'Playa de Nhat Le',
+      subtitle: 'Una pausa tranquila junto al mar',
+      narration: 'La playa de Nhat Le está cerca de la desembocadura del río del mismo nombre. Por la mañana, la orilla está tranquila mientras despierta la ciudad costera. Báñese solo en zonas seguras, preste atención a las señales y llévese la basura.',
+    },
+  },
+  'dong-hoi-market': {
+    'zh-CN': {
+      title: '同海市场',
+      subtitle: '品尝广平当地风味',
+      narration: '同海市场展现了日丽河畔的日常生活。可以向当地摊主了解当地面汤、木薯粉饼或时令海鲜。每家店都有自己的做法，请慢慢挑选，并在点餐前询问价格。',
+    },
+    'ko-KR': {
+      title: '동허이 시장',
+      subtitle: '꽝빈의 현지 음식을 맛보다',
+      narration: '동허이 시장에서는 녓레강 주변의 일상을 엿볼 수 있습니다. 현지 상인에게 짜오까인 국수, 타피오카 만두, 제철 해산물을 물어보세요. 가게마다 맛이 다르니 천천히 둘러보고 주문 전에 가격을 확인해 주세요.',
+    },
+    es: {
+      title: 'Mercado de Dong Hoi',
+      subtitle: 'Sabores locales de Quang Binh',
+      narration: 'El mercado de Dong Hoi ofrece una mirada a la vida cotidiana junto al río Nhat Le. Pregunte por la sopa de fideos chao canh, las empanadillas de tapioca o el marisco de temporada. Cada puesto tiene su estilo: tómese su tiempo y consulte el precio antes de pedir.',
+    },
+  },
+  'bao-ninh-village': {
+    'zh-CN': {
+      title: '宝宁渔村',
+      subtitle: '河口旁的海滨生活',
+      narration: '穿过日丽桥便来到宝宁，这里与海洋和近海捕鱼息息相关。请保持适当距离，观察渔船、渔网和出海前的准备工作。如想与居民交谈或拍照，请先征得同意。',
+    },
+    'ko-KR': {
+      title: '바오닌 어촌',
+      subtitle: '강어귀 곁의 해안 생활',
+      narration: '녓레 다리를 건너면 바다와 연안 어업으로 이어진 바오닌 지역에 도착합니다. 배와 그물, 출항 준비 모습을 적당한 거리를 두고 살펴보세요. 주민과 대화하거나 사진을 찍기 전에는 먼저 허락을 구해 주세요.',
+    },
+    es: {
+      title: 'Aldea pesquera de Bao Ninh',
+      subtitle: 'Vida costera junto a la desembocadura',
+      narration: 'Al otro lado del puente Nhat Le se encuentra Bao Ninh, una zona ligada al mar y a la pesca costera. Observe los barcos, las redes y los preparativos para salir al mar desde una distancia respetuosa. Pida permiso antes de conversar con los residentes o tomar fotografías.',
+    },
+  },
+  'vinh-moc-tunnels': {
+    'zh-CN': {
+      title: '永木地道',
+      subtitle: '地下的生活空间',
+      narration: '战争期间，永木居民修建了地道系统，用于躲避战火并维持日常生活。通道、房间和水井展现了人们在艰难环境中的坚韧。请遵循现场指引，并注意低矮狭窄的路段。',
+    },
+    'ko-KR': {
+      title: '빈목 터널',
+      subtitle: '땅속에 마련한 생활 공간',
+      narration: '전쟁 중 빈목 주민들은 피난과 생활을 위해 지하 터널을 만들었습니다. 통로와 방, 우물은 어려운 상황을 견뎌 낸 공동체의 모습을 보여 줍니다. 현장 안내를 따르고 낮고 좁은 구간에서는 주의해 주세요.',
+    },
+    es: {
+      title: 'Túneles de Vinh Moc',
+      subtitle: 'Un espacio de vida bajo tierra',
+      narration: 'Durante la guerra, los habitantes de Vinh Moc construyeron una red de túneles para refugiarse y continuar su vida cotidiana. Los pasadizos, las habitaciones y los pozos muestran la resistencia de la comunidad en circunstancias difíciles. Siga las indicaciones del lugar y tenga cuidado en los tramos bajos y estrechos.',
+    },
+  },
+  'hien-luong-bridge': {
+    'zh-CN': {
+      title: '贤良桥与滨海河',
+      subtitle: '见证分裂岁月的河流',
+      narration: '贤良桥横跨滨海河。1954年日内瓦协议后，这里曾与临时军事分界线相关。在国家分裂的岁月里，这座桥成为人们期盼团聚的象征。您可以在河畔停留，感受这片土地承载的历史记忆。',
+    },
+    'ko-KR': {
+      title: '히엔르엉 다리와 벤하이강',
+      subtitle: '분단의 역사를 간직한 강',
+      narration: '히엔르엉 다리는 벤하이강을 가로지릅니다. 이곳은 1954년 제네바 협정 이후 임시 군사 경계선과 관련된 장소였습니다. 분단의 시기 다리는 재회를 바라는 희망의 상징이 되었습니다. 강가에 잠시 머물며 이 지역의 역사를 되새겨 보세요.',
+    },
+    es: {
+      title: 'Puente de Hien Luong y río Ben Hai',
+      subtitle: 'Un río marcado por la división',
+      narration: 'El puente de Hien Luong cruza el río Ben Hai, asociado a la línea militar provisional establecida tras los Acuerdos de Ginebra de 1954. Durante la división del país, el puente simbolizó la esperanza de reunificación. Deténgase junto al río y reflexione sobre la historia de la región.',
+    },
+  },
+  'quang-tri-citadel': {
+    'zh-CN': {
+      title: '广治古城',
+      subtitle: '城市中心的古城遗迹',
+      narration: '广治古城见证了越南历史上的动荡时期，尤其是1972年的激烈战事。如今，城内的纪念空间提醒人们铭记战争带来的牺牲与和平的珍贵。参观时请保持肃穆。',
+    },
+    'ko-KR': {
+      title: '꽝찌 고성',
+      subtitle: '도시 한가운데 남은 옛 성터',
+      narration: '꽝찌 고성은 베트남 역사의 격동기를 간직한 유적이며, 특히 1972년의 치열한 전투와 관련이 있습니다. 오늘날 성 안의 추모 공간은 전쟁의 희생과 평화의 소중함을 일깨워 줍니다. 방문 중에는 경건한 태도를 지켜 주세요.',
+    },
+    es: {
+      title: 'Ciudadela antigua de Quang Tri',
+      subtitle: 'Una ciudadela histórica en el centro de la ciudad',
+      narration: 'La ciudadela antigua de Quang Tri fue testigo de etapas turbulentas de la historia del país, en especial de los intensos combates de 1972. Hoy, su espacio conmemorativo invita a recordar las pérdidas de la guerra y el valor de la paz. Mantenga una actitud respetuosa durante la visita.',
+    },
+  },
+  'truong-son-cemetery': {
+    'zh-CN': {
+      title: '长山烈士陵园',
+      subtitle: '缅怀为国捐躯者的纪念地',
+      narration: '长山烈士陵园安葬着许多在战争期间于长山线路牺牲的人们。群山之间整齐排列的墓碑让人追思逝者并心怀感念。参观时请保持安静与庄重。',
+    },
+    'ko-KR': {
+      title: '쯔엉선 열사 묘지',
+      subtitle: '희생된 이들을 기리는 추모 공간',
+      narration: '쯔엉선 열사 묘지는 전쟁 중 쯔엉선 도로에서 목숨을 잃은 많은 이들이 잠든 곳입니다. 산속에 늘어선 묘역은 희생과 추모의 의미를 되새기게 합니다. 방문 중에는 조용하고 경건한 태도를 지켜 주세요.',
+    },
+    es: {
+      title: 'Cementerio de los Mártires de Truong Son',
+      subtitle: 'Un memorial para quienes perdieron la vida',
+      narration: 'El cementerio de los Mártires de Truong Son es el lugar de descanso de muchas personas que murieron en la ruta de Truong Son durante la guerra. Las filas de tumbas entre las montañas invitan al recuerdo y a la reflexión. Mantenga el silencio y el respeto durante la visita.',
+    },
+  },
+  'cua-tung-beach': {
+    'zh-CN': {
+      title: '炉门海滩',
+      subtitle: '广治海岸的一处宁静角落',
+      narration: '炉门海滩位于广治北部，适合停下脚步欣赏海景与沿岸生活。请留意安全标识，只在指定安全区域游泳，并帮助保持海滩整洁。',
+    },
+    'ko-KR': {
+      title: '끄어뚱 해변',
+      subtitle: '꽝찌 해안의 조용한 쉼터',
+      narration: '끄어뚱은 꽝찌 북부에 있는 해변으로, 바다와 해안의 일상을 바라보며 쉬어 갈 수 있습니다. 현지 안전 표지판을 확인하고 안전 구역에서만 수영하며 해변을 깨끗하게 이용해 주세요.',
+    },
+    es: {
+      title: 'Playa de Cua Tung',
+      subtitle: 'Una pausa tranquila en la costa de Quang Tri',
+      narration: 'Cua Tung es una playa al norte de Quang Tri, un lugar para contemplar el mar y la vida costera. Respete las señales de seguridad, báñese solo en las zonas autorizadas y ayude a mantener limpia la playa.',
+    },
+  },
+  'nuoc-mooc-spring': {
+    'zh-CN': {
+      title: '莫瀑溪',
+      subtitle: '峰牙森林中的清澈溪流',
+      narration: '莫瀑溪位于峰牙地区的石灰岩山与森林之间。清澈的溪水和荫凉的环境为游客提供了一处亲近自然、放松休息的地方。请沿参观路线行走，并遵守景区安全指引。',
+    },
+    'ko-KR': {
+      title: '느억묵 샘',
+      subtitle: '퐁냐 숲속의 맑은 물줄기',
+      narration: '느억묵 샘은 퐁냐 지역의 석회암 언덕과 숲 사이에 자리합니다. 맑은 물과 나무 그늘이 어우러져 자연 속에서 편히 쉬어 갈 수 있습니다. 관람로를 이용하고 현장의 안전 안내를 따라 주세요.',
+    },
+    es: {
+      title: 'Manantial de Nuoc Mooc',
+      subtitle: 'Un arroyo claro en los bosques de Phong Nha',
+      narration: 'El manantial de Nuoc Mooc se encuentra entre las colinas de piedra caliza y los bosques de Phong Nha. Sus aguas claras y sus zonas de sombra ofrecen un descanso tranquilo en la naturaleza. Siga los senderos y las indicaciones de seguridad del lugar.',
+    },
+  },
+  'da-nhay-beach': {
+    'zh-CN': {
+      title: '跳石海滩',
+      subtitle: '广平海岸边的奇石景观',
+      narration: '跳石海滩以广平海岸上形态各异的岩石而闻名。潮汐和海浪会不断改变海岸景色。请小心行走，避开湿滑区域，并遵循海滩的安全指引。',
+    },
+    'ko-KR': {
+      title: '다냐이 해변',
+      subtitle: '꽝빈 해안의 바위 풍경',
+      narration: '다냐이 해변은 꽝빈 해안을 따라 다양한 모양으로 놓인 바위로 유명합니다. 해안 풍경은 조수와 파도에 따라 달라집니다. 바위 위에서는 조심하고 미끄러운 곳을 피하며 현지 안전 안내를 따라 주세요.',
+    },
+    es: {
+      title: 'Playa de Da Nhay',
+      subtitle: 'Formaciones rocosas en la costa de Quang Binh',
+      narration: 'La playa de Da Nhay destaca por sus formaciones rocosas de distintas formas a lo largo de la costa de Quang Binh. El paisaje cambia con las mareas y las olas. Camine con cuidado, evite las zonas resbaladizas y siga las indicaciones de seguridad.',
+    },
+  },
+}
+
+export const places: Place[] = basePlaces.map((place) => {
+  const addedCopy = additionalCopies[place.id]
+  if (!addedCopy) throw new Error(`Missing added-language content for place "${place.id}".`)
+
+  return { ...place, copy: { ...place.copy, ...addedCopy } }
+})
 
 export const findPlace = (id: string) => places.find((place) => place.id === id)
 

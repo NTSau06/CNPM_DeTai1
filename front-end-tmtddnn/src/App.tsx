@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { Bookmark, Compass, Map, MapPinned, Settings2 } from 'lucide-react'
 import { translate } from './i18n'
+import { languages } from './data/places'
 import { useAppStore } from './store'
 import { AppShell } from './components/AppShell'
 
@@ -105,10 +106,9 @@ function LanguagePicker() {
     <label className="language-picker">
       <span className="sr-only">Narration language</span>
       <select value={language} onChange={(event) => setLanguage(event.target.value as typeof language)} aria-label="Narration language">
-        <option value="vi">🇻🇳　VI</option>
-        <option value="en">🇬🇧　EN</option>
-        <option value="ja">🇯🇵　日本</option>
-        <option value="fr">🇫🇷　FR</option>
+        {languages.map((item) => (
+          <option key={item.code} value={item.code}>{item.flag}　{item.native}</option>
+        ))}
       </select>
     </label>
   )

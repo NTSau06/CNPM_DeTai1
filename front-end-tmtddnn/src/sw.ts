@@ -13,9 +13,9 @@ cleanupOutdatedCaches()
 precacheAndRoute(self.__WB_MANIFEST)
 
 registerRoute(
-  ({ url }) => url.origin === 'https://tile.openstreetmap.org',
+  ({ url }) => url.origin === 'https://tile.openstreetmap.de',
   new CacheFirst({
-    cacheName: 'hoi-an-map-tiles-v1',
+    cacheName: 'osm-map-tiles-v2',
     plugins: [new ExpirationPlugin({ maxEntries: 1400, maxAgeSeconds: 60 * 60 * 24 * 30, purgeOnQuotaError: true })],
   }),
 )

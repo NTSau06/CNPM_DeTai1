@@ -6,9 +6,9 @@ export function makeOnlineStyle(): StyleSpecification {
     sources: {
       streets: {
         type: 'raster',
-        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+        tiles: ['https://tile.openstreetmap.de/{z}/{x}/{y}.png'],
         tileSize: 256,
-        attribution: '© OpenStreetMap contributors',
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       },
     },
     layers: [{ id: 'street-tiles', type: 'raster', source: 'streets' }],

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { cachePlaces, deleteOfflineMap, deleteTour, getCachedPlaces, getOfflineMap, getSavedTours, readSetting, saveOfflineMap, saveTour, writeSetting } from './db'
-import { places as bundledPlaces } from './data/places'
+import { languages, places as bundledPlaces } from './data/places'
 import type { Language, OfflineMapPack, Place, SavedTour } from './types'
 
 const placeOrder = new Map(bundledPlaces.map((place, index) => [place.id, index]))
@@ -131,7 +131,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           : bundledPlaces,
         savedTours: tours.reverse(),
         offlineMap: offlineMap ?? null,
-        language: typeof selectedLanguage === 'string' && ['vi', 'en', 'ja', 'fr'].includes(selectedLanguage) ? selectedLanguage as Language : 'vi',
+        language: languages.find((item) => item.code === selectedLanguage)?.code ?? 'vi',
         useOfflineMap: Boolean(offlineMode?.value && offlineMap),
         bootstrapped: true,
       })

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { ArrowDownToLine, Check, FileUp, Globe2, HardDrive, Info, Languages, MapPinned, Radio, Trash2, WifiOff } from 'lucide-react'
 import { PMTiles } from 'pmtiles'
+import { languages } from '../data/places'
 import { translate } from '../i18n'
 import { useAppStore } from '../store'
 import type { OfflineMapPack } from '../types'
@@ -73,18 +74,13 @@ export function SettingsPage() {
         </section>
 
         <section className="setting-card">
-          <div className="setting-card-heading"><div className="setting-icon"><Languages size={20} /></div><span className="setting-tag">4 LANGUAGES</span></div>
+          <div className="setting-card-heading"><div className="setting-icon"><Languages size={20} /></div><span className="setting-tag">{languages.length} LANGUAGES</span></div>
           <h2>{translate(language, 'language')}</h2>
           <p>{translate(language, 'speechDescription')}</p>
           <div className="language-cards">
-            {[
-              ['vi', 'Tiếng Việt', 'VI'],
-              ['en', 'English', 'EN'],
-              ['ja', '日本語', '日本'],
-              ['fr', 'Français', 'FR'],
-            ].map(([code, name, short]) => (
-              <button key={code} className={`language-card${language === code ? ' selected' : ''}`} onClick={() => useAppStore.getState().setLanguage(code as typeof language)}>
-                <span>{short}</span><strong>{name}</strong>{language === code && <Check size={14} />}
+            {languages.map((item) => (
+              <button key={item.code} className={`language-card${language === item.code ? ' selected' : ''}`} onClick={() => useAppStore.getState().setLanguage(item.code)}>
+                <span>{item.native}</span><strong>{item.label}</strong>{language === item.code && <Check size={14} />}
               </button>
             ))}
           </div>
@@ -95,7 +91,7 @@ export function SettingsPage() {
           <h2>{translate(language, 'cacheTitle')}</h2>
           <p>{translate(language, 'cacheDescription')}</p>
           <div className="offline-data-items">
-            <div><span className="data-item-icon"><MapPinned size={16} /></span><span><strong>Quang Tri &amp; Quang Binh</strong><small>Stories in 4 languages</small></span><span className="data-ready">READY</span></div>
+            <div><span className="data-item-icon"><MapPinned size={16} /></span><span><strong>Quang Tri &amp; Quang Binh</strong><small>Stories in {languages.length} languages</small></span><span className="data-ready">READY</span></div>
             <div><span className="data-item-icon"><ArrowDownToLine size={16} /></span><span><strong>Saved walks</strong><small>Stored privately on this device</small></span><span className="data-ready">READY</span></div>
             <div><span className="data-item-icon"><Radio size={16} /></span><span><strong>Voice narration</strong><small>{translate(language, 'speechDescription')}</small></span><span className="data-optional">DEVICE VOICE</span></div>
           </div>
