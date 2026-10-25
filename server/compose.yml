@@ -1,0 +1,106 @@
+services:
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    command: uvicorn api_gateway.main:app --host 0.0.0.0 --port 8000
+    environment:
+      POI_SERVICE_URL: http://poi-service:8001
+      TOUR_SERVICE_URL: http://tour-service:8002
+      NARRATION_SERVICE_URL: http://narration-service:8003
+      ANALYTICS_SERVICE_URL: http://analytics-service:8004
+      CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:19006,http://localhost:8081,http://127.0.0.1:8081
+    ports:
+      - "8000:8000"
+    depends_on:
+      poi-service:
+        condition: service_healthy
+      tour-service:
+        condition: service_healthy
+      narration-service:
+        condition: service_healthy
+      analytics-service:
+        condition: service_healthy
+    restart: unless-stopped
+
+  poi-service:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    command: uvicorn services.poi_service.main:app --host 0.0.0.0 --port 8001
+    environment:
+      POI_DATABASE_PATH: /data/poi-service.sqlite
+    volumes:
+      - poi-data:/data
+    expose:
+      - "8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  tour-service:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    command: uvicorn services.tour_service.main:app --host 0.0.0.0 --port 8002
+    environment:
+      TOUR_DATABASE_PATH: /data/tour-service.sqlite
+      POI_SERVICE_URL: http://poi-service:8001
+    volumes:
+      - tour-data:/data
+    expose:
+      - "8002"
+    depends_on:
+      poi-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  narration-service:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    command: uvicorn services.narration_service.main:app --host 0.0.0.0 --port 8003
+    environment:
+      POI_SERVICE_URL: http://poi-service:8001
+    expose:
+      - "8003"
+    depends_on:
+      poi-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  analytics-service:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    command: uvicorn services.analytics_service.main:app --host 0.0.0.0 --port 8004
+    environment:
+      ANALYTICS_DATABASE_PATH: /data/analytics-service.sqlite
+    volumes:
+      - analytics-data:/data
+    expose:
+      - "8004"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8004/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  poi-data:
+  tour-data:
+  analytics-data:

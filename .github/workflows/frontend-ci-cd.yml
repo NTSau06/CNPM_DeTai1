@@ -4,12 +4,12 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'front-end-tmtddnn/**'
+      - 'clients/frontend/**'
       - '.github/workflows/frontend-ci-cd.yml'
   push:
     branches: [main]
     paths:
-      - 'front-end-tmtddnn/**'
+      - 'clients/frontend/**'
       - '.github/workflows/frontend-ci-cd.yml'
   workflow_dispatch:
 
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: front-end-tmtddnn
+        working-directory: clients/frontend
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: front-end-tmtddnn/package-lock.json
+          cache-dependency-path: clients/frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -61,7 +61,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: front-end-tmtddnn/dist
+          path: clients/frontend/dist
 
   deploy:
     name: Deploy to GitHub Pages

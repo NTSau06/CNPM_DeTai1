@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Quảng Trị",
+    "slug": "quang-tri",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Vị trí được dùng để tự động phát thuyết minh và ghi nhận lượt ghé ẩn danh gần điểm tham quan."
+      }
+    },
+    "android": {
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
+      "adaptiveIcon": {
+        "backgroundColor": "#28483A"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Cho phép Quảng Trị dùng vị trí để tự động thuyết minh và ghi nhận lượt ghé ẩn danh gần điểm tham quan."
+        }
+      ]
+    ]
+  }
+}
