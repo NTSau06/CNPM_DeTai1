@@ -32,7 +32,7 @@ def request(
 
 def main() -> None:
     status, places = request("/places")
-    assert status == 200 and places is not None and places["total"] == 12
+    assert status == 200 and places is not None and places["total"] == 14
     assert set(places["items"][0]["copy"]) == {
         "vi",
         "en",
