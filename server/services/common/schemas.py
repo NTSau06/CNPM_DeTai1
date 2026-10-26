@@ -1,3 +1,4 @@
+"""Định nghĩa các model Pydantic dùng chung giữa backend service."""
 from __future__ import annotations
 
 from typing import Annotated, Literal
@@ -35,6 +36,7 @@ class TourCreate(BaseModel):
     id: UUID | None = None
     place_ids: Annotated[list[str], Field(alias="placeIds", min_length=1, max_length=30)]
     created_at: int | None = Field(default=None, alias="createdAt", ge=0)
+    owner_id: str | None = Field(default=None, alias="ownerId")
 
     @field_validator("place_ids")
     @classmethod

@@ -1,3 +1,4 @@
+"""Tạo ứng dụng Analytics Service và khởi tạo kho SQLite."""
 from __future__ import annotations
 
 import os

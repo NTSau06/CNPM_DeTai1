@@ -1,3 +1,4 @@
+"""Cung cấp API lấy nội dung thuyết minh theo địa điểm và ngôn ngữ."""
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from services.common.errors import ServiceUnavailableError

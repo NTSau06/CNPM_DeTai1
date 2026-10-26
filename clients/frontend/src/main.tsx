@@ -1,3 +1,4 @@
+// Khởi chạy React, router, stylesheet và service worker của ứng dụng web.
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'

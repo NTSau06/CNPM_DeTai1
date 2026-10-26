@@ -1,3 +1,4 @@
+"""Tạo ứng dụng POI Service và khởi tạo danh mục địa điểm ban đầu."""
 from __future__ import annotations
 
 import os

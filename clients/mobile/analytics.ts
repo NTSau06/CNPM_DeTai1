@@ -1,3 +1,4 @@
+// Gọi API thống kê và quản lý mã thiết bị để ghi lượt ghé, đánh giá.
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Crypto from 'expo-crypto'
 

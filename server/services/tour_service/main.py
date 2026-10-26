@@ -1,3 +1,4 @@
+"""Tạo ứng dụng Tour Service, repository và kết nối tới POI Service."""
 from __future__ import annotations
 
 import os

@@ -1,3 +1,4 @@
+// Tạo cấu hình Expo động và nạp EAS project ID khi được thiết lập.
 import type { ExpoConfig, ConfigContext } from 'expo/config'
 
 export default ({ config }: ConfigContext): ExpoConfig => ({

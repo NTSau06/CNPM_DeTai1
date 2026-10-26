@@ -1,3 +1,4 @@
+"""Kiểm tra điểm dừng và tính quãng đường, thời lượng hành trình."""
 from __future__ import annotations
 
 import math
@@ -76,15 +77,16 @@ class TourPlanner:
                 durationMinutes=sum(
                     places_by_id[place_id].duration for place_id in payload.place_ids
                 ),
-            )
+            ),
+            payload.owner_id,
         )
 
-    def list_tours(self) -> TourCollection:
-        items = self.repository.list()
+    def list_tours(self, owner_id: str | None = None) -> TourCollection:
+        items = self.repository.list(owner_id)
         return TourCollection(items=items, total=len(items))
 
-    def delete_tour(self, tour_id: str) -> bool:
-        return self.repository.delete(tour_id)
+    def delete_tour(self, tour_id: str, owner_id: str | None = None) -> bool:
+        return self.repository.delete(tour_id, owner_id)
 
 
 def _haversine_km(

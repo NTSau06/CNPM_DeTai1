@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, Request, Response, status
+"""Cung cấp API tạo, liệt kê và xóa hành trình đã lưu."""
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
 from services.common.errors import PlaceValidationError, ServiceUnavailableError
 from services.common.schemas import Tour, TourCollection, TourCreate
@@ -17,8 +18,11 @@ def health() -> dict[str, str]:
 
 
 @router.get("/internal/v1/tours", response_model=TourCollection)
-def list_tours(request: Request) -> TourCollection:
-    return planner(request).list_tours()
+def list_tours(
+    request: Request,
+    user_id: str = Query(alias="userId", min_length=1),
+) -> TourCollection:
+    return planner(request).list_tours(user_id)
 
 
 @router.post(
@@ -31,9 +35,15 @@ async def create_tour(payload: TourCreate, request: Request) -> Tour:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except ServiceUnavailableError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @router.delete("/internal/v1/tours/{tour_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_tour(tour_id: str, request: Request) -> Response:
-    planner(request).delete_tour(tour_id)
+def delete_tour(
+    tour_id: str,
+    request: Request,
+    user_id: str = Query(alias="userId", min_length=1),
+) -> Response:
+    planner(request).delete_tour(tour_id, user_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

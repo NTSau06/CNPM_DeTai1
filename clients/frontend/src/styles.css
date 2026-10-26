@@ -1,3 +1,4 @@
+/* Kiểu dáng và bố cục dùng chung cho các màn hình web. */
 :root {
   font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
   color: #303c32;
@@ -260,9 +261,6 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .audio-progress::-webkit-slider-thumb { width: 12px; height: 12px; appearance: none; border: 2px solid #fffefa; border-radius: 50%; background: #526d56; box-shadow: 0 0 0 1px #526d56; }
 .audio-progress::-moz-range-thumb { width: 9px; height: 9px; border: 2px solid #fffefa; border-radius: 50%; background: #526d56; box-shadow: 0 0 0 1px #526d56; }
 .audio-progress:focus-visible { outline: 2px solid #bf865f; outline-offset: 4px; }
-.audio-transcript { position: relative; max-height: 148px; overflow-y: auto; overscroll-behavior: contain; margin-top: 12px; padding: 9px 11px; border: 1px solid #ece9df; border-left: 2px solid #d8d5c8; border-radius: 5px; background: #faf9f5; scroll-behavior: smooth; }
-.audio-transcript-line { margin: 0; padding: 5px 7px; border-radius: 4px; color: #87897f; font-family: var(--serif); font-size: 11px; line-height: 1.65; transition: color .18s ease, background-color .18s ease; }
-.audio-transcript-line.active { color: #354b3c; background: #e8ece4; box-shadow: inset 2px 0 #71856f; }
 .play-button, .route-button { height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 4px; font-size: 9px; font-weight: 700; }
 .play-button { padding: 0 13px; color: #fffdfa; background: #485f4b; }
 .play-button:hover { background: #354a39; }
@@ -341,8 +339,6 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .auth-heading h1, .user-page-heading h1 { margin: 7px 0 5px; color: #354b3c; font-family: var(--serif); font-size: 27px; font-weight: 500; }
 .auth-heading p, .user-page-heading p { margin: 0; color: #85887e; font-size: 11px; line-height: 1.6; }
 .preview-notice { margin: 17px 0; padding: 10px 12px; border: 1px solid #e9ddc6; border-radius: 5px; color: #806844; background: #faf5e9; font-size: 10px; line-height: 1.55; }
-.google-preview-button { width: 100%; height: 39px; display: flex; align-items: center; justify-content: center; gap: 9px; border: 1px solid #e4e1d8; border-radius: 5px; color: #4f5d52; background: white; font-size: 11px; font-weight: 600; }
-.google-preview-button:hover { background: #f8f7f2; }
 .auth-divider { display: flex; align-items: center; gap: 12px; margin: 17px 0; color: #a0a094; font-size: 9px; }
 .auth-divider:before, .auth-divider:after { height: 1px; flex: 1; content: ''; background: #ece9e1; }
 .user-form { display: grid; gap: 12px; }

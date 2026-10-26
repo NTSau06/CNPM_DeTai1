@@ -1,3 +1,4 @@
+// Hiển thị số liệu địa điểm và biểu mẫu gửi/xem đánh giá từ backend.
 import { useEffect, useState } from 'react'
 import { LoaderCircle, Star } from 'lucide-react'
 import { getPlaceAnalytics, getPlaceRatings, getVisitorId, submitPlaceRating } from '../api'

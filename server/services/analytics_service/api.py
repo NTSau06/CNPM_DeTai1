@@ -1,3 +1,4 @@
+"""Định nghĩa API nội bộ để ghi lượt ghé và quản lý thống kê."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Request

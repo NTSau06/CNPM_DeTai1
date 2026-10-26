@@ -1,0 +1,1 @@
+"""Service quản lý danh mục và nội dung địa điểm."""

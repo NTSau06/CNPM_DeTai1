@@ -1,3 +1,4 @@
+// Chọn trải nghiệm máy tính/điện thoại và tạo mã QR để mở trên điện thoại.
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, Map, Monitor, QrCode, Smartphone } from 'lucide-react'
 import QRCode from 'qrcode'

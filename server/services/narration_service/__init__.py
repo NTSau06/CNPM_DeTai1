@@ -1,0 +1,1 @@
+"""Service cung cấp lời thuyết minh địa điểm theo ngôn ngữ."""

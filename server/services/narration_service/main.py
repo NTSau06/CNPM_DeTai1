@@ -1,3 +1,4 @@
+"""Tạo ứng dụng Narration Service và cấu hình kết nối tới POI Service."""
 from __future__ import annotations
 
 import os

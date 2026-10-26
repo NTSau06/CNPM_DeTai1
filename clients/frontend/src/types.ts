@@ -1,3 +1,4 @@
+// Kiểu dữ liệu dùng chung cho địa điểm, hành trình, hồ sơ và gói ngoại tuyến.
 export type Language = 'vi' | 'en' | 'ja' | 'fr' | 'zh-CN' | 'ko-KR' | 'es'
 export type Category = 'landmark' | 'food' | 'craft' | 'rest'
 
@@ -38,6 +39,7 @@ export interface SavedTour {
 }
 
 export interface UserProfile {
+  id: string
   fullName: string
   email: string
   phone: string

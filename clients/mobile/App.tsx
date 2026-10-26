@@ -1,3 +1,4 @@
+// Màn hình chính React Native cho khám phá bản đồ, GPS và thuyết minh.
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Crypto from 'expo-crypto'
 import * as Location from 'expo-location'
@@ -7,6 +8,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   ActivityIndicator,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -41,7 +45,8 @@ type Collection<T> = { items: T[]; total: number }
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 const PLACES_KEY = 'quang-tri:places:v1'
-const TOURS_KEY = 'quang-tri:tours:v1'
+const AUTH_KEY = 'quang-tri:auth-token:v1'
+const TOURS_KEY = 'quang-tri:tours:v2'
 const RETIRED_PLACE_IDS = new Set(['truong-son-cemetery'])
 const locales: Language[] = ['vi', 'en', 'ja', 'fr', 'zh-CN', 'ko-KR', 'es']
 const languages: { code: Language; label: string }[] = [
@@ -72,12 +77,17 @@ const words: Record<Language, Record<string, string>> = {
   es: { kicker: 'CAMINA DESPACIO Y ESCUCHA', intro: 'Un viaje tranquilo entre patrimonio y costa.', search: 'Busca un monumento o una cueva…', places: 'Lugares para descubrir', listen: 'Escuchar la historia', stop: 'Detener', add: 'Añadir a mi ruta', added: 'Añadido', walk: 'Activar guía automática', walking: 'Guía automática activada', save: 'Guardar este paseo', saved: 'Paseo guardado', empty: 'Elige algunas paradas para empezar.', offline: 'Usando los lugares guardados en este dispositivo.', loading: 'Cargando lugares…', error: 'Sin conexión; se muestran los lugares guardados.' },
 }
 
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
+async function api<T>(path: string, init?: RequestInit, token?: string): Promise<T> {
   let response: Response
   try {
     response = await fetch(`${API_BASE}${path}`, {
       ...init,
-      headers: { Accept: 'application/json', ...(init?.body ? { 'Content-Type': 'application/json' } : {}), ...init?.headers },
+      headers: {
+        Accept: 'application/json',
+        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init?.headers,
+      },
     })
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : 'Backend connection failed.')
@@ -88,6 +98,14 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
+}
+
+function tourStorageKey(userId: string) {
+  return `${TOURS_KEY}:${userId}`
+}
+
+function draftTourStorageKey(userId: string) {
+  return `quang-tri:draft-tour:${userId}`
 }
 
 function distanceMeters(
@@ -108,6 +126,19 @@ export default function App() {
   const [places, setPlaces] = useState<Place[]>([])
   const [tours, setTours] = useState<Tour[]>([])
   const [routeIds, setRouteIds] = useState<string[]>([])
+  const [activeRouteTourId, setActiveRouteTourId] = useState<string | null>(null)
+  const [routeSaving, setRouteSaving] = useState(false)
+  const [authToken, setAuthToken] = useState<string | null>(null)
+  const [account, setAccount] = useState<{ id: string; fullName: string; email: string } | null>(null)
+  const [authVisible, setAuthVisible] = useState(false)
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
+  const [authName, setAuthName] = useState('')
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authConfirmPassword, setAuthConfirmPassword] = useState('')
+  const [authBusy, setAuthBusy] = useState(false)
+  const [authError, setAuthError] = useState('')
+  const [pendingPlaceId, setPendingPlaceId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState('')
   const [query, setQuery] = useState('')
   const [busy, setBusy] = useState(true)
@@ -117,6 +148,7 @@ export default function App() {
   const [offlineGuideSaved, setOfflineGuideSaved] = useState(false)
   const [vietnamHour, setVietnamHour] = useState(getVietnamHour)
   const watcher = useRef<Location.LocationSubscription | null>(null)
+  const routeSavingRef = useRef(false)
   const spokenPlaces = useRef(new Set<string>())
   const recordedVisits = useRef(new Set<string>())
   const languageRef = useRef(language)
@@ -171,18 +203,36 @@ export default function App() {
 
   useEffect(() => {
     void refreshPlaces()
-    AsyncStorage.getItem(TOURS_KEY).then((cached) => {
-      if (cached) setTours(JSON.parse(cached) as Tour[])
-    }).catch(() => setMessage(words[languageRef.current].error))
-    api<Collection<Tour>>('/tours').then(async (result) => {
-      const cached = await AsyncStorage.getItem(TOURS_KEY)
-      const localTours = cached ? JSON.parse(cached) as Tour[] : []
-      const remoteIds = new Set(result.items.map((tour) => tour.id))
-      const merged = [...result.items, ...localTours.filter((tour) => !remoteIds.has(tour.id))]
-      setTours(merged)
-      await AsyncStorage.setItem(TOURS_KEY, JSON.stringify(merged))
+    let active = true
+    void AsyncStorage.getItem(AUTH_KEY).then(async (token) => {
+      if (!token) return
+      try {
+        const user = await api<{ id: string; fullName: string; email: string }>('/auth/me', undefined, token)
+        const result = await api<Collection<Tour>>('/tours', undefined, token)
+        if (!active) return
+        const draftId = await AsyncStorage.getItem(draftTourStorageKey(user.id))
+        const activeDraft = result.items.find((tour) => tour.id === draftId)
+        setAuthToken(token)
+        setAccount(user)
+        setTours(result.items)
+        setActiveRouteTourId(activeDraft?.id ?? null)
+        setRouteIds(activeDraft?.placeIds ?? [])
+        await AsyncStorage.setItem(tourStorageKey(user.id), JSON.stringify(result.items))
+      } catch (error) {
+        if (!active) return
+        if (error instanceof Error && error.message.includes('(401)')) {
+          await AsyncStorage.removeItem(AUTH_KEY)
+          setAuthToken(null)
+          setAccount(null)
+          setTours([])
+          setActiveRouteTourId(null)
+          setRouteIds([])
+        }
+        setMessage(words[languageRef.current].error)
+      }
     }).catch(() => setMessage(words[languageRef.current].error))
     return () => {
+      active = false
       watcher.current?.remove()
       Speech.stop()
     }
@@ -300,58 +350,158 @@ export default function App() {
   }, [beginWalk, stopWalk, walking])
 
   const toggleRoute = (placeId: string) => {
-    setRouteIds((current) => current.includes(placeId)
-      ? current.filter((id) => id !== placeId)
-      : [...current, placeId])
+    if (!account) {
+      setPendingPlaceId(placeId)
+      setAuthMode('login')
+      setAuthVisible(true)
+      return
+    }
+    const nextRouteIds = routeIds.includes(placeId)
+      ? routeIds.filter((id) => id !== placeId)
+      : [...routeIds, placeId]
+    void persistRoute(nextRouteIds)
   }
 
-  const saveTour = async () => {
-    if (routeIds.length === 0) {
-      setMessage(currentLanguage.empty)
-      return
-    }
-    const tour: Tour = {
-      id: Crypto.randomUUID(),
-      placeIds: routeIds,
-      createdAt: Date.now(),
-      distanceKm: 0,
-      durationMinutes: routeIds.reduce((total, id) =>
-        total + (places.find((place) => place.id === id)?.duration ?? 0), 0),
-    }
-    const localTours = [tour, ...tours.filter((item) => item.id !== tour.id)]
-    setTours(localTours)
+  const persistRoute = async (
+    nextRouteIds: string[],
+    owner = account,
+    token = authToken,
+    existingTours = tours,
+    draftId = activeRouteTourId,
+  ) => {
+    if (!owner || !token || routeSavingRef.current) return false
+    routeSavingRef.current = true
+    setRouteSaving(true)
     try {
-      await AsyncStorage.setItem(TOURS_KEY, JSON.stringify(localTours))
-    } catch {
-      setMessage(currentLanguage.error)
-      return
-    }
-    setRouteIds([])
-    try {
+      if (nextRouteIds.length === 0) {
+        if (draftId) {
+          await api<void>(`/tours/${encodeURIComponent(draftId)}`, { method: 'DELETE' }, token)
+          const updated = existingTours.filter((tour) => tour.id !== draftId)
+          setTours(updated)
+          setActiveRouteTourId(null)
+          setRouteIds([])
+          await AsyncStorage.setItem(tourStorageKey(owner.id), JSON.stringify(updated))
+          await AsyncStorage.removeItem(draftTourStorageKey(owner.id))
+        }
+        if (!draftId) setRouteIds([])
+        setMessage(language === 'vi' ? 'Đã cập nhật hành trình đã lưu.' : 'Saved walk updated.')
+        return true
+      }
+      const tour: Tour = {
+        id: draftId ?? Crypto.randomUUID(),
+        placeIds: nextRouteIds,
+        createdAt: existingTours.find((item) => item.id === draftId)?.createdAt ?? Date.now(),
+        distanceKm: nextRouteIds.slice(1).reduce((total, id, index) => {
+          const first = places.find((place) => place.id === nextRouteIds[index])
+          const second = places.find((place) => place.id === id)
+          return first && second ? total + distanceMeters(first.coordinates, second.coordinates) / 1000 : total
+        }, 0),
+        durationMinutes: nextRouteIds.reduce((total, id) =>
+          total + (places.find((place) => place.id === id)?.duration ?? 0), 0),
+      }
       const saved = await api<Tour>('/tours', {
         method: 'POST',
         body: JSON.stringify({ id: tour.id, placeIds: tour.placeIds, createdAt: tour.createdAt }),
-      })
-      const updated = [saved, ...tours.filter((item) => item.id !== saved.id)]
+      }, token)
+      const updated = [saved, ...existingTours.filter((item) => item.id !== saved.id)]
       setTours(updated)
-      await AsyncStorage.setItem(TOURS_KEY, JSON.stringify(updated))
-      setMessage(currentLanguage.saved)
+      setRouteIds(nextRouteIds)
+      setActiveRouteTourId(saved.id)
+      await AsyncStorage.setItem(tourStorageKey(owner.id), JSON.stringify(updated))
+      await AsyncStorage.setItem(draftTourStorageKey(owner.id), saved.id)
+      setMessage(language === 'vi' ? 'Đã tự lưu vào hành trình của bạn.' : 'Automatically saved to your walk.')
+      return true
     } catch {
       setMessage(currentLanguage.offline)
+      return false
+    } finally {
+      routeSavingRef.current = false
+      setRouteSaving(false)
+    }
+  }
+
+  const authenticate = async () => {
+    setAuthError('')
+    if (authMode === 'register' && !authName.trim()) {
+      setAuthError(language === 'vi' ? 'Vui lòng nhập họ và tên.' : 'Enter your name.')
+      return
+    }
+    if (authPassword.length < 8) {
+      setAuthError(language === 'vi' ? 'Mật khẩu cần có ít nhất 8 ký tự.' : 'Password must be at least 8 characters.')
+      return
+    }
+    if (authMode === 'register' && authPassword !== authConfirmPassword) {
+      setAuthError(language === 'vi' ? 'Mật khẩu xác nhận chưa khớp.' : 'Passwords do not match.')
+      return
+    }
+    setAuthBusy(true)
+    try {
+      const result = await api<{
+        token: string
+        user: { id: string; fullName: string; email: string }
+      }>(`/auth/${authMode}`, {
+        method: 'POST',
+        body: JSON.stringify({
+          ...(authMode === 'register' ? { fullName: authName.trim() } : {}),
+          email: authEmail.trim().toLowerCase(),
+          password: authPassword,
+        }),
+      })
+      const tourResult = await api<Collection<Tour>>('/tours', undefined, result.token)
+      setAuthToken(result.token)
+      setAccount(result.user)
+      setTours(tourResult.items)
+      await AsyncStorage.setItem(AUTH_KEY, result.token)
+      await AsyncStorage.setItem(tourStorageKey(result.user.id), JSON.stringify(tourResult.items))
+      const draftId = await AsyncStorage.getItem(draftTourStorageKey(result.user.id))
+      const activeDraft = tourResult.items.find((tour) => tour.id === draftId)
+      setActiveRouteTourId(activeDraft?.id ?? null)
+      setRouteIds(activeDraft?.placeIds ?? [])
+      if (pendingPlaceId) {
+        const nextRouteIds = (activeDraft?.placeIds ?? []).includes(pendingPlaceId)
+          ? activeDraft?.placeIds ?? []
+          : [...(activeDraft?.placeIds ?? []), pendingPlaceId]
+        await persistRoute(nextRouteIds, result.user, result.token, tourResult.items, activeDraft?.id ?? null)
+      }
+      setPendingPlaceId(null)
+      setAuthVisible(false)
+      setAuthPassword('')
+      setAuthConfirmPassword('')
+      setMessage('')
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : currentLanguage.error)
+    } finally {
+      setAuthBusy(false)
+    }
+  }
+
+  const signOut = async () => {
+    const token = authToken
+    setAuthToken(null)
+    setAccount(null)
+    setTours([])
+    setRouteIds([])
+    setActiveRouteTourId(null)
+    try {
+      await AsyncStorage.removeItem(AUTH_KEY)
+      if (token) await api<void>('/auth/logout', { method: 'POST' }, token)
+    } catch {
+      setMessage(currentLanguage.error)
     }
   }
 
   const deleteTour = async (id: string) => {
+    if (!account || !authToken) return
     const updated = tours.filter((tour) => tour.id !== id)
-    setTours(updated)
     try {
-      await AsyncStorage.setItem(TOURS_KEY, JSON.stringify(updated))
-    } catch {
-      setMessage(currentLanguage.error)
-      return
-    }
-    try {
-      await api<void>(`/tours/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      await api<void>(`/tours/${encodeURIComponent(id)}`, { method: 'DELETE' }, authToken)
+      setTours(updated)
+      if (activeRouteTourId === id) {
+        setActiveRouteTourId(null)
+        setRouteIds([])
+        await AsyncStorage.removeItem(draftTourStorageKey(account.id))
+      }
+      await AsyncStorage.setItem(tourStorageKey(account.id), JSON.stringify(updated))
     } catch {
       setMessage(currentLanguage.error)
     }
@@ -389,7 +539,29 @@ export default function App() {
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
         <View style={styles.topbar}>
           <Text style={styles.brand}>QUẢNG TRỊ</Text>
-          <Text style={styles.brandMark}>✳</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              if (account) {
+                Alert.alert(
+                  language === 'vi' ? 'Tài khoản' : 'Account',
+                  account.fullName,
+                  [
+                    { text: language === 'vi' ? 'Hủy' : 'Cancel', style: 'cancel' },
+                    { text: language === 'vi' ? 'Đăng xuất' : 'Sign out', onPress: () => { void signOut() } },
+                  ],
+                )
+              } else {
+                setAuthMode('login')
+                setAuthVisible(true)
+              }
+            }}
+            style={styles.accountButton}
+          >
+            <Text style={styles.accountButtonText}>
+              {account ? account.fullName : language === 'vi' ? 'Đăng nhập' : 'Sign in'}
+            </Text>
+          </Pressable>
         </View>
 
         <View style={styles.hero}>
@@ -450,7 +622,7 @@ export default function App() {
                   <Pressable accessibilityRole="button" onPress={() => playing && active ? (Speech.stop(), setPlaying(false)) : void playPlace(place)} style={styles.listenButton}>
                     <Text style={styles.listenButtonText}>{playing && active ? `■ ${currentLanguage.stop}` : `▶ ${currentLanguage.listen}`}</Text>
                   </Pressable>
-                  <Pressable accessibilityRole="button" onPress={() => toggleRoute(place.id)} style={styles.addButton}>
+                  <Pressable accessibilityRole="button" disabled={routeSaving} onPress={() => toggleRoute(place.id)} style={styles.addButton}>
                     <Text style={styles.addButtonText}>{inRoute ? `✓ ${currentLanguage.added}` : `+ ${currentLanguage.add}`}</Text>
                   </Pressable>
                 </View>
@@ -498,9 +670,7 @@ export default function App() {
         {routeIds.length > 0 && (
           <View style={styles.tourCard}>
             <Text style={styles.tourTitle}>{routeIds.length} {currentLanguage.places.toLocaleLowerCase()}</Text>
-            <Pressable accessibilityRole="button" onPress={() => void saveTour()} style={styles.saveButton}>
-              <Text style={styles.saveButtonText}>{currentLanguage.save} →</Text>
-            </Pressable>
+            <Text style={styles.tourSavedText}>{language === 'vi' ? 'Đã tự lưu vào hành trình đã lưu.' : 'Automatically saved to your saved walks.'}</Text>
           </View>
         )}
 
@@ -518,6 +688,104 @@ export default function App() {
         ))}
         <Text style={styles.footer}>QUẢNG TRỊ · QUẢNG BÌNH{'\n'}A SMALL GUIDE TO SLOW TRAVEL</Text>
       </ScrollView>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => {
+          setAuthVisible(false)
+          setPendingPlaceId(null)
+        }}
+        transparent
+        visible={authVisible}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.authOverlay}
+        >
+          <View style={styles.authCard}>
+            <View style={styles.authHeader}>
+              <Text style={styles.authTitle}>
+                {authMode === 'register'
+                  ? language === 'vi' ? 'Tạo tài khoản' : 'Create account'
+                  : language === 'vi' ? 'Đăng nhập để thêm hành trình' : 'Sign in to add a walk'}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  setAuthVisible(false)
+                  setPendingPlaceId(null)
+                }}
+              >
+                <Text style={styles.authClose}>×</Text>
+              </Pressable>
+            </View>
+            {authMode === 'register' && (
+              <TextInput
+                autoComplete="name"
+                autoCapitalize="words"
+                onChangeText={setAuthName}
+                placeholder={language === 'vi' ? 'Họ và tên' : 'Full name'}
+                style={styles.authInput}
+                value={authName}
+              />
+            )}
+            <TextInput
+              autoComplete="email"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              onChangeText={setAuthEmail}
+              placeholder="Email"
+              style={styles.authInput}
+              value={authEmail}
+            />
+            <TextInput
+              autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
+              onChangeText={setAuthPassword}
+              placeholder={language === 'vi' ? 'Mật khẩu (ít nhất 8 ký tự)' : 'Password (at least 8 characters)'}
+              secureTextEntry
+              style={styles.authInput}
+              value={authPassword}
+            />
+            {authMode === 'register' && (
+              <TextInput
+                autoComplete="new-password"
+                onChangeText={setAuthConfirmPassword}
+                placeholder={language === 'vi' ? 'Xác nhận mật khẩu' : 'Confirm password'}
+                secureTextEntry
+                style={styles.authInput}
+                value={authConfirmPassword}
+              />
+            )}
+            {authError ? <Text accessibilityRole="alert" style={styles.authError}>{authError}</Text> : null}
+            <Pressable
+              accessibilityRole="button"
+              disabled={authBusy}
+              onPress={() => void authenticate()}
+              style={[styles.authSubmit, authBusy && styles.authSubmitDisabled]}
+            >
+              <Text style={styles.authSubmitText}>
+                {authBusy
+                  ? language === 'vi' ? 'Đang xử lý…' : 'Please wait…'
+                  : authMode === 'register'
+                    ? language === 'vi' ? 'Tạo tài khoản' : 'Create account'
+                    : language === 'vi' ? 'Đăng nhập' : 'Sign in'}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setAuthMode((mode) => mode === 'login' ? 'register' : 'login')
+                setAuthError('')
+              }}
+            >
+              <Text style={styles.authSwitch}>
+                {authMode === 'register'
+                  ? language === 'vi' ? 'Đã có tài khoản? Đăng nhập' : 'Already registered? Sign in'
+                  : language === 'vi' ? 'Chưa có tài khoản? Đăng ký' : 'New here? Create an account'}
+              </Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -527,7 +795,19 @@ const styles = StyleSheet.create({
   page: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 48 },
   topbar: { height: 62, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brand: { color: '#28483A', fontSize: 13, fontWeight: '800', letterSpacing: 2 },
-  brandMark: { color: '#B96D4C', fontSize: 23 },
+  accountButton: { maxWidth: 190, paddingHorizontal: 13, paddingVertical: 9, borderRadius: 99, backgroundColor: '#E6EDE3' },
+  accountButtonText: { color: '#28483A', fontSize: 11, fontWeight: '800' },
+  authOverlay: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: '#14231DB8' },
+  authCard: { width: '100%', maxWidth: 460, alignSelf: 'center', padding: 22, borderRadius: 22, backgroundColor: '#FFFDF7' },
+  authHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  authTitle: { flex: 1, color: '#28483A', fontSize: 19, fontWeight: '800' },
+  authClose: { color: '#68776D', fontSize: 28, lineHeight: 30, paddingHorizontal: 6 },
+  authInput: { height: 48, marginTop: 10, paddingHorizontal: 13, borderWidth: 1, borderColor: '#D7DED3', borderRadius: 12, color: '#24352D', backgroundColor: '#FFFFFF' },
+  authError: { color: '#9B3F32', fontSize: 12, marginTop: 11 },
+  authSubmit: { marginTop: 15, padding: 13, borderRadius: 12, alignItems: 'center', backgroundColor: '#28483A' },
+  authSubmitDisabled: { opacity: 0.6 },
+  authSubmitText: { color: '#FFFDF7', fontSize: 13, fontWeight: '800' },
+  authSwitch: { marginTop: 16, textAlign: 'center', color: '#40584A', fontSize: 12, fontWeight: '700' },
   hero: { minHeight: 255, overflow: 'hidden', borderRadius: 26, backgroundColor: '#28483A', padding: 24, position: 'relative', justifyContent: 'flex-start' },
   eyebrow: { color: '#DDBA96', fontSize: 10, fontWeight: '800', letterSpacing: 1.7 },
   heroTitle: { color: '#FFFDF7', fontSize: 43, fontWeight: '800', letterSpacing: -1.5, marginTop: 15 },
@@ -571,6 +851,7 @@ const styles = StyleSheet.create({
   walkSubtitle: { color: '#68776D', fontSize: 11, marginTop: 4 },
   tourCard: { marginTop: 12, padding: 17, borderRadius: 18, backgroundColor: '#F3E5D8' },
   tourTitle: { color: '#28483A', fontWeight: '800', fontSize: 14 },
+  tourSavedText: { color: '#52685A', fontSize: 12, marginTop: 8 },
   saveButton: { marginTop: 11, padding: 12, borderRadius: 12, backgroundColor: '#28483A', alignItems: 'center' },
   saveButtonText: { color: '#FFFDF7', fontSize: 13, fontWeight: '800' },
   message: { marginTop: 14, padding: 12, borderRadius: 12, backgroundColor: '#FFF4DC', color: '#765633', fontSize: 12 },

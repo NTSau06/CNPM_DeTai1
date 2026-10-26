@@ -1,4 +1,5 @@
-import type { Language, Place, SavedTour } from './types'
+// Định nghĩa các lời gọi tới backend và chuyển đổi dữ liệu API cho giao diện.
+import type { Language, Place, SavedTour, UserProfile } from './types'
 
 interface ApiPlace {
   id: string
@@ -12,6 +13,11 @@ interface ApiPlace {
 interface ApiCollection<T> {
   items: T[]
   total: number
+}
+
+export interface AuthResponse {
+  token: string
+  user: UserProfile
 }
 
 export interface PlaceRatingSummary {
@@ -40,7 +46,7 @@ export class BackendApiError extends Error {
 
 const baseUrl = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '')
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, token?: string): Promise<T> {
   let response: Response
   try {
     response = await fetch(`${baseUrl}${path}`, {
@@ -48,6 +54,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       headers: {
         Accept: 'application/json',
         ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init?.headers,
       },
     })
@@ -87,12 +94,49 @@ export async function fetchPlaces(): Promise<ApiPlace[]> {
   return result.items
 }
 
-export async function fetchTours(): Promise<SavedTour[]> {
-  const result = await request<ApiCollection<SavedTour>>('/tours')
+export async function registerAccount(
+  fullName: string,
+  email: string,
+  phone: string,
+  password: string,
+): Promise<AuthResponse> {
+  return request<AuthResponse>('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ fullName, email, phone, password }),
+  })
+}
+
+export async function loginAccount(email: string, password: string): Promise<AuthResponse> {
+  return request<AuthResponse>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  })
+}
+
+export async function fetchCurrentUser(token: string): Promise<UserProfile> {
+  return request<UserProfile>('/auth/me', undefined, token)
+}
+
+export async function logoutAccount(token: string): Promise<void> {
+  await request<void>('/auth/logout', { method: 'POST' }, token)
+}
+
+export function getStoredAuthToken() {
+  return typeof localStorage === 'undefined' ? null : localStorage.getItem('quang-tri:auth-token:v1')
+}
+
+export function storeAuthToken(token: string | null) {
+  if (typeof localStorage === 'undefined') return
+  if (token) localStorage.setItem('quang-tri:auth-token:v1', token)
+  else localStorage.removeItem('quang-tri:auth-token:v1')
+}
+
+export async function fetchTours(token: string): Promise<SavedTour[]> {
+  const result = await request<ApiCollection<SavedTour>>('/tours', undefined, token)
   return result.items
 }
 
-export async function createTour(tour: SavedTour): Promise<SavedTour> {
+export async function createTour(tour: SavedTour, token: string): Promise<SavedTour> {
   return request<SavedTour>('/tours', {
     method: 'POST',
     body: JSON.stringify({
@@ -100,11 +144,11 @@ export async function createTour(tour: SavedTour): Promise<SavedTour> {
       placeIds: tour.placeIds,
       createdAt: tour.createdAt,
     }),
-  })
+  }, token)
 }
 
-export async function deleteRemoteTour(id: string): Promise<void> {
-  await request<void>(`/tours/${encodeURIComponent(id)}`, { method: 'DELETE' })
+export async function deleteRemoteTour(id: string, token: string): Promise<void> {
+  await request<void>(`/tours/${encodeURIComponent(id)}`, { method: 'DELETE' }, token)
 }
 
 export async function getVisitorId(): Promise<string> {

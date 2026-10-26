@@ -1,0 +1,1 @@
+"""Service lưu lượt ghé, đánh giá và thống kê theo địa điểm."""

@@ -1,0 +1,1 @@
+"""Schema và lỗi nghiệp vụ dùng chung giữa các backend service."""

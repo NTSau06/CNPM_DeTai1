@@ -1,0 +1,1 @@
+"""Gói gốc chứa API Gateway, các backend service và kiểm thử."""

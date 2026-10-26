@@ -1,3 +1,4 @@
+"""Cung cấp API nội bộ để liệt kê, lấy và kiểm tra địa điểm."""
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from services.common.schemas import (

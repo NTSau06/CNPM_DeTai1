@@ -1,3 +1,4 @@
+// Định nghĩa nguồn dữ liệu và kiểu hiển thị các lớp bản đồ.
 import type { StyleSpecification } from 'maplibre-gl'
 
 export function makeOnlineStyle(): StyleSpecification {

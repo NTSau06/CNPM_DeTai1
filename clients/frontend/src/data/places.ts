@@ -1,3 +1,4 @@
+// Dữ liệu địa điểm mặc định cùng danh sách ngôn ngữ và hàm tra cứu.
 import type { Category, Language, Place } from '../types'
 import { placeDetails } from './placeDetails'
 

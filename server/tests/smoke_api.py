@@ -1,3 +1,4 @@
+"""Kiểm tra tích hợp API qua Gateway khi các service đang chạy."""
 from __future__ import annotations
 
 import json
@@ -13,13 +14,17 @@ def request(
     path: str,
     method: str = "GET",
     payload: dict | None = None,
+    token: str | None = None,
 ) -> tuple[int, dict | None]:
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
     request_message = urllib.request.Request(
         f"{BASE_URL}{path}",
         data=data,
         method=method,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            **({"Authorization": f"Bearer {token}"} if token else {}),
+        },
     )
     try:
         with urllib.request.urlopen(request_message, timeout=10) as response:
@@ -47,6 +52,16 @@ def main() -> None:
     assert status == 200 and narration is not None
     assert narration["locale"] == "ja" and narration["speechLocale"] == "ja-JP"
 
+    email = f"smoke-{uuid.uuid4()}@example.com"
+    status, account = request(
+        "/auth/register",
+        "POST",
+        {"fullName": "Smoke Test", "email": email, "password": "Smoke-test-123"},
+    )
+    assert status == 201 and account is not None
+    token = account["token"]
+    status, _ = request("/tours")
+    assert status == 401
     tour_id = str(uuid.uuid4())
     status, tour = request(
         "/tours",
@@ -56,13 +71,16 @@ def main() -> None:
             "createdAt": 1_800_000_000_000,
             "placeIds": ["phong-nha-cave", "thien-duong-cave"],
         },
+        token,
     )
     assert status == 201 and tour is not None
     assert tour["id"] == tour_id and tour["distanceKm"] > 0
     assert tour["durationMinutes"] == 12
-    status, _ = request(f"/tours/{tour_id}", "DELETE")
+    status, user_tours = request("/tours", token=token)
+    assert status == 200 and user_tours is not None and user_tours["total"] == 1
+    status, _ = request(f"/tours/{tour_id}", "DELETE", token=token)
     assert status == 204
-    status, error = request("/tours", "POST", {"placeIds": ["not-a-place"]})
+    status, error = request("/tours", "POST", {"placeIds": ["not-a-place"]}, token)
     assert status == 422 and error is not None
 
     place = places["items"][0]

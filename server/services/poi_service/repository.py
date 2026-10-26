@@ -1,3 +1,4 @@
+"""Nạp, cập nhật và truy vấn danh mục địa điểm lưu trong SQLite."""
 from __future__ import annotations
 
 import json

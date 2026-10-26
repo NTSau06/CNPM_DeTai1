@@ -1,3 +1,4 @@
+# Khởi động/dừng các FastAPI service cục bộ trên Windows và quản lý PID, log.
 param(
   [Parameter(Mandatory = $true, Position = 0)]
   [ValidateSet("start", "stop")]

@@ -1,3 +1,4 @@
+// Cấu hình Vite, React, PWA và proxy API dùng trong môi trường phát triển.
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -11,7 +12,7 @@ export default defineConfig({
       filename: 'sw.ts',
       registerType: 'autoUpdate',
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,svg,webp,png,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,webp,png,woff2,mp3}'],
       },
       manifest: {
         name: 'Quảng Trị — Khám phá Quảng Bình',

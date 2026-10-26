@@ -1,3 +1,4 @@
+// Kết nối các trang, điều hướng chính và trạng thái dùng chung của ứng dụng web.
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AlertCircle, Bookmark, ChevronDown, Compass, Map, MapPinned, Menu, Settings2, X } from 'lucide-react'

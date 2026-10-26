@@ -1,9 +1,11 @@
+// Trình bày nội dung thuyết minh và điều khiển hướng dẫn đi bộ tại địa điểm.
 import { useEffect, useState } from 'react'
 import { Headphones, Plus, Radio } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { languages } from '../data/places'
 import { translate } from '../i18n'
 import { getOfflinePlacePack } from '../db'
-import { getNarrationText, stopSpeaking } from '../speech'
+import { getNarrationAudioUrl, getNarrationText, stopSpeaking } from '../speech'
 import { useAppStore } from '../store'
 import type { Language, Place } from '../types'
 import { AudioPlayer } from './AudioPlayer'
@@ -17,15 +19,36 @@ interface NarrationCardProps {
 }
 
 export function NarrationCard({ place, language, distanceMeters, onStartWalk, onStopWalk }: NarrationCardProps) {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [playing, setPlaying] = useState(false)
   const [audioLanguage, setAudioLanguage] = useState(language)
   const [savedNarration, setSavedNarration] = useState<string | null>(null)
   const autoNarration = useAppStore((state) => state.autoNarration)
+  const currentUser = useAppStore((state) => state.currentUser)
   const routeIds = useAppStore((state) => state.routeIds)
-  const toggleRoutePlace = useAppStore((state) => state.toggleRoutePlace)
+  const isSavingRoute = useAppStore((state) => state.isSavingRoute)
+  const setRoutePlace = useAppStore((state) => state.setRoutePlace)
   const isInRoute = routeIds.includes(place.id)
   const audioCopy = place.copy[audioLanguage] ?? place.copy.vi
-  const audioText = savedNarration ?? getNarrationText(place, audioLanguage)
+  const localNarration = getNarrationText(place, audioLanguage)
+  const audioText = savedNarration && savedNarration.length > localNarration.length
+    ? savedNarration
+    : localNarration
+  const estimatedMinutes = Math.max(1, Math.ceil(audioText.length / 14 / 60))
+
+  const changeRoute = () => {
+    if (!currentUser) {
+      navigate('/login', {
+        state: {
+          returnTo: `${location.pathname}${location.search}`,
+          pendingPlaceId: place.id,
+        },
+      })
+      return
+    }
+    void setRoutePlace(place.id)
+  }
 
   useEffect(() => {
     let active = true
@@ -39,7 +62,7 @@ export function NarrationCard({ place, language, distanceMeters, onStartWalk, on
   return (
     <section className="narration-card" aria-label={translate(language, 'play')}>
       <div className="narration-head">
-        <div className="narration-label"><Headphones size={14} /> AUDIO WALK <span className="duration-dot">·</span> {place.duration} {translate(language, 'minute')}</div>
+        <div className="narration-label"><Headphones size={14} /> AUDIO WALK <span className="duration-dot">·</span> ~{estimatedMinutes} {translate(language, 'minute')}</div>
         <div className="narration-head-actions">
           <label className="audio-language">
             <span>{translate(language, 'audioLanguage')}</span>
@@ -61,8 +84,15 @@ export function NarrationCard({ place, language, distanceMeters, onStartWalk, on
       <p className="narration-copy">{audioCopy.narration}</p>
       {distanceMeters !== null && <div className="distance-note"><span className="distance-line" />{translate(language, 'distance')} <strong>{distanceMeters < 1000 ? `${Math.round(distanceMeters)} m` : `${(distanceMeters / 1000).toFixed(1)} km`}</strong></div>}
       <div className="narration-actions">
-        <AudioPlayer key={`${place.id}:${audioLanguage}`} text={audioText} language={language} speechLanguage={audioLanguage} onPlayingChange={setPlaying} />
-        <button className={`route-button${isInRoute ? ' in-route' : ''}`} onClick={() => toggleRoutePlace(place.id)}>
+        <AudioPlayer
+          key={`${place.id}:${audioLanguage}`}
+          text={audioText}
+          language={language}
+          speechLanguage={audioLanguage}
+          audioSrc={getNarrationAudioUrl(place.id, audioLanguage)}
+          onPlayingChange={setPlaying}
+        />
+        <button className={`route-button${isInRoute ? ' in-route' : ''}`} onClick={changeRoute} disabled={isSavingRoute}>
           {isInRoute ? <Radio size={15} /> : <Plus size={16} />}
           {translate(language, isInRoute ? 'removeRoute' : 'addRoute')}
         </button>

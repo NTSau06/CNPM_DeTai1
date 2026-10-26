@@ -1,3 +1,4 @@
+// Chọn gợi ý ứng xử tại Thành cổ theo giờ Việt Nam và ngôn ngữ giao diện.
 import { useEffect, useState } from 'react'
 import { Clock3 } from 'lucide-react'
 import type { Language, Place } from '../types'

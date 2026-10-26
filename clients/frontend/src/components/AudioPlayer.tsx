@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+// Phát lời thuyết minh qua giọng đọc trình duyệt, hỗ trợ tua và đổi tốc độ.
+import { useEffect, useRef, useState } from 'react'
 import { Pause, Play, Square } from 'lucide-react'
 import { translate } from '../i18n'
 import { speakFrom, speechAvailable, stopSpeaking } from '../speech'
@@ -12,26 +13,25 @@ interface AudioPlayerProps {
   text: string
   language: Language
   speechLanguage: Language
+  audioSrc?: string
   onPlayingChange: (playing: boolean) => void
 }
 
-export function AudioPlayer({ text, language, speechLanguage, onPlayingChange }: AudioPlayerProps) {
+export function AudioPlayer({ text, language, speechLanguage, audioSrc, onPlayingChange }: AudioPlayerProps) {
   const [playing, setPlaying] = useState(false)
   const [rate, setRate] = useState(1)
   const [characterIndex, setCharacterIndex] = useState(0)
   const [seekDraft, setSeekDraft] = useState<number | null>(null)
+  const [audioFileFailed, setAudioFileFailed] = useState(false)
   const characterIndexRef = useRef(0)
+  const audioRef = useRef<HTMLAudioElement>(null)
   const generation = useRef(0)
   const utteranceActive = useRef(false)
   const baseCharacter = useRef(0)
   const segmentStartedAt = useRef(0)
   const rateRef = useRef(rate)
   const playingRef = useRef(playing)
-  const transcriptRef = useRef<HTMLDivElement>(null)
-  const segmentRefs = useRef<(HTMLParagraphElement | null)[]>([])
-  const transcriptSegments = useMemo(() => splitTranscript(text), [text])
-  const currentSegmentIndex = transcriptSegments.findIndex((segment) => characterIndex < segment.end)
-  const activeSegmentIndex = currentSegmentIndex === -1 ? transcriptSegments.length - 1 : currentSegmentIndex
+  const useAudioFile = Boolean(audioSrc && !audioFileFailed)
 
   const updateCharacterIndex = (value: number) => {
     const next = Math.max(0, Math.min(text.length, value))
@@ -82,7 +82,22 @@ export function AudioPlayer({ text, language, speechLanguage, onPlayingChange }:
     }
   }
 
+  const playAudioFile = () => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (audio.ended) audio.currentTime = 0
+    audio.playbackRate = rateRef.current
+    void audio.play().catch(() => {
+      setAudioFileFailed(true)
+      startAt(characterIndexRef.current)
+    })
+  }
+
   const play = () => {
+    if (useAudioFile) {
+      playAudioFile()
+      return
+    }
     if (utteranceActive.current && window.speechSynthesis.paused) {
       baseCharacter.current = characterIndexRef.current
       segmentStartedAt.current = performance.now()
@@ -97,6 +112,10 @@ export function AudioPlayer({ text, language, speechLanguage, onPlayingChange }:
 
   const pause = () => {
     if (!playingRef.current) return
+    if (useAudioFile) {
+      audioRef.current?.pause()
+      return
+    }
     const elapsedSeconds = (performance.now() - segmentStartedAt.current) / 1000
     updateCharacterIndex(baseCharacter.current + elapsedSeconds * estimatedCharactersPerSecond * rateRef.current)
     window.speechSynthesis.pause()
@@ -108,6 +127,10 @@ export function AudioPlayer({ text, language, speechLanguage, onPlayingChange }:
   const stop = () => {
     generation.current += 1
     stopSpeaking()
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+    }
     utteranceActive.current = false
     playingRef.current = false
     updateCharacterIndex(0)
@@ -116,6 +139,16 @@ export function AudioPlayer({ text, language, speechLanguage, onPlayingChange }:
   }
 
   const seekTo = (percentage: number) => {
+    if (useAudioFile) {
+      const audio = audioRef.current
+      if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return
+      const resumeAfterSeek = playingRef.current
+      audio.currentTime = audio.duration * percentage / 100
+      setSeekDraft(null)
+      updateCharacterIndex(Math.round(text.length * percentage / 100))
+      if (resumeAfterSeek) playAudioFile()
+      return
+    }
     const target = Math.round(text.length * percentage / 100)
     let offset = Math.max(0, Math.min(text.length, target))
     if (percentage < 100) {
@@ -136,6 +169,10 @@ export function AudioPlayer({ text, language, speechLanguage, onPlayingChange }:
   const changeRate = (nextRate: number) => {
     rateRef.current = nextRate
     setRate(nextRate)
+    if (useAudioFile) {
+      if (audioRef.current) audioRef.current.playbackRate = nextRate
+      return
+    }
     if (!utteranceActive.current) return
 
     const currentIndex = characterIndexRef.current
@@ -157,25 +194,32 @@ export function AudioPlayer({ text, language, speechLanguage, onPlayingChange }:
 
   useEffect(() => {
     if (!playing) return
+    if (useAudioFile) return
     const timer = window.setInterval(() => {
       const elapsedSeconds = (performance.now() - segmentStartedAt.current) / 1000
       updateCharacterIndex(baseCharacter.current + elapsedSeconds * estimatedCharactersPerSecond * rateRef.current)
     }, 120)
     return () => window.clearInterval(timer)
-  }, [playing])
+  }, [playing, useAudioFile])
 
-  useEffect(() => {
-    if (!playing) return
-    const activeSegment = segmentRefs.current[activeSegmentIndex]
-    if (!activeSegment) return
-    const container = transcriptRef.current
-    if (!container) return
-    const segmentTop = activeSegment.offsetTop - container.offsetTop
-    const segmentBottom = segmentTop + activeSegment.offsetHeight
-    if (segmentTop < container.scrollTop || segmentBottom > container.scrollTop + container.clientHeight) {
-      container.scrollTo({ top: segmentTop - container.clientHeight / 2, behavior: 'smooth' })
-    }
-  }, [activeSegmentIndex, playing])
+  const updateAudioProgress = () => {
+    const audio = audioRef.current
+    if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return
+    updateCharacterIndex(Math.round(text.length * audio.currentTime / audio.duration))
+  }
+
+  const handleAudioError = () => {
+    if (!audioSrc || audioFileFailed) return
+    setAudioFileFailed(true)
+    if (playingRef.current) startAt(characterIndexRef.current)
+  }
+
+  const handleAudioEnded = () => {
+    updateCharacterIndex(text.length)
+    playingRef.current = false
+    setPlaying(false)
+    onPlayingChange(false)
+  }
 
   useEffect(() => () => {
     generation.current += 1
@@ -184,18 +228,45 @@ export function AudioPlayer({ text, language, speechLanguage, onPlayingChange }:
     onPlayingChange(false)
   }, [onPlayingChange])
 
-  const progress = seekDraft ?? (text.length ? characterIndex / text.length * 100 : 0)
-  const totalSeconds = text.length / estimatedCharactersPerSecond / rate
-  const currentSeconds = characterIndex / estimatedCharactersPerSecond / rate
+  const audio = audioRef.current
+  const progress = seekDraft ?? (useAudioFile && audio && audio.duration > 0
+    ? audio.currentTime / audio.duration * 100
+    : text.length ? characterIndex / text.length * 100 : 0)
+  const totalSeconds = useAudioFile && audio && Number.isFinite(audio.duration)
+    ? audio.duration
+    : text.length / estimatedCharactersPerSecond / rate
+  const currentSeconds = useAudioFile && audio
+    ? audio.currentTime
+    : characterIndex / estimatedCharactersPerSecond / rate
 
   return (
     <div className="audio-player" aria-label={translate(language, 'play')}>
+      {audioSrc && (
+        <audio
+          ref={audioRef}
+          src={audioSrc}
+          preload="metadata"
+          onPlay={() => {
+            playingRef.current = true
+            setPlaying(true)
+            onPlayingChange(true)
+          }}
+          onPause={() => {
+            playingRef.current = false
+            setPlaying(false)
+            onPlayingChange(false)
+          }}
+          onTimeUpdate={updateAudioProgress}
+          onEnded={handleAudioEnded}
+          onError={handleAudioError}
+        />
+      )}
       <div className="audio-player-controls">
         <button
           type="button"
           className="audio-play-button"
           onClick={playing ? pause : play}
-          disabled={!speechAvailable()}
+          disabled={!useAudioFile && !speechAvailable()}
           aria-label={translate(language, playing ? 'pause' : 'play')}
         >
           {playing ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
@@ -226,35 +297,9 @@ export function AudioPlayer({ text, language, speechLanguage, onPlayingChange }:
         onKeyUp={() => { if (seekDraft !== null) seekTo(seekDraft) }}
         onBlur={() => { if (seekDraft !== null) seekTo(seekDraft) }}
       />
-      <div className="audio-transcript" ref={transcriptRef} aria-label={translate(language, 'liveTranscript')}>
-        {transcriptSegments.map((segment, index) => (
-          <p
-            className={`audio-transcript-line${index === activeSegmentIndex ? ' active' : ''}`}
-            key={`${segment.start}-${segment.end}`}
-            ref={(element) => { segmentRefs.current[index] = element }}
-            aria-current={index === activeSegmentIndex ? 'true' : undefined}
-          >
-            {segment.text}
-          </p>
-        ))}
-      </div>
       {!speechAvailable() && <p className="inline-warning">{translate(language, 'speechUnsupported')}</p>}
     </div>
   )
-}
-
-function splitTranscript(text: string) {
-  const segments: { start: number; end: number; text: string }[] = []
-  const sentencePattern = /[^.!?。！？]+[.!?。！？]*/g
-  for (const match of text.matchAll(sentencePattern)) {
-    const raw = match[0]
-    const trimmed = raw.trim()
-    if (!trimmed || match.index === undefined) continue
-    const leadingWhitespace = raw.length - raw.trimStart().length
-    const start = match.index + leadingWhitespace
-    segments.push({ start, end: start + trimmed.length, text: trimmed })
-  }
-  return segments
 }
 
 function formatTime(seconds: number) {

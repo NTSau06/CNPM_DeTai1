@@ -1,3 +1,4 @@
+"""Định nghĩa schema kiểm tra dữ liệu vào/ra của Analytics API."""
 from __future__ import annotations
 
 from typing import Annotated

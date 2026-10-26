@@ -1,3 +1,4 @@
+# Kiểm tra ứng dụng React Native và tùy chọn build native bằng EAS.
 name: React Native CI/CD
 
 on:

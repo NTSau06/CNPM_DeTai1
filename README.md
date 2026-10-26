@@ -33,7 +33,7 @@ không có chức năng quản trị hoặc số liệu bán vé. Xem [hướng 
 
 ### Ngoại tuyến và hướng dẫn ứng xử
 
-- Trên web, mở **Ngoại tuyến** để tải gói cho từng địa điểm/ngôn ngữ. Gói gồm lời thuyết minh, nội dung câu chuyện và ảnh chi tiết trong bộ nhớ IndexedDB; có thể gỡ từng gói. Giọng đọc là TTS của thiết bị/trình duyệt đã cài, không phải MP3 tải sẵn.
+- Trên web, mở **Ngoại tuyến** để tải gói cho từng địa điểm/ngôn ngữ. Gói gồm lời thuyết minh, nội dung câu chuyện và ảnh chi tiết trong bộ nhớ IndexedDB; có thể gỡ từng gói. Audio player phát MP3 đã có cho địa điểm/ngôn ngữ tương ứng; nếu chưa có bản thu, ứng dụng dùng TTS của trình duyệt. Các MP3 trong ứng dụng web được cache để phát khi ngoại tuyến.
 - Trên mobile, có thể lưu lời thuyết minh của địa điểm/ngôn ngữ đang chọn vào thiết bị để phát bằng Expo Speech khi mất mạng.
 - Tại Thành cổ Quảng Trị, ứng dụng hiển thị gợi ý ứng xử theo buổi sáng/chiều/tối theo giờ Việt Nam. Đây không phải lịch nghi lễ hay thông báo sự kiện; hãy xác nhận giờ mở cửa và hoạt động với đơn vị quản lý.
 

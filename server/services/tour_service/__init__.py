@@ -1,0 +1,1 @@
+"""Service xác thực và lưu hành trình ghé thăm các địa điểm."""

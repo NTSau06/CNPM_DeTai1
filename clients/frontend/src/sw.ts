@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+// Cache tài nguyên, tile bản đồ và API để ứng dụng tiếp tục hoạt động ngoại tuyến.
 import { clientsClaim } from 'workbox-core'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { cleanupOutdatedCaches, precacheAndRoute, type PrecacheEntry } from 'workbox-precaching'

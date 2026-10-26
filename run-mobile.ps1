@@ -1,3 +1,4 @@
+﻿# Khởi chạy backend cùng Expo và chỉ dừng các service do lệnh này khởi tạo.
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 

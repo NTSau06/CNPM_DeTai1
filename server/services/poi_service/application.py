@@ -1,3 +1,4 @@
+"""Xử lý nghiệp vụ danh mục địa điểm giữa API và repository."""
 from __future__ import annotations
 
 from services.common.schemas import Place, PlaceCollection

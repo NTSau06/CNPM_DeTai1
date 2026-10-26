@@ -1,3 +1,4 @@
+// Trang khám phá: tìm/lọc địa điểm, xem bản đồ, GPS, hành trình và thuyết minh.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDownRight, ArrowRight, BookmarkPlus, ChevronDown, ChevronRight, Clock3, Compass, LocateFixed, MapPin, Search, Sparkles, Volume2 } from 'lucide-react'
 import { distance, point } from '@turf/turf'
@@ -9,7 +10,7 @@ import { RitualGuidancePanel } from '../components/RitualGuidancePanel'
 import { getOfflinePlacePack } from '../db'
 import { categoryKeys, categoryLabels, findPlace, languages, localizedTitle, places as bundledPlaces } from '../data/places'
 import { translate } from '../i18n'
-import { getNarrationText, speak, speechAvailable, stopSpeaking } from '../speech'
+import { getNarrationAudioUrl, getNarrationText, speakWithAudio, speechAvailable, stopSpeaking } from '../speech'
 import { useAppStore } from '../store'
 import type { Category } from '../types'
 
@@ -26,7 +27,6 @@ export function ExplorePage() {
   const setLocation = useAppStore((state) => state.setLocation)
   const autoNarration = useAppStore((state) => state.autoNarration)
   const setAutoNarration = useAppStore((state) => state.setAutoNarration)
-  const saveCurrentTour = useAppStore((state) => state.saveCurrentTour)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<Category | 'all'>('all')
   const [placesExpanded, setPlacesExpanded] = useState(false)
@@ -75,10 +75,10 @@ export function ExplorePage() {
     if (!nearby || spokenPlaces.current.has(nearby.id)) return
     spokenPlaces.current.add(nearby.id)
     setSelectedPlace(nearby.id)
-    if (speechAvailable()) speak(getNarrationText(nearby, language), language)
+    if (speechAvailable()) speakWithAudio(getNarrationText(nearby, language), language, getNarrationAudioUrl(nearby.id, language))
   }, [location, autoNarration, places, language, setSelectedPlace])
 
-  useEffect(() => () => { if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel() }, [])
+  useEffect(() => () => stopSpeaking(), [])
 
   useEffect(() => {
     if (!autoNarration && watchId.current !== null && navigator.geolocation) {
@@ -103,7 +103,7 @@ export function ExplorePage() {
     spokenPlaces.current.clear()
     spokenPlaces.current.add(selectedPlace.id)
     setAutoNarration(true)
-    if (speechAvailable()) speak(getNarrationText(selectedPlace, language), language)
+    if (speechAvailable()) speakWithAudio(getNarrationText(selectedPlace, language), language, getNarrationAudioUrl(selectedPlace.id, language))
     watchId.current = navigator.geolocation.watchPosition(
       (position) => {
         const coordinates: [number, number] = [position.coords.longitude, position.coords.latitude]
@@ -294,10 +294,9 @@ export function ExplorePage() {
         <section className="route-summary">
           <div className="route-summary-icon"><BookmarkPlus size={18} /></div>
           <div className="route-summary-copy"><strong>{translate(language, 'route')} <span>·</span> {routeIds.length} {translate(language, 'stopCount')}</strong><small>{routeDistance.toFixed(1)} {translate(language, 'distanceUnit')} <span>·</span> {routePlaces.reduce((total, place) => total + place.duration, 0)} {translate(language, 'minute')}</small></div>
-          <button onClick={async () => { if (await saveCurrentTour()) setGpsMessage(translate(language, 'routeSaved')) }} className="save-route-button">{translate(language, 'saveRoute')} <ArrowRight size={15} /></button>
+          <NavLink to="/saved" className="save-route-button">{language === 'vi' ? 'Đã tự lưu' : 'Saved'} <BookmarkPlus size={15} /></NavLink>
         </section>
       )}
-      {gpsMessage === translate(language, 'routeSaved') && <p className="route-saved-message" role="status">{gpsMessage}</p>}
 
       <button className={`walk-fab${autoNarration ? ' is-active' : ''}`} onClick={autoNarration ? stopWalk : startWalk}>
         {autoNarration ? <Volume2 size={17} /> : <Compass size={17} />}

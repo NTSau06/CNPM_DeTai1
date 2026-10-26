@@ -15,7 +15,7 @@ docker compose -f server/compose.yml up --build
 The gateway is available at `http://localhost:8000`; interactive API docs are at
 `http://localhost:8000/docs`. The web app's Vite development server proxies
 `/api` to the gateway. The POI, tour, narration and analytics services remain private on
-the Compose network. Named volumes persist POI, tour and analytics data.
+the Compose network. Named volumes persist accounts, POI, tour and analytics data.
 
 Docker Compose is required for this one-command multi-service run. Without
 Docker on Windows, you can use the repository venv and PID scripts from the
@@ -61,10 +61,8 @@ $env:ANALYTICS_SERVICE_URL = "http://127.0.0.1:8004"
 python -m uvicorn api_gateway.main:app --port 8000
 ```
 
-For disposable local data, set `POI_DATABASE_PATH` and `TOUR_DATABASE_PATH` to
-paths outside the repository; otherwise the services create `server/var/` SQLite
-files. The POI seed is derived from the existing frontend catalog so both
-clients start with the same 14 places and seven reviewed locale copies.
+The POI seed is derived from the existing frontend catalog so both clients
+start with the same 14 places and seven reviewed locale copies.
 
 ## Three-layer and service boundaries
 
@@ -72,8 +70,8 @@ clients start with the same 14 places and seven reviewed locale copies.
   in `services/*/api.py` handle HTTP, DTO validation and status codes.
 - **Business/application:** `PlaceCatalog`, `TourPlanner` and
   `NarrationReader` implement catalog, tour and narration use cases.
-- **Data access:** POI, tour and analytics repositories own SQLite access and seed/data
-  serialization.
+- **Data access:** POI, tour and analytics repositories own SQLite access and
+  seed/data serialization.
 - **POI Service:** serves the canonical catalog and resolves tour stop IDs.
 - **Tour Service:** calls POI Service over HTTP before calculating and saving a
   tour.
@@ -89,9 +87,13 @@ clients start with the same 14 places and seven reviewed locale copies.
 - **API Gateway:** routes web/mobile clients to the internal services; service
   URLs are supplied through environment variables.
 
-The current tour endpoints are for the course prototype and do not yet include
-user authentication/authorization. Do not expose tour reads/writes on a public
-production deployment until a real identity/ownership policy is added.
+Email-and-password registration/login is provided by the Gateway. Passwords are
+stored as salted scrypt hashes, and issued bearer sessions expire after 30 days.
+Tour list, create and delete endpoints require a valid account session; each
+saved tour is scoped to its owner. The web and mobile clients restore the session
+and account's tours on reload. This is a course-project authentication implementation, not a
+substitute for a production identity provider, HTTPS, rate limiting or account
+recovery.
 
 ## API examples
 
@@ -102,13 +104,20 @@ Invoke-RestMethod "http://localhost:8000/api/v1/narrations/phong-nha-cave?locale
 ```
 
 ```powershell
+$account = Invoke-RestMethod -Method Post `
+  -Uri http://localhost:8000/api/v1/auth/register `
+  -ContentType 'application/json' `
+  -Body (@{ fullName = 'Nguyen An'; email = 'an@example.com'; password = 'mat-khau-123' } | ConvertTo-Json)
+$headers = @{ Authorization = "Bearer $($account.token)" }
+
 $tour = @{
   id = [guid]::NewGuid().ToString()
   createdAt = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   placeIds = @('phong-nha-cave', 'thien-duong-cave')
 } | ConvertTo-Json
 Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/v1/tours `
-  -ContentType 'application/json' -Body $tour
+  -Headers $headers -ContentType 'application/json' -Body $tour
+Invoke-RestMethod -Uri http://localhost:8000/api/v1/tours -Headers $headers
 ```
 
 ## Verification and CI/CD

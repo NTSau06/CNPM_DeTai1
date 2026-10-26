@@ -1,3 +1,4 @@
+"""Chuyển tiếp yêu cầu tới service nội bộ và xử lý lỗi phản hồi."""
 from __future__ import annotations
 
 from typing import Any

@@ -1,0 +1,1 @@
+"""API Gateway công khai, nhận yêu cầu từ web/mobile và gọi service nội bộ."""

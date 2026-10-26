@@ -1,3 +1,4 @@
+# Chạy các backend và frontend web cục bộ, đồng thời tạo URL LAN cho mã QR.
 Set-Location $PSScriptRoot
 
 $pythonPath = Join-Path $PSScriptRoot "venvs\.venv\Scripts\python.exe"

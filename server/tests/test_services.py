@@ -1,3 +1,4 @@
+"""Kiểm thử API và nghiệp vụ backend mà không cần service bên ngoài."""
 from __future__ import annotations
 
 import asyncio
@@ -11,7 +12,7 @@ from api_gateway.api import _distance_meters
 from api_gateway.main import create_app as create_gateway_app
 from services.analytics_service.main import create_app as create_analytics_app
 from services.common.errors import PlaceValidationError
-from services.common.schemas import Place, TourCreate
+from services.common.schemas import Place, Tour, TourCreate
 from services.narration_service.application import NarrationReader
 from services.poi_service.main import create_app as create_poi_app
 from services.poi_service.repository import PlaceRepository
@@ -104,6 +105,25 @@ def test_tour_service_rejects_unknown_stop(tmp_path: Path) -> None:
         asyncio.run(planner.create_tour(TourCreate(placeIds=["not-a-place"])))
 
 
+def test_tour_repository_scopes_saved_tours_to_their_owner(tmp_path: Path) -> None:
+    repository = TourRepository(tmp_path / "tours.sqlite")
+    repository.initialize()
+    first = Tour(
+        id="tour-a",
+        placeIds=["phong-nha-cave"],
+        createdAt=1,
+        distanceKm=0,
+        durationMinutes=4,
+    )
+    repository.save(first, "account-a")
+    assert repository.list("account-a") == [first]
+    assert repository.list("account-b") == []
+    with pytest.raises(ValueError):
+        repository.save(first, "account-b")
+    assert not repository.delete(first.id, "account-b")
+    assert repository.delete(first.id, "account-a")
+
+
 class RepositoryPlaceReader:
     def __init__(self, repository: PlaceRepository) -> None:
         self.repository = repository
@@ -176,6 +196,7 @@ def test_visit_distance_uses_meters() -> None:
 
 
 def test_gateway_exposes_place_analytics_and_validates_visit_location(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def fake_request_service(
@@ -204,7 +225,8 @@ def test_gateway_exposes_place_analytics_and_validates_visit_location(
             "tour": "tour",
             "narration": "narration",
             "analytics": "analytics",
-        }
+        },
+        tmp_path / "accounts.sqlite",
     )
     with TestClient(app) as client:
         analytics = client.get("/api/v1/places/phong-nha-cave/analytics")
@@ -232,3 +254,115 @@ def test_gateway_exposes_place_analytics_and_validates_visit_location(
     assert accepted_visit.status_code == 201
     assert distant_visit.status_code == 422
 
+
+def test_gateway_requires_accounts_and_scopes_tours(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    forwarded: list[dict] = []
+
+    async def fake_request_service(
+        base_url: str,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, str | None] | None = None,
+        json: dict | None = None,
+    ) -> dict:
+        forwarded.append({"baseUrl": base_url, "method": method, "path": path, "params": params, "json": json})
+        if method == "POST":
+            return {
+                "id": json.get("id", "created-tour"),
+                "placeIds": json["placeIds"],
+                "createdAt": json.get("createdAt", 1),
+                "distanceKm": 1.2,
+                "durationMinutes": 6,
+            }
+        if method == "DELETE":
+            return {}
+        return {"items": [], "total": 0}
+
+    monkeypatch.setattr("api_gateway.api.request_service", fake_request_service)
+    app = create_gateway_app(
+        {
+            "poi": "poi",
+            "tour": "tour",
+            "narration": "narration",
+            "analytics": "analytics",
+        },
+        tmp_path / "accounts.sqlite",
+    )
+    with TestClient(app) as client:
+        first = client.post(
+            "/api/v1/auth/register",
+            json={
+                "fullName": "Account A",
+                "email": "a@example.com",
+                "password": "valid-password",
+            },
+        )
+        second = client.post(
+            "/api/v1/auth/register",
+            json={
+                "fullName": "Account B",
+                "email": "b@example.com",
+                "password": "valid-password",
+            },
+        )
+        assert first.status_code == 201
+        assert second.status_code == 201
+        first_token = first.json()["token"]
+        first_id = first.json()["user"]["id"]
+        second_token = second.json()["token"]
+        login = client.post(
+            "/api/v1/auth/login",
+            json={"email": "A@EXAMPLE.COM", "password": "valid-password"},
+        )
+        assert login.status_code == 200
+        assert login.json()["user"]["id"] == first_id
+        assert client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {first_token}"},
+        ).json()["email"] == "a@example.com"
+        assert client.post(
+            "/api/v1/auth/login",
+            json={"email": "a@example.com", "password": "wrong-password"},
+        ).status_code == 401
+
+        assert client.get("/api/v1/tours").status_code == 401
+        first_tours = client.get(
+            "/api/v1/tours", headers={"Authorization": f"Bearer {first_token}"}
+        )
+        second_tours = client.get(
+            "/api/v1/tours", headers={"Authorization": f"Bearer {second_token}"}
+        )
+        assert first_tours.status_code == second_tours.status_code == 200
+        assert forwarded[-2]["params"] == {"userId": first_id}
+        assert forwarded[-1]["params"] == {"userId": second.json()["user"]["id"]}
+
+        created = client.post(
+            "/api/v1/tours",
+            headers={"Authorization": f"Bearer {first_token}"},
+            json={"placeIds": ["phong-nha-cave"]},
+        )
+        assert created.status_code == 201
+        assert forwarded[-1]["json"]["ownerId"] == first_id
+
+        duplicate = client.post(
+            "/api/v1/auth/register",
+            json={
+                "fullName": "Duplicate",
+                "email": "A@example.com",
+                "password": "valid-password",
+            },
+        )
+        assert duplicate.status_code == 409
+        logged_out = client.post(
+            "/api/v1/auth/logout",
+            headers={"Authorization": f"Bearer {first_token}"},
+        )
+        assert logged_out.status_code == 204
+        assert client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {first_token}"},
+        ).status_code == 401

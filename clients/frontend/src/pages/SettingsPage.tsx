@@ -1,3 +1,4 @@
+// Cấu hình ngôn ngữ và cài đặt/xóa bản đồ, nội dung địa điểm ngoại tuyến.
 import { useEffect, useRef, useState } from 'react'
 import { ArrowDownToLine, Check, FileUp, Globe2, HardDrive, Info, Languages, MapPinned, Radio, Trash2, WifiOff } from 'lucide-react'
 import { PMTiles } from 'pmtiles'

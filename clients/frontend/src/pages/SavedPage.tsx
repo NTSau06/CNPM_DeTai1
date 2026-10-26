@@ -1,3 +1,4 @@
+// Liệt kê, mở và xóa các hành trình đã lưu.
 import { ArrowLeft, ArrowRight, Bookmark, Clock3, MapPin, Route, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { findPlace, localizedTitle } from '../data/places'
@@ -8,6 +9,7 @@ export function SavedPage() {
   const language = useAppStore((state) => state.language)
   const tours = useAppStore((state) => state.savedTours)
   const removeTour = useAppStore((state) => state.removeTour)
+  const currentUser = useAppStore((state) => state.currentUser)
 
   return (
     <div className="subpage">
@@ -17,7 +19,14 @@ export function SavedPage() {
         <h1>{translate(language, 'savedTitle')}</h1>
         <p>{translate(language, 'noSavedText')}</p>
       </div>
-      {tours.length === 0 ? (
+      {!currentUser ? (
+        <section className="empty-state">
+          <div className="empty-icon"><Bookmark size={25} /></div>
+          <h2>Đăng nhập để xem hành trình</h2>
+          <p>Hành trình đã lưu được gắn với tài khoản của bạn.</p>
+          <Link className="primary-link" to="/login">Đăng nhập <ArrowRight size={15} /></Link>
+        </section>
+      ) : tours.length === 0 ? (
         <section className="empty-state">
           <div className="empty-icon"><Bookmark size={25} /></div>
           <h2>{translate(language, 'noSaved')}</h2>

@@ -1,3 +1,4 @@
+"""Tạo nội dung thuyết minh đa ngôn ngữ từ dữ liệu của POI Service."""
 from __future__ import annotations
 
 from typing import Protocol

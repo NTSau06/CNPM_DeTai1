@@ -1,3 +1,4 @@
+// Hiển thị bản đồ, marker địa điểm và các tuyến đường bằng MapLibre.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import { GeoJSONSource, type Map as MapLibreMap, type MapLayerMouseEvent } from 'maplibre-gl'

@@ -1,3 +1,4 @@
+# Khởi chạy Gateway và các backend service cùng kiểm tra sức khỏe, dữ liệu lưu trữ.
 services:
   api-gateway:
     build:
@@ -9,7 +10,10 @@ services:
       TOUR_SERVICE_URL: http://tour-service:8002
       NARRATION_SERVICE_URL: http://narration-service:8003
       ANALYTICS_SERVICE_URL: http://analytics-service:8004
+      AUTH_DATABASE_PATH: /data/accounts.sqlite
       CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:19006,http://localhost:8081,http://127.0.0.1:8081
+    volumes:
+      - auth-data:/data
     ports:
       - "8000:8000"
     depends_on:
@@ -107,6 +111,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  auth-data:
   poi-data:
   tour-data:
   analytics-data:

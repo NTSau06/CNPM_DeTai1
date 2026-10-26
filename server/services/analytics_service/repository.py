@@ -1,3 +1,4 @@
+"""Lưu lượt ghé/đánh giá và tính thống kê từng địa điểm bằng SQLite."""
 from __future__ import annotations
 
 import hashlib

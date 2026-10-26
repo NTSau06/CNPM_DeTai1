@@ -1,28 +1,31 @@
+// Đăng ký, đăng nhập và quản lý hồ sơ tài khoản.
 import { useState, type FormEvent } from 'react'
 import { Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, LogOut, Mail, MapPin, Phone, UserRound } from 'lucide-react'
+import { loginAccount, registerAccount } from '../api'
 import { useAppStore } from '../store'
 import type { UserProfile } from '../types'
-
-const previewNotice = 'Bản xem trước: đăng nhập chưa xác minh tài khoản và dữ liệu chỉ nằm trong bộ nhớ trang. Google OAuth chưa được kết nối.'
 
 export function UserPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const currentUser = useAppStore((state) => state.currentUser)
-  const setCurrentUser = useAppStore((state) => state.setCurrentUser)
+  const signIn = useAppStore((state) => state.signIn)
   const updateCurrentUser = useAppStore((state) => state.updateCurrentUser)
   const signOut = useAppStore((state) => state.signOut)
+  const setRoutePlace = useAppStore((state) => state.setRoutePlace)
   const isProfile = location.pathname === '/profile'
   const isRegister = location.pathname === '/register'
   const [feedback, setFeedback] = useState('')
   const [saved, setSaved] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   if (isProfile && !currentUser) return <Navigate to="/login" replace />
   if (!isProfile && currentUser) return <Navigate to="/profile" replace />
 
-  const onSubmitAuth = (event: FormEvent<HTMLFormElement>) => {
+  const onSubmitAuth = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    setFeedback('')
     const values = new FormData(event.currentTarget)
     const email = String(values.get('email') ?? '').trim().toLowerCase()
     const password = String(values.get('password') ?? '')
@@ -36,17 +39,34 @@ export function UserPage() {
       return
     }
 
-    const emailName = email.split('@')[0].replace(/[._-]+/g, ' ').trim()
-    const user: UserProfile = {
-      fullName: isRegister ? String(values.get('fullName') ?? '').trim() : emailName,
-      email,
-      phone: isRegister ? String(values.get('phone') ?? '').trim() : '',
-      birthDate: '',
-      gender: '',
-      address: '',
+    setSubmitting(true)
+    try {
+      const result = isRegister
+        ? await registerAccount(
+          String(values.get('fullName') ?? '').trim(),
+          email,
+          String(values.get('phone') ?? '').trim(),
+          password,
+        )
+        : await loginAccount(email, password)
+      await signIn(result.token, result.user)
+      const navigationState = location.state as { returnTo?: unknown; pendingPlaceId?: unknown } | null
+      if (typeof navigationState?.pendingPlaceId === 'string') {
+        if (!useAppStore.getState().routeIds.includes(navigationState.pendingPlaceId)) {
+          await setRoutePlace(navigationState.pendingPlaceId)
+        }
+        const returnTo = typeof navigationState.returnTo === 'string' && navigationState.returnTo.startsWith('/') && !navigationState.returnTo.startsWith('//')
+          ? navigationState.returnTo
+          : '/explore'
+        navigate(returnTo, { replace: true })
+      } else {
+        navigate('/profile', { replace: true })
+      }
+    } catch (error) {
+      setFeedback(getAuthErrorMessage(error))
+    } finally {
+      setSubmitting(false)
     }
-    setCurrentUser(user)
-    navigate('/profile', { replace: true })
   }
 
   const onSaveProfile = (event: FormEvent<HTMLFormElement>) => {
@@ -77,11 +97,10 @@ export function UserPage() {
               <h1>Hồ sơ cá nhân</h1>
               <p>Cập nhật thông tin để cá nhân hóa hành trình của bạn.</p>
             </div>
-            <button className="signout-button" onClick={() => { signOut(); navigate('/login', { replace: true }) }}>
+            <button className="signout-button" onClick={() => { void signOut().then(() => navigate('/login', { replace: true })) }}>
               <LogOut size={15} /> Đăng xuất
             </button>
           </div>
-          <PreviewNotice />
           <form className="user-form profile-form" onSubmit={onSaveProfile}>
             <label>Họ và tên
               <span className="input-with-icon"><UserRound size={16} /><input name="fullName" required maxLength={80} defaultValue={currentUser.fullName} autoComplete="name" /></span>
@@ -127,11 +146,7 @@ export function UserPage() {
           <h1>{isRegister ? 'Tạo tài khoản' : 'Chào mừng trở lại'}</h1>
           <p>{isRegister ? 'Tạo hồ sơ để lưu lại những hành trình đáng nhớ.' : 'Đăng nhập để tiếp tục hành trình của bạn.'}</p>
         </div>
-        <PreviewNotice />
-        <button className="google-preview-button" type="button" onClick={() => setFeedback('Google OAuth chưa được kết nối. Bạn có thể xem trước bằng biểu mẫu email bên dưới.')}>
-          <GoogleMark /> Tiếp tục với Google
-        </button>
-        <div className="auth-divider"><span>hoặc bằng email</span></div>
+        <div className="auth-divider"><span>bằng email</span></div>
         <form className="user-form" onSubmit={onSubmitAuth}>
           {isRegister && (
             <>
@@ -153,30 +168,34 @@ export function UserPage() {
             <input name="confirmPassword" type="password" required minLength={8} autoComplete="new-password" placeholder="Nhập lại mật khẩu" />
           </label>}
           {feedback && <p className="user-feedback" role="status">{feedback}</p>}
-          <button className="user-submit" type="submit">{isRegister ? 'Tạo tài khoản xem trước' : 'Đăng nhập xem trước'}</button>
+          <button className="user-submit" type="submit" disabled={submitting}>
+            {submitting ? 'Đang xử lý…' : isRegister ? 'Tạo tài khoản' : 'Đăng nhập'}
+          </button>
         </form>
         <p className="auth-switch">
           {isRegister ? 'Đã có tài khoản?' : 'Chưa có tài khoản?'}{' '}
-          <NavLink to={isRegister ? '/login' : '/register'}>{isRegister ? 'Đăng nhập' : 'Đăng ký'}</NavLink>
+          <NavLink to={isRegister ? '/login' : '/register'} state={location.state}>
+            {isRegister ? 'Đăng nhập' : 'Đăng ký'}
+          </NavLink>
         </p>
       </div>
     </section>
   )
 }
 
-function PreviewNotice() {
-  return <p className="preview-notice" role="note">{previewNotice}</p>
+function getAuthErrorMessage(error: unknown) {
+  if (typeof error !== 'object' || error === null || !('status' in error)) {
+    return 'Không thể kết nối máy chủ. Hãy kiểm tra kết nối mạng và thử lại.'
+  }
+  const status = error.status
+  if (status === 401) return 'Email hoặc mật khẩu không chính xác.'
+  if (status === 409) return 'Email này đã được đăng ký. Hãy đăng nhập hoặc dùng email khác.'
+  if (status === 422) return 'Thông tin đăng ký chưa hợp lệ. Hãy kiểm tra email và mật khẩu.'
+  if (status === 404) return 'Máy chủ đang chạy phiên bản cũ, chưa có API tài khoản. Hãy khởi động lại backend rồi thử lại.'
+  if (status === 0) return 'Không kết nối được máy chủ. Hãy kiểm tra backend và thử lại.'
+  return 'Không thể xác thực tài khoản. Vui lòng thử lại.'
 }
 
 function getInitials(name: string) {
   return name.trim().split(/\s+/).slice(-2).map((part) => part[0]?.toUpperCase() ?? '').join('')
-}
-
-function GoogleMark() {
-  return <svg aria-hidden="true" viewBox="0 0 18 18" width="17" height="17">
-    <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.27h2.92c1.7-1.57 2.68-3.88 2.68-6.63Z" />
-    <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.17l-2.92-2.27c-.8.54-1.82.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.95v2.34A9 9 0 0 0 9 18Z" />
-    <path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.94H.95a9 9 0 0 0 0 8.12l3.02-2.34Z" />
-    <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.43 1.35L15 2.36A8.6 8.6 0 0 0 9 0a9 9 0 0 0-8.05 4.94l3.02 2.34c.71-2.12 2.69-3.7 5.03-3.7Z" />
-  </svg>
 }

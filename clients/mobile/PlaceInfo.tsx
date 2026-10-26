@@ -1,3 +1,4 @@
+// Tải thống kê và hiển thị thông tin/biểu mẫu đánh giá của một địa điểm.
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,

@@ -1,3 +1,4 @@
+// Đọc và ghi dữ liệu ứng dụng cục bộ bằng IndexedDB, kể cả gói ngoại tuyến.
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { OfflineMapPack, OfflinePlacePack, Place, SavedTour } from './types'
 
