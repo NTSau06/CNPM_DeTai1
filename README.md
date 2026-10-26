@@ -27,9 +27,40 @@ Backend gồm API Gateway, POI Service, Tour Service, Narration Service và
 Analytics Service; mỗi service tách Presentation, Business/Application và Data Access. Tour Service
 kiểm tra điểm dừng qua POI Service; Narration Service lấy nội dung theo locale
 qua POI Service. Analytics Service lưu lượt ghé ẩn danh và đánh giá của người dùng.
-Số lượt ghé và điểm đánh giá hiển thị trong thông tin của từng địa điểm; ứng dụng
-không có chức năng quản trị hoặc số liệu bán vé. Xem [hướng dẫn backend](server/README.md)
+Số lượt ghé, điểm đánh giá và mục đặt vé thử nghiệm hiển thị trong thông tin
+của từng địa điểm; trang quản trị tổng hợp thêm thống kê sử dụng. Xem
+[hướng dẫn backend](server/README.md)
 để chạy từng service không cần Docker và chạy kiểm thử.
+
+### Trang quản trị
+
+Trang admin ở đường dẫn `/admin` hiển thị tổng tài khoản người dùng, số tài khoản
+đang hoạt động, lượt ghé 30 ngày gần nhất, số địa điểm và thống kê vé.
+Trang được cập nhật định kỳ. Một tài khoản được tính đang hoạt động khi có ít
+nhất một phiên đăng nhập còn hiệu lực; đăng nhập trên nhiều thiết bị vẫn chỉ
+tính một tài khoản. Phiên hết hạn hoặc đã đăng xuất không được tính; khách chưa
+đăng nhập không được tính. Đây là số liệu tài khoản có phiên đăng nhập, không
+phải số người hiện diện được xác minh. Giao diện admin nằm trong `clients/frontend/src/admin/`; API dùng chung
+và các endpoint quản trị nằm trong `clients/frontend/src/api.ts` và
+`server/api_gateway/`. Admin có thể đặt giá vé VND theo địa điểm; để trống giá
+rồi lưu sẽ đóng bán. Dashboard hiển thị số vé đã đặt, số đơn, doanh thu mô phỏng
+và số vé theo điểm. Người dùng đăng nhập để đặt tối đa 10 vé mỗi lần và xem số
+vé đã đặt ở địa điểm đang chọn. Đây là luồng thử nghiệm, không có thanh toán
+online hoặc xác nhận vé thực tế. Giá mẫu mặc định nằm trong khoảng 70.000–150.000
+VND và chỉ dùng để chạy thử; cần kiểm tra giá niêm yết với đơn vị quản lý trước
+khi sử dụng thực tế.
+
+Trước khi khởi động backend, cấu hình `ADMIN_EMAIL` và `ADMIN_PASSWORD` (mật khẩu
+tối thiểu 12 ký tự) qua biến môi trường hoặc file `.env` cục bộ không đưa vào Git.
+Tài khoản và phiên đăng nhập admin được lưu riêng trong `admin_accounts.sqlite`;
+tài khoản người dùng và đơn vé vẫn nằm trong `accounts.sqlite`. Dữ liệu admin cũ
+trùng email admin đang cấu hình được chuyển khỏi bảng người dùng khi gateway
+khởi động, để không tính admin vào thống kê tài khoản người dùng. Gateway
+tạo/cập nhật tài khoản quản trị theo cấu hình này khi khởi động. Với
+Docker Compose, dùng cùng lệnh `docker compose -f server/compose.yml up --build`;
+với script cục bộ, đặt hai biến trong PowerShell trước `npm run backend:start`.
+Sau đó mở `http://localhost:5173/admin` và đăng nhập bằng tài khoản vừa cấu hình.
+Không sử dụng mật khẩu mặc định hoặc chia sẻ file cấu hình chứa mật khẩu.
 
 ### Ngoại tuyến và hướng dẫn ứng xử
 
@@ -94,7 +125,7 @@ nhấn `Ctrl+C` để dừng Expo và các backend. Nếu biến `EXPO_PUBLIC_AP
 - [PRD — Quảng Trị](docs/PRD.md): yêu cầu sản phẩm, kiến trúc, luồng nghiệp vụ, API và CI/CD cho đủ ba phần của đồ án.
 - [Bài thuyết minh](system-presentation-standalone.html): bài trình bày độc lập với ba phần, sơ đồ và đọc thuyết minh bằng bảy ngôn ngữ.
 - `clients/frontend`: React.js PWA; `clients/mobile`: Expo/React Native; `server`: FastAPI ba lớp và các service giao tiếp qua HTTP.
-- Trong thông tin mỗi địa điểm trên web/mobile có số lượt ghé do app ghi nhận trong 30 ngày gần nhất và điểm đánh giá. Lượt ghé chỉ được ghi nhận khi người dùng bật hướng dẫn GPS; backend kiểm tra khoảng cách 85 m, không lưu tọa độ và đếm tối đa một lượt cho mỗi thiết bị/điểm/ngày. Đây là số liệu ước tính, không phải tổng khách thực tế; GPS có thể bị giả mạo. Đánh giá không xác minh danh tính. Chưa có nguồn dữ liệu bán vé nên ứng dụng không hiển thị số vé.
+- Trong thông tin mỗi địa điểm trên web có số lượt ghé do app ghi nhận trong 30 ngày gần nhất, điểm đánh giá và mục đặt vé thử nghiệm. Lượt ghé chỉ được ghi nhận khi người dùng bật hướng dẫn GPS; backend kiểm tra khoảng cách 85 m, không lưu tọa độ và đếm tối đa một lượt cho mỗi thiết bị/điểm/ngày. Đây là số liệu ước tính, không phải tổng khách thực tế; GPS có thể bị giả mạo. Đánh giá không xác minh danh tính. Vé đặt trong luồng thử nghiệm chưa được thanh toán hoặc xác nhận sử dụng.
 
 ## CI/CD
 

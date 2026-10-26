@@ -45,3 +45,31 @@ class RatingSummary(BaseModel):
     average_rating: float | None = Field(alias="averageRating")
     total_ratings: int = Field(alias="totalRatings")
     reviews: list[RatingReview]
+
+
+class AdminPlaceAnalytics(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    place_id: str = Field(alias="placeId")
+    visits: int
+    average_rating: float | None = Field(alias="averageRating")
+    rating_count: int = Field(alias="ratingCount")
+
+
+class AdminReview(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    place_id: str = Field(alias="placeId")
+    rating: int
+    review: str
+    created_at: str = Field(alias="createdAt")
+
+
+class AdminAnalyticsSummary(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    visits_last_30_days: int = Field(alias="visitsLast30Days")
+    total_ratings: int = Field(alias="totalRatings")
+    average_rating: float | None = Field(alias="averageRating")
+    places: list[AdminPlaceAnalytics]
+    latest_reviews: list[AdminReview] = Field(alias="latestReviews")

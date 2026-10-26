@@ -569,9 +569,24 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .rating-panel-heading { grid-column: auto; }
 }
 
-.device-entry { min-height: 100vh; display: flex; flex-direction: column; padding: 28px clamp(22px, 7vw, 100px) 20px; background: radial-gradient(ellipse at 50% 40%, #fffefa 0, #f7f5ef 68%); }
-.device-entry-brand { display: inline-flex; align-items: center; gap: 11px; }
+.device-entry { min-height: calc(100vh - 177px); display: flex; flex-direction: column; padding: 0 clamp(0px, 2vw, 28px); background: radial-gradient(ellipse at 50% 40%, #fffefa 0, #f7f5ef 68%); }
+.ticket-purchase-panel { display: grid; gap: 12px; margin-top: 18px; padding: 18px 20px; border: 1px solid #e8e5dc; border-radius: 8px; background: #fffefa; }
+.ticket-purchase-heading { display: flex; align-items: center; gap: 11px; }
+.ticket-purchase-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 7px; color: #547286; background: #edf2f4; }
+.ticket-purchase-heading h2 { margin: 0 0 4px; color: #3d5142; font-family: var(--serif); font-size: 18px; }
+.ticket-purchase-heading p, .ticket-owned-count { margin: 0; color: #85887e; font-size: 10px; }
+.ticket-order-controls { display: flex; align-items: end; gap: 10px; }
+.ticket-order-controls label { display: grid; gap: 5px; color: #667267; font-size: 10px; }
+.ticket-order-controls select { min-height: 35px; padding: 0 9px; border: 1px solid #e4e1d8; border-radius: 5px; color: #354b3c; background: #fff; }
+.ticket-order-controls button, .ticket-order-controls a { min-height: 35px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 12px; border: 0; border-radius: 5px; color: #fffefa; background: var(--forest-dark); font-size: 10px; font-weight: 700; }
+.ticket-order-controls button:disabled { opacity: .6; }
+.ticket-purchase-note { color: #96988e; font-size: 9px; line-height: 1.5; }
+.ticket-purchase-feedback { margin: 0; color: #536b56; font-size: 10px; line-height: 1.5; }
+.ticket-purchase-feedback.error { color: #a4513f; }
 .device-entry-content { width: min(760px, 100%); flex: 1; display: flex; flex-direction: column; justify-content: center; align-self: center; padding: 48px 0 24px; }
+.device-entry-actions { display: flex; justify-content: flex-end; margin-bottom: 22px; }
+.device-entry-home { display: inline-flex; align-items: center; gap: 7px; padding: 9px 12px; border: 1px solid #e4e1d8; border-radius: 6px; color: #526255; background: #fffefa; font-size: 11px; font-weight: 600; }
+.device-entry-home:hover { border-color: #c9d1c5; background: #f0f2ec; }
 .device-entry-eyebrow { display: flex; align-items: center; justify-content: center; gap: 9px; color: #9b795c; font-size: 9px; font-weight: 700; letter-spacing: 1.45px; text-align: center; }
 .device-entry-eyebrow span, .device-entry-footer span { width: 22px; height: 1px; background: #bf895f; }
 .device-entry-content h1 { margin: 22px 0 10px; color: #354b3c; font-family: var(--serif); font-size: clamp(38px, 5.5vw, 58px); font-weight: 500; letter-spacing: -1.5px; line-height: 1.08; text-align: center; }
@@ -622,4 +637,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .device-qr-steps { justify-self: center; }
   .device-qr-code { width: min(280px, 100%); min-height: 0; justify-self: center; }
   .device-qr-warning { font-size: 9px; }
+  .ticket-purchase-panel { padding: 15px; }
+  .ticket-order-controls { align-items: stretch; flex-direction: column; }
+  .ticket-order-controls button, .ticket-order-controls a { width: 100%; }
 }

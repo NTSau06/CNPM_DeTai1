@@ -5,6 +5,7 @@ from fastapi import APIRouter, Request
 
 from services.analytics_service.repository import AnalyticsRepository
 from services.analytics_service.schemas import (
+    AdminAnalyticsSummary,
     PlaceAnalytics,
     RatingCreate,
     RatingSummary,
@@ -46,3 +47,11 @@ def get_rating(place_id: str, request: Request) -> RatingSummary:
 )
 def get_place_analytics(place_id: str, request: Request) -> PlaceAnalytics:
     return repository(request).place_analytics(place_id)
+
+
+@router.get(
+    "/internal/v1/analytics/admin/summary",
+    response_model=AdminAnalyticsSummary,
+)
+def get_admin_summary(request: Request) -> AdminAnalyticsSummary:
+    return repository(request).admin_summary()

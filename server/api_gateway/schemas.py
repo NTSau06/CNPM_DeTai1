@@ -44,3 +44,16 @@ class LoginRequest(BaseModel):
     @classmethod
     def normalize_email(cls, value: str) -> str:
         return value.strip().lower()
+
+
+class TicketOrderCreate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    place_id: Annotated[str, Field(alias="placeId", min_length=1, max_length=120)]
+    quantity: Annotated[int, Field(ge=1, le=10)]
+
+
+class TicketPriceUpdate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    price_vnd: Annotated[int | None, Field(alias="priceVnd", ge=70_000, le=150_000)]

@@ -6,6 +6,7 @@ import { NavLink } from 'react-router-dom'
 import { getVisitorId, recordVisit } from '../api'
 import { NarrationCard } from '../components/NarrationCard'
 import { PlaceRatingPanel } from '../components/PlaceRatingPanel'
+import { TicketPurchasePanel } from '../components/TicketPurchasePanel'
 import { RitualGuidancePanel } from '../components/RitualGuidancePanel'
 import { getOfflinePlacePack } from '../db'
 import { categoryKeys, categoryLabels, findPlace, languages, localizedTitle, places as bundledPlaces } from '../data/places'
@@ -258,6 +259,7 @@ export function ExplorePage() {
           </div>
           <NarrationCard place={selectedPlace} language={language} distanceMeters={distanceMeters} onStartWalk={startWalk} onStopWalk={stopWalk} />
           <RitualGuidancePanel place={selectedPlace} language={language} />
+          <TicketPurchasePanel placeId={selectedPlace.id} />
           <section className="place-language-card" lang={language}>
             <h2>{selectedLanguage?.label ?? language}</h2>
             <h3>{selectedPlace.copy[language].title}</h3>

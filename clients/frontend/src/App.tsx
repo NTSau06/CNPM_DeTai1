@@ -1,17 +1,19 @@
 // Kết nối các trang, điều hướng chính và trạng thái dùng chung của ứng dụng web.
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { AlertCircle, Bookmark, ChevronDown, Compass, Map, MapPinned, Menu, Settings2, X } from 'lucide-react'
+import { AlertCircle, Bookmark, ChevronDown, Compass, Map, MapPinned, Menu, MonitorSmartphone, Settings2, X } from 'lucide-react'
 import { translate } from './i18n'
 import { languages } from './data/places'
 import { useAppStore } from './store'
 import { AppShell } from './components/AppShell'
 import { DeviceEntryPage } from './pages/DeviceEntryPage'
+import { sendSessionHeartbeat } from './api'
 
 const ExplorePage = lazy(() => import('./pages/ExplorePage').then((module) => ({ default: module.ExplorePage })))
 const SavedPage = lazy(() => import('./pages/SavedPage').then((module) => ({ default: module.SavedPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })))
 const UserPage = lazy(() => import('./pages/UserPage').then((module) => ({ default: module.UserPage })))
+const AdminPage = lazy(() => import('./admin/AdminPage').then((module) => ({ default: module.AdminPage })))
 
 export default function App() {
   const location = useLocation()
@@ -19,6 +21,7 @@ export default function App() {
   const savedTourCount = useAppStore((state) => state.savedTours.length)
   const online = useAppStore((state) => state.online)
   const currentUser = useAppStore((state) => state.currentUser)
+  const authToken = useAppStore((state) => state.authToken)
   const storageError = useAppStore((state) => state.storageError)
   const clearStorageError = useAppStore((state) => state.clearStorageError)
   const [navigationOpen, setNavigationOpen] = useState(false)
@@ -57,6 +60,25 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (!authToken) return
+    let disposed = false
+    const heartbeat = () => {
+      if (document.visibilityState !== 'visible') return
+      void sendSessionHeartbeat(authToken).catch((error: unknown) => {
+        if (!disposed) console.error('Unable to update account activity.', error)
+      })
+    }
+    heartbeat()
+    const interval = window.setInterval(heartbeat, 30_000)
+    document.addEventListener('visibilitychange', heartbeat)
+    return () => {
+      disposed = true
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', heartbeat)
+    }
+  }, [authToken])
+
+  useEffect(() => {
     let nextToastId = 0
     let timeout: number | undefined
     const showApiError = (event: Event) => {
@@ -81,12 +103,14 @@ export default function App() {
     { to: '/settings', label: translate(language, 'settings'), icon: Settings2 },
   ]
 
-  if (location.pathname === '/' && new URLSearchParams(location.search).get('device') === 'mobile') {
-    return <Navigate to="/explore" replace />
-  }
-
-  if (location.pathname === '/') {
-    return <AppShell><DeviceEntryPage /></AppShell>
+  if (location.pathname.startsWith('/admin')) {
+    return (
+      <AppShell>
+        <Suspense fallback={<div className="page-loading" role="status">Đang mở trang quản trị…</div>}>
+          <AdminPage />
+        </Suspense>
+      </AppShell>
+    )
   }
 
   return (
@@ -117,6 +141,14 @@ export default function App() {
             </button>
             {navigationOpen && (
               <nav className="header-navigation-menu" id="header-navigation-menu" aria-label={translate(language, 'navMenu')}>
+                <NavLink
+                  to="/device"
+                  className={({ isActive }) => `header-navigation-item${isActive ? ' active' : ''}`}
+                  onClick={() => setNavigationOpen(false)}
+                >
+                  <MonitorSmartphone size={17} strokeWidth={1.8} />
+                  <span>Chọn thiết bị</span>
+                </NavLink>
                 {items.map(({ to, label, icon: Icon, end }) => (
                   <NavLink
                     key={to}
@@ -148,6 +180,7 @@ export default function App() {
         )}
         <Suspense fallback={<div className="page-loading" aria-label={translate(language, 'loading')}><span className="skeleton page-skeleton-title" /><span className="skeleton page-skeleton-line" /><span className="skeleton page-skeleton-block" /></div>}>
           <Routes>
+            <Route path="/device" element={<DeviceEntryPage />} />
             <Route path="/explore" element={<ExplorePage />} />
             <Route path="/saved" element={<SavedPage />} />
             <Route path="/offline" element={<SettingsPage />} />

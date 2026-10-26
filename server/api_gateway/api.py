@@ -5,7 +5,13 @@ from typing import Annotated
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
 
 from api_gateway.proxy import request_service
-from api_gateway.schemas import LoginRequest, RegisterRequest, VisitSubmission
+from api_gateway.schemas import (
+    LoginRequest,
+    RegisterRequest,
+    TicketOrderCreate,
+    TicketPriceUpdate,
+    VisitSubmission,
+)
 from services.analytics_service.schemas import RatingCreate
 from services.common.schemas import Locale, TourCreate
 
@@ -26,6 +32,18 @@ def authenticated_user(
     if user is None:
         raise HTTPException(status_code=401, detail="Your session has expired. Sign in again.")
     return user
+
+
+def administrator(
+    request: Request,
+    authorization: str | None,
+) -> dict:
+    if authorization is None or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Administrator sign-in is required.")
+    admin = request.app.state.admin_auth_repository.authenticate(authorization[7:])
+    if admin is None:
+        raise HTTPException(status_code=401, detail="Administrator session is invalid or expired.")
+    return admin
 
 
 @router.post("/auth/register", status_code=status.HTTP_201_CREATED)
@@ -60,12 +78,49 @@ def login(payload: LoginRequest, request: Request) -> dict:
     return {"token": token, "user": user}
 
 
+@router.post("/admin/login")
+def admin_login(payload: LoginRequest, request: Request) -> dict:
+    result = request.app.state.admin_auth_repository.login(
+        payload.email.strip().lower(),
+        payload.password,
+    )
+    if result is None:
+        raise HTTPException(status_code=401, detail="Admin email or password is incorrect.")
+    token, admin = result
+    return {"token": token, "user": admin}
+
+
+@router.post("/admin/logout", status_code=status.HTTP_204_NO_CONTENT)
+def admin_logout(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    administrator(request, authorization)
+    if authorization is None:
+        raise HTTPException(status_code=401, detail="Administrator sign-in is required.")
+    request.app.state.admin_auth_repository.revoke(authorization[7:])
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/auth/me")
 def get_current_user(
     request: Request,
     authorization: str | None = Header(default=None),
 ) -> dict:
     return authenticated_user(request, authorization)
+
+
+@router.post("/auth/heartbeat")
+def heartbeat(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict[str, bool]:
+    authenticated_user(request, authorization)
+    if authorization is None or not request.app.state.auth_repository.heartbeat(
+        authorization[7:]
+    ):
+        raise HTTPException(status_code=401, detail="Your session has expired. Sign in again.")
+    return {"active": True}
 
 
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -78,6 +133,90 @@ def logout(
         raise HTTPException(status_code=401, detail="Sign in to continue.")
     request.app.state.auth_repository.revoke(authorization[7:])
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/admin/overview")
+async def admin_overview(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    administrator(request, authorization)
+    if authorization is None or not request.app.state.admin_auth_repository.heartbeat(
+        authorization[7:]
+    ):
+        raise HTTPException(status_code=401, detail="Your session has expired. Sign in again.")
+    analytics = await request_service(
+        service_url(request, "analytics"),
+        "GET",
+        "/internal/v1/analytics/admin/summary",
+    )
+    return {
+        **request.app.state.auth_repository.account_metrics(),
+        "analytics": analytics,
+        "tickets": request.app.state.ticket_repository.sales_summary(),
+    }
+
+
+@router.get("/tickets/prices")
+def ticket_prices(request: Request) -> dict:
+    return {"items": request.app.state.ticket_repository.prices()}
+
+
+@router.post("/tickets/orders", status_code=status.HTTP_201_CREATED)
+async def create_ticket_order(
+    payload: TicketOrderCreate,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    user = authenticated_user(request, authorization)
+    await request_service(
+        service_url(request, "poi"),
+        "GET",
+        f"/internal/v1/places/{payload.place_id}",
+    )
+    try:
+        order = request.app.state.ticket_repository.create_order(
+            user["id"], payload.place_id, payload.quantity
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return order
+
+
+@router.get("/tickets/orders")
+def get_ticket_orders(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    user = authenticated_user(request, authorization)
+    items = request.app.state.ticket_repository.user_orders(user["id"])
+    return {"items": items, "total": sum(item["quantity"] for item in items)}
+
+
+@router.put("/admin/tickets/prices/{place_id}")
+async def update_ticket_price(
+    place_id: str,
+    payload: TicketPriceUpdate,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    administrator(request, authorization)
+    await request_service(
+        service_url(request, "poi"),
+        "GET",
+        f"/internal/v1/places/{place_id}",
+    )
+    request.app.state.ticket_repository.set_price(place_id, payload.price_vnd)
+    return {"placeId": place_id, "priceVnd": payload.price_vnd}
+
+
+@router.get("/admin/tickets")
+def get_ticket_sales(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    administrator(request, authorization)
+    return request.app.state.ticket_repository.sales_summary()
 
 
 @router.post("/analytics/visits", status_code=status.HTTP_201_CREATED)

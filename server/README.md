@@ -82,8 +82,8 @@ start with the same 14 places and seven reviewed locale copies.
   statistics show visits from the last 30 days and the average rating from all
   submitted ratings. Rating submissions are not identity-verified; device
   identifiers can be reset or spoofed. Visits count app users who enable GPS,
-  not all people physically visiting a destination. There is no ticket-sales
-  data source in the application, so ticket counts are not displayed.
+  not all people physically visiting a destination. Ticket bookings are
+  simulated and do not represent real paid or validated tickets.
 - **API Gateway:** routes web/mobile clients to the internal services; service
   URLs are supplied through environment variables.
 
@@ -94,6 +94,31 @@ saved tour is scoped to its owner. The web and mobile clients restore the sessio
 and account's tours on reload. This is a course-project authentication implementation, not a
 substitute for a production identity provider, HTTPS, rate limiting or account
 recovery.
+
+Ticket orders are an authenticated test flow, not real payment processing.
+Administrators configure a positive VND price per place; a blank price disables
+sales. Each successful order records a price snapshot, ticket quantity and
+simulated revenue. Users can see their own order totals; admins see aggregate
+sales and revenue in `/admin`. No payment provider or real ticket validation is
+integrated. Initial demo prices are seeded for the sample catalog in the
+70,000–150,000 VND range and are not official venue prices; verify tariffs with
+the venue before any real use. Admin changes persist and are not overwritten
+when the gateway restarts.
+
+The gateway bootstraps the administrator account from `ADMIN_EMAIL` and
+`ADMIN_PASSWORD` on startup. Both values are required together; the password
+must contain at least 12 characters. Keep them in an untracked local `.env` or
+deployment secret store. Admin credentials and sessions are stored in the
+separate `admin_accounts.sqlite` database (`ADMIN_DATABASE_PATH`); user accounts,
+user sessions and ticket orders remain in `accounts.sqlite`. Legacy admin rows
+matching the configured admin email are migrated out of the user table when the
+gateway starts. The web app sends an authenticated heartbeat every 30 seconds
+while visible. The protected
+`/api/v1/admin/overview` endpoint reports distinct user accounts with at least
+one unexpired login session and an analytics summary; multiple device sessions
+for one account count once. Admin sessions do not count as user accounts.
+Expired or revoked sessions and guest sessions are not counted. It does not
+expose user profiles.
 
 ## API examples
 

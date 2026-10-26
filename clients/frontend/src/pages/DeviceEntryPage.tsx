@@ -1,6 +1,6 @@
 // Chọn trải nghiệm máy tính/điện thoại và tạo mã QR để mở trên điện thoại.
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ArrowRight, Map, Monitor, QrCode, Smartphone } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Home, Monitor, QrCode, Smartphone } from 'lucide-react'
 import QRCode from 'qrcode'
 import { useNavigate } from 'react-router-dom'
 
@@ -47,13 +47,13 @@ export function DeviceEntryPage() {
   }
 
   return (
-    <main className="device-entry">
-      <header className="device-entry-brand">
-        <span className="brand-mark"><Map size={19} strokeWidth={1.8} /></span>
-        <span className="brand-name">Quảng Trị</span>
-      </header>
-
+    <section className="device-entry">
       <section className="device-entry-content">
+        <div className="device-entry-actions">
+          <button className="device-entry-home" type="button" onClick={() => navigate('/explore')}>
+            <Home size={16} /> Về trang chủ
+          </button>
+        </div>
         <div className="device-entry-eyebrow"><span /> HÀNH TRÌNH KHÁM PHÁ BẮT ĐẦU TỪ ĐÂY</div>
         {!showQr ? (
           <>
@@ -112,6 +112,6 @@ export function DeviceEntryPage() {
         )}
         <div className="device-entry-footer"><span /> QUẢNG TRỊ · QUẢNG BÌNH <span /></div>
       </section>
-    </main>
+    </section>
   )
 }

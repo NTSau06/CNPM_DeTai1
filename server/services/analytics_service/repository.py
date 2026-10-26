@@ -8,6 +8,9 @@ from pathlib import Path
 from uuid import UUID
 
 from services.analytics_service.schemas import (
+    AdminAnalyticsSummary,
+    AdminPlaceAnalytics,
+    AdminReview,
     PlaceAnalytics,
     RatingCreate,
     RatingReview,
@@ -134,6 +137,74 @@ class AnalyticsRepository:
             visits=visits[0],
             averageRating=round(rating[0], 2) if rating[0] is not None else None,
             ratingCount=rating[1],
+        )
+
+    def admin_summary(self, period_days: int = 30) -> AdminAnalyticsSummary:
+        today = datetime.now(timezone.utc).date()
+        start_date = (today - timedelta(days=period_days - 1)).isoformat()
+        with sqlite3.connect(self.database_path) as connection:
+            visits_total = connection.execute(
+                "SELECT COUNT(*) FROM visits WHERE visit_date >= ?",
+                (start_date,),
+            ).fetchone()[0]
+            rating_total, overall_average = connection.execute(
+                "SELECT COUNT(*), AVG(rating) FROM ratings"
+            ).fetchone()
+            place_rows = connection.execute(
+                """
+                SELECT place_id, COUNT(*)
+                FROM visits
+                WHERE visit_date >= ?
+                GROUP BY place_id
+                """,
+                (start_date,),
+            ).fetchall()
+            rating_rows = connection.execute(
+                """
+                SELECT place_id, AVG(rating), COUNT(*)
+                FROM ratings
+                GROUP BY place_id
+                """
+            ).fetchall()
+            recent_rows = connection.execute(
+                """
+                SELECT place_id, rating, review, updated_at
+                FROM ratings
+                WHERE review != ''
+                ORDER BY updated_at DESC
+                LIMIT 8
+                """
+            ).fetchall()
+
+        ratings_by_place = {
+            row[0]: (round(row[1], 2), row[2]) for row in rating_rows
+        }
+        visits_by_place = {row[0]: row[1] for row in place_rows}
+        place_ids = visits_by_place.keys() | ratings_by_place.keys()
+        places = [
+            AdminPlaceAnalytics(
+                placeId=place_id,
+                visits=visits_by_place.get(place_id, 0),
+                averageRating=ratings_by_place.get(place_id, (None, 0))[0],
+                ratingCount=ratings_by_place.get(place_id, (None, 0))[1],
+            )
+            for place_id in place_ids
+        ]
+        places.sort(key=lambda item: (-item.visits, item.place_id))
+        return AdminAnalyticsSummary(
+            visitsLast30Days=visits_total,
+            totalRatings=rating_total,
+            averageRating=round(overall_average, 2) if overall_average is not None else None,
+            places=places,
+            latestReviews=[
+                AdminReview(
+                    placeId=row[0],
+                    rating=row[1],
+                    review=row[2],
+                    createdAt=row[3],
+                )
+                for row in recent_rows
+            ],
         )
 
 

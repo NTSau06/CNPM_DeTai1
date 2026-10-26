@@ -23,15 +23,31 @@ class AuthRepository:
                     email TEXT NOT NULL UNIQUE,
                     phone TEXT NOT NULL,
                     password_salt BLOB NOT NULL,
-                    password_hash BLOB NOT NULL
+                    password_hash BLOB NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'user'
                 );
                 CREATE TABLE IF NOT EXISTS auth_sessions (
                     token_hash TEXT PRIMARY KEY,
                     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    expires_at INTEGER NOT NULL
+                    expires_at INTEGER NOT NULL,
+                    last_seen_at INTEGER
                 );
                 """
             )
+            user_columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(users)")
+            }
+            if "role" not in user_columns:
+                connection.execute(
+                    "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'"
+                )
+            session_columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(auth_sessions)")
+            }
+            if "last_seen_at" not in session_columns:
+                connection.execute(
+                    "ALTER TABLE auth_sessions ADD COLUMN last_seen_at INTEGER"
+                )
 
     def register(self, full_name: str, email: str, phone: str, password: str) -> tuple[str, dict]:
         salt = secrets.token_bytes(16)
@@ -97,21 +113,58 @@ class AuthRepository:
         with sqlite3.connect(self.database_path) as connection:
             connection.execute("DELETE FROM auth_sessions WHERE token_hash = ?", (token_hash,))
 
+    def heartbeat(self, token: str) -> bool:
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        now = int(time.time())
+        with sqlite3.connect(self.database_path) as connection:
+            cursor = connection.execute(
+                """
+                UPDATE auth_sessions
+                SET last_seen_at = ?
+                WHERE token_hash = ? AND expires_at > ?
+                """,
+                (now, token_hash, now),
+            )
+        return cursor.rowcount == 1
+
+    def account_metrics(self) -> dict[str, int]:
+        now = int(time.time())
+        with sqlite3.connect(self.database_path) as connection:
+            total_accounts = connection.execute(
+                "SELECT COUNT(*) FROM users"
+            ).fetchone()[0]
+            active_accounts = connection.execute(
+                """
+                SELECT COUNT(DISTINCT user_id)
+                FROM auth_sessions
+                WHERE expires_at > ?
+                """,
+                (now,),
+            ).fetchone()[0]
+        return {
+            "accountCount": total_accounts,
+            "activeAccountCount": active_accounts,
+        }
+
     def _create_session(self, user_id: str) -> str:
         token = secrets.token_urlsafe(32)
-        expires_at = int(time.time()) + 30 * 24 * 60 * 60
+        now = int(time.time())
+        expires_at = now + 30 * 24 * 60 * 60
         token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
         with sqlite3.connect(self.database_path) as connection:
             connection.execute(
-                "INSERT INTO auth_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)",
-                (token_hash, user_id, expires_at),
+                """
+                INSERT INTO auth_sessions (token_hash, user_id, expires_at, last_seen_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (token_hash, user_id, expires_at, now),
             )
         return token
 
     def _get_user(self, user_id: str) -> dict | None:
         with sqlite3.connect(self.database_path) as connection:
             row = connection.execute(
-                "SELECT id, full_name, email, phone FROM users WHERE id = ?",
+                "SELECT id, full_name, email, phone, role FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
         if row is None:
@@ -124,6 +177,7 @@ class AuthRepository:
             "birthDate": "",
             "gender": "",
             "address": "",
+            "role": row[4],
         }
 
 

@@ -190,6 +190,47 @@ def test_analytics_counts_visits_and_ratings_per_place(tmp_path: Path) -> None:
     }
 
 
+def test_analytics_admin_summary_aggregates_visits_ratings_and_reviews(
+    tmp_path: Path,
+) -> None:
+    app = create_analytics_app(tmp_path / "analytics.sqlite")
+    visitor_ids = [
+        "fb0bbd7e-926c-4e38-a9cb-ec57a66e314d",
+        "2c7b7a37-1bb4-4f40-b241-54e39ef45e37",
+    ]
+    with TestClient(app) as client:
+        for visitor_id, rating in zip(visitor_ids, (5, 4), strict=True):
+            client.post(
+                "/internal/v1/analytics/visits",
+                json={"placeId": "phong-nha-cave", "visitorId": visitor_id},
+            )
+            client.post(
+                "/internal/v1/analytics/ratings",
+                json={
+                    "placeId": "phong-nha-cave",
+                    "visitorId": visitor_id,
+                    "rating": rating,
+                    "review": f"Nhận xét {rating}",
+                },
+            )
+        response = client.get("/internal/v1/analytics/admin/summary")
+
+    assert response.status_code == 200
+    summary = response.json()
+    assert summary["visitsLast30Days"] == 2
+    assert summary["totalRatings"] == 2
+    assert summary["averageRating"] == 4.5
+    assert summary["places"] == [
+        {
+            "placeId": "phong-nha-cave",
+            "visits": 2,
+            "averageRating": 4.5,
+            "ratingCount": 2,
+        }
+    ]
+    assert len(summary["latestReviews"]) == 2
+
+
 def test_visit_distance_uses_meters() -> None:
     assert _distance_meters(0, 0, 0, 0) == 0
     assert 80 < _distance_meters(0, 0, 0.0008, 0) < 90

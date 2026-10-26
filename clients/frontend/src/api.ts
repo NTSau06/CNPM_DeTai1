@@ -34,6 +34,46 @@ export interface PlaceAnalytics {
   ratingCount: number
 }
 
+export interface AdminOverview {
+  accountCount: number
+  activeAccountCount: number
+  tickets?: TicketSalesSummary
+  analytics: {
+    visitsLast30Days: number
+    totalRatings: number
+    averageRating: number | null
+    places: PlaceAnalytics[]
+    latestReviews: {
+      placeId: string
+      rating: number
+      review: string
+      createdAt: string
+    }[]
+  }
+}
+
+export interface TicketPrice {
+  placeId: string
+  priceVnd: number | null
+}
+
+export interface TicketOrder {
+  id: string
+  placeId: string
+  quantity: number
+  unitPriceVnd: number
+  totalPriceVnd: number
+  createdAt: string
+}
+
+export interface TicketSalesSummary {
+  totalTicketsSold: number
+  totalOrders: number
+  totalRevenueVnd: number
+  places: { placeId: string; ticketsSold: number; revenueVnd: number }[]
+  recentOrders: TicketOrder[]
+}
+
 export class BackendApiError extends Error {
   constructor(
     message: string,
@@ -119,6 +159,67 @@ export async function fetchCurrentUser(token: string): Promise<UserProfile> {
 
 export async function logoutAccount(token: string): Promise<void> {
   await request<void>('/auth/logout', { method: 'POST' }, token)
+}
+
+export async function sendSessionHeartbeat(token: string): Promise<void> {
+  await request<void>('/auth/heartbeat', { method: 'POST' }, token)
+}
+
+export async function loginAdmin(email: string, password: string): Promise<AuthResponse> {
+  return request<AuthResponse>('/admin/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  })
+}
+
+export async function logoutAdmin(token: string): Promise<void> {
+  await request<void>('/admin/logout', { method: 'POST' }, token)
+}
+
+export async function fetchAdminOverview(token: string): Promise<AdminOverview> {
+  return request<AdminOverview>('/admin/overview', undefined, token)
+}
+
+export async function fetchTicketPrices(): Promise<TicketPrice[]> {
+  const result = await request<{ items: TicketPrice[] }>('/tickets/prices')
+  return result.items
+}
+
+export async function fetchMyTicketOrders(token: string): Promise<TicketOrder[]> {
+  const result = await request<{ items: TicketOrder[]; total: number }>('/tickets/orders', undefined, token)
+  return result.items
+}
+
+export async function createTicketOrder(
+  placeId: string,
+  quantity: number,
+  token: string,
+): Promise<TicketOrder> {
+  return request<TicketOrder>('/tickets/orders', {
+    method: 'POST',
+    body: JSON.stringify({ placeId, quantity }),
+  }, token)
+}
+
+export async function updateAdminTicketPrice(
+  placeId: string,
+  priceVnd: number | null,
+  token: string,
+): Promise<TicketPrice> {
+  return request<TicketPrice>(`/admin/tickets/prices/${encodeURIComponent(placeId)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ priceVnd }),
+  }, token)
+}
+
+export function getStoredAdminToken() {
+  return typeof localStorage === 'undefined' ? null : localStorage.getItem('quang-tri:admin-token:v1')
+}
+
+export function storeAdminToken(token: string | null) {
+  if (typeof localStorage === 'undefined') return
+  if (token) localStorage.setItem('quang-tri:admin-token:v1', token)
+  else localStorage.removeItem('quang-tri:admin-token:v1')
 }
 
 export function getStoredAuthToken() {
