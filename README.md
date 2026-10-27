@@ -14,12 +14,21 @@ npm run dev
 thư mục gốc dự án và kết nối máy tính, điện thoại vào cùng mạng Wi-Fi. Ứng dụng
 sẽ tạo mã QR trỏ tới địa chỉ mạng của máy tính.
 
+Để dừng frontend và các backend của ứng dụng cục bộ, chạy từ thư mục gốc:
+
+```powershell
+npm run stop:local
+```
+
+Lệnh chỉ dừng tiến trình có câu lệnh khớp với service của dự án trên các cổng
+`5173` và `8000`–`8004`; tiến trình khác đang dùng các cổng này sẽ được giữ lại.
+
 ## Chạy backend
 
 Cần Docker Desktop và Docker Compose.
 
 ```powershell
-docker compose -f server/compose.yml up --build
+docker compose --env-file .env -f server/compose.yml up --build
 ```
 
 Gateway/API docs ở `http://localhost:8000` và `http://localhost:8000/docs`.
@@ -57,7 +66,7 @@ tài khoản người dùng và đơn vé vẫn nằm trong `accounts.sqlite`. D
 trùng email admin đang cấu hình được chuyển khỏi bảng người dùng khi gateway
 khởi động, để không tính admin vào thống kê tài khoản người dùng. Gateway
 tạo/cập nhật tài khoản quản trị theo cấu hình này khi khởi động. Với
-Docker Compose, dùng cùng lệnh `docker compose -f server/compose.yml up --build`;
+Docker Compose, dùng lệnh `docker compose --env-file .env -f server/compose.yml up --build`;
 với script cục bộ, đặt hai biến trong PowerShell trước `npm run backend:start`.
 Sau đó mở `http://localhost:5173/admin` và đăng nhập bằng tài khoản vừa cấu hình.
 Không sử dụng mật khẩu mặc định hoặc chia sẻ file cấu hình chứa mật khẩu.

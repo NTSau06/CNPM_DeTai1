@@ -9,7 +9,7 @@ SQLite so the class project can run locally without provisioning a database.
 From the repository root:
 
 ```powershell
-docker compose -f server/compose.yml up --build
+docker compose --env-file .env -f server/compose.yml up --build
 ```
 
 The gateway is available at `http://localhost:8000`; interactive API docs are at

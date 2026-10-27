@@ -12,8 +12,8 @@ services:
       ANALYTICS_SERVICE_URL: http://analytics-service:8004
       AUTH_DATABASE_PATH: /data/accounts.sqlite
       ADMIN_DATABASE_PATH: /data/admin_accounts.sqlite
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin.test@quangtri.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in the root .env file}
       CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:19006,http://localhost:8081,http://127.0.0.1:8081
     volumes:
       - auth-data:/data
