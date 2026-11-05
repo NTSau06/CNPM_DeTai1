@@ -29,6 +29,12 @@ export function getNarrationAudioUrl(placeId: string, language: Language): strin
   return `${import.meta.env.BASE_URL}audio/${placeId}/${language}.mp3`
 }
 
+export function getNarrationAudioLanguage(placeId: string, preferredLanguage: Language): Language {
+  const availableLanguages = narrationAudioLanguages[placeId]
+  if (!availableLanguages || availableLanguages.includes(preferredLanguage)) return preferredLanguage
+  return availableLanguages[0]
+}
+
 export function getNarrationText(place: Place, language: Language) {
   const copy = place.copy[language] ?? place.copy.vi
   if (language !== 'vi') return copy.narration

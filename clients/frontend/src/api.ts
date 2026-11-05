@@ -1,13 +1,15 @@
-// Định nghĩa các lời gọi tới backend và chuyển đổi dữ liệu API cho giao diện.
+﻿// Định nghĩa các lời gọi tới backend và chuyển đổi dữ liệu API cho giao diện.
 import type { Language, Place, SavedTour, UserProfile } from './types'
 
-interface ApiPlace {
+export interface ApiPlace {
   id: string
   category: Place['category']
   coordinates: [number, number]
   duration: number
   image: string
   copy: Partial<Record<Language, Place['copy'][Language]>>
+  detailSections?: Place['detailSections']
+  detailImage?: Place['detailImage'] | null
 }
 
 interface ApiCollection<T> {
@@ -34,9 +36,16 @@ export interface PlaceAnalytics {
   ratingCount: number
 }
 
-export interface AdminOverview {
+export interface OnlineVisitorCount {
+  onlineVisitors: number
+}
+
+export interface AdminOverview extends OnlineVisitorCount {
   accountCount: number
   activeAccountCount: number
+  placeCount: number
+  visits: number
+  ratingCount: number
   tickets?: TicketSalesSummary
   analytics: {
     visitsLast30Days: number
@@ -50,6 +59,14 @@ export interface AdminOverview {
       createdAt: string
     }[]
   }
+}
+
+export interface AdminUser {
+  id: string
+  fullName: string
+  email: string
+  phone: string
+  isAdmin: boolean
 }
 
 export interface TicketPrice {
@@ -157,6 +174,29 @@ export async function fetchCurrentUser(token: string): Promise<UserProfile> {
   return request<UserProfile>('/auth/me', undefined, token)
 }
 
+export async function updateProfile(token: string, profile: UserProfile): Promise<UserProfile> {
+  return request<UserProfile>('/auth/me', {
+    method: 'PUT',
+    body: JSON.stringify({
+      fullName: profile.fullName,
+      phone: profile.phone,
+      birthDate: profile.birthDate,
+      gender: profile.gender,
+      address: profile.address,
+    }),
+  }, token)
+}
+
+export async function changePassword(
+  token: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<AuthResponse> {
+  return request<AuthResponse>('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  }, token)
+}
 export async function logoutAccount(token: string): Promise<void> {
   await request<void>('/auth/logout', { method: 'POST' }, token)
 }
@@ -232,6 +272,16 @@ export function storeAuthToken(token: string | null) {
   else localStorage.removeItem('quang-tri:auth-token:v1')
 }
 
+export function getStoredAdminAuthToken() {
+  return typeof localStorage === 'undefined' ? null : localStorage.getItem('quang-tri:admin-auth-token:v1')
+}
+
+export function storeAdminAuthToken(token: string | null) {
+  if (typeof localStorage === 'undefined') return
+  if (token) localStorage.setItem('quang-tri:admin-auth-token:v1', token)
+  else localStorage.removeItem('quang-tri:admin-auth-token:v1')
+}
+
 export async function fetchTours(token: string): Promise<SavedTour[]> {
   const result = await request<ApiCollection<SavedTour>>('/tours', undefined, token)
   return result.items
@@ -252,11 +302,24 @@ export async function deleteRemoteTour(id: string, token: string): Promise<void>
   await request<void>(`/tours/${encodeURIComponent(id)}`, { method: 'DELETE' }, token)
 }
 
+/**
+ * Tạo UUID v4. `crypto.randomUUID()` chỉ có trong ngữ cảnh an toàn (HTTPS/localhost),
+ * nên khi mở bằng http://<IP-LAN> trên điện thoại phải dùng getRandomValues.
+ */
+export function generateId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
 export async function getVisitorId(): Promise<string> {
   const key = 'quang-tri:visitor-id:v1'
   const existing = localStorage.getItem(key)
   if (existing) return existing
-  const visitorId = crypto.randomUUID()
+  const visitorId = generateId()
   localStorage.setItem(key, visitorId)
   return visitorId
 }
@@ -277,6 +340,69 @@ export async function getPlaceAnalytics(placeId: string): Promise<PlaceAnalytics
   return request(`/places/${encodeURIComponent(placeId)}/analytics`)
 }
 
+export async function updateOnlinePresence(visitorId: string): Promise<void> {
+  await request<void>('/analytics/presence', {
+    method: 'POST',
+    body: JSON.stringify({ visitorId }),
+  })
+}
+
+/** Báo thiết bị đã rời trang; dùng sendBeacon để vẫn gửi được khi tab đang đóng. */
+export function leaveOnlinePresence(visitorId: string): void {
+  const url = `${baseUrl}/analytics/presence/leave`
+  const body = JSON.stringify({ visitorId })
+  try {
+    if (navigator.sendBeacon?.(url, new Blob([body], { type: 'application/json' }))) return
+  } catch {
+    // Chuyển sang fetch bên dưới.
+  }
+  void fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    keepalive: true,
+  }).catch(() => undefined)
+}
+
+export async function getOnlineVisitorCount(): Promise<OnlineVisitorCount> {
+  return request('/analytics/presence')
+}
+
+export async function getAdminOnlineVisitorCount(token: string): Promise<OnlineVisitorCount> {
+  return request('/admin/analytics/online', undefined, token)
+}
+
+export async function getAdminOverview(token: string): Promise<AdminOverview> {
+  return request('/admin/overview', undefined, token)
+}
+
+export async function getAdminUsers(token: string): Promise<AdminUser[]> {
+  const result = await request<ApiCollection<AdminUser>>('/admin/users', undefined, token)
+  return result.items
+}
+
+export async function deleteAdminUser(userId: string, token: string): Promise<void> {
+  await request<void>(`/admin/users/${encodeURIComponent(userId)}`, { method: 'DELETE' }, token)
+}
+
+export async function createAdminPlace(place: ApiPlace, token: string): Promise<ApiPlace> {
+  return request<ApiPlace>('/admin/places', {
+    method: 'POST',
+    body: JSON.stringify(place),
+  }, token)
+}
+
+export async function updateAdminPlace(placeId: string, place: ApiPlace, token: string): Promise<ApiPlace> {
+  return request<ApiPlace>(`/admin/places/${encodeURIComponent(placeId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(place),
+  }, token)
+}
+
+export async function deleteAdminPlace(placeId: string, token: string): Promise<void> {
+  await request<void>(`/admin/places/${encodeURIComponent(placeId)}`, { method: 'DELETE' }, token)
+}
+
 export async function getPlaceRatings(placeId: string): Promise<PlaceRatingSummary> {
   return request(`/places/${encodeURIComponent(placeId)}/ratings`)
 }
@@ -294,12 +420,29 @@ export async function submitPlaceRating(
 }
 
 export function mergeRemotePlaces(localPlaces: Place[], remotePlaces: ApiPlace[]): Place[] {
-  const remoteById = new Map(remotePlaces.map((place) => [place.id, place]))
   const retiredPlaceIds = new Set(['truong-son-cemetery'])
-  return localPlaces.flatMap((place) => {
-    if (retiredPlaceIds.has(place.id)) return []
-    const remote = remoteById.get(place.id)
-    if (!remote) return [place]
+  const localById = new Map(localPlaces.map((place) => [place.id, place]))
+  return remotePlaces.flatMap((remote) => {
+    if (retiredPlaceIds.has(remote.id)) return []
+    const place = localById.get(remote.id)
+    if (!place) {
+      const vietnameseCopy = remote.copy.vi ?? Object.values(remote.copy)[0]
+      if (!vietnameseCopy) return []
+      return [{
+        ...remote,
+        copy: {
+          vi: remote.copy.vi ?? vietnameseCopy,
+          en: remote.copy.en ?? vietnameseCopy,
+          ja: remote.copy.ja ?? vietnameseCopy,
+          fr: remote.copy.fr ?? vietnameseCopy,
+          'zh-CN': remote.copy['zh-CN'] ?? vietnameseCopy,
+          'ko-KR': remote.copy['ko-KR'] ?? vietnameseCopy,
+          es: remote.copy.es ?? vietnameseCopy,
+        },
+        detailSections: remote.detailSections ?? [],
+        detailImage: remote.detailImage ?? { src: '', alt: vietnameseCopy.title, caption: '' },
+      }]
+    }
     return [{
       ...place,
       category: remote.category,
@@ -307,8 +450,8 @@ export function mergeRemotePlaces(localPlaces: Place[], remotePlaces: ApiPlace[]
       duration: remote.duration,
       image: remote.image,
       copy: { ...place.copy, ...remote.copy },
+      detailSections: remote.detailSections ?? place.detailSections,
+      detailImage: remote.detailImage ?? place.detailImage,
     }]
   })
 }
-
-export type { ApiPlace }

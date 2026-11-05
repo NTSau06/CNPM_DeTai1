@@ -1,4 +1,4 @@
-"""Cung cấp API công khai và điều phối yêu cầu giữa các backend service."""
+﻿"""Cung cấp API công khai và điều phối yêu cầu giữa các backend service."""
 import math
 from typing import Annotated
 
@@ -7,13 +7,15 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, 
 from api_gateway.proxy import request_service
 from api_gateway.schemas import (
     LoginRequest,
+    PasswordChange,
+    ProfileUpdate,
     RegisterRequest,
     TicketOrderCreate,
     TicketPriceUpdate,
     VisitSubmission,
 )
-from services.analytics_service.schemas import RatingCreate
-from services.common.schemas import Locale, TourCreate
+from services.analytics_service.schemas import PresenceHeartbeat, RatingCreate
+from services.common.schemas import Locale, Place, TourCreate
 
 router = APIRouter(prefix="/api/v1")
 
@@ -34,16 +36,14 @@ def authenticated_user(
     return user
 
 
-def administrator(
-    request: Request,
-    authorization: str | None,
-) -> dict:
-    if authorization is None or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Administrator sign-in is required.")
-    admin = request.app.state.admin_auth_repository.authenticate(authorization[7:])
-    if admin is None:
-        raise HTTPException(status_code=401, detail="Administrator session is invalid or expired.")
-    return admin
+def admin_user(request: Request, authorization: str | None) -> dict:
+    user = authenticated_user(request, authorization)
+    if not user["isAdmin"]:
+        raise HTTPException(status_code=403, detail="Admin access is required.")
+    return user
+
+
+administrator = admin_user
 
 
 @router.post("/auth/register", status_code=status.HTTP_201_CREATED)
@@ -80,11 +80,13 @@ def login(payload: LoginRequest, request: Request) -> dict:
 
 @router.post("/admin/login")
 def admin_login(payload: LoginRequest, request: Request) -> dict:
-    result = request.app.state.admin_auth_repository.login(
+    result = request.app.state.auth_repository.login(
         payload.email.strip().lower(),
         payload.password,
     )
-    if result is None:
+    if result is None or not result[1]["isAdmin"]:
+        if result is not None:
+            request.app.state.auth_repository.revoke(result[0])
         raise HTTPException(status_code=401, detail="Admin email or password is incorrect.")
     token, admin = result
     return {"token": token, "user": admin}
@@ -98,7 +100,7 @@ def admin_logout(
     administrator(request, authorization)
     if authorization is None:
         raise HTTPException(status_code=401, detail="Administrator sign-in is required.")
-    request.app.state.admin_auth_repository.revoke(authorization[7:])
+    request.app.state.auth_repository.revoke(authorization[7:])
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -121,6 +123,46 @@ def heartbeat(
     ):
         raise HTTPException(status_code=401, detail="Your session has expired. Sign in again.")
     return {"active": True}
+@router.put("/auth/me")
+def update_current_user(
+    payload: ProfileUpdate,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    user = authenticated_user(request, authorization)
+    full_name = payload.full_name.strip()
+    if not full_name:
+        raise HTTPException(status_code=422, detail="Enter your name.")
+    updated = request.app.state.auth_repository.update_profile(
+        user["id"],
+        full_name,
+        payload.phone.strip(),
+        payload.birth_date,
+        payload.gender,
+        payload.address.strip(),
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+    return updated
+
+
+@router.post("/auth/change-password")
+def change_password(
+    payload: PasswordChange,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    user = authenticated_user(request, authorization)
+    if payload.current_password == payload.new_password:
+        raise HTTPException(
+            status_code=422, detail="The new password must differ from the current one."
+        )
+    token = request.app.state.auth_repository.change_password(
+        user["id"], payload.current_password, payload.new_password
+    )
+    if token is None:
+        raise HTTPException(status_code=403, detail="Current password is incorrect.")
+    return {"token": token, "user": user}
 
 
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -141,7 +183,7 @@ async def admin_overview(
     authorization: str | None = Header(default=None),
 ) -> dict:
     administrator(request, authorization)
-    if authorization is None or not request.app.state.admin_auth_repository.heartbeat(
+    if authorization is None or not request.app.state.auth_repository.heartbeat(
         authorization[7:]
     ):
         raise HTTPException(status_code=401, detail="Your session has expired. Sign in again.")
@@ -150,10 +192,20 @@ async def admin_overview(
         "GET",
         "/internal/v1/analytics/admin/summary",
     )
+    places = await request_service(
+        service_url(request, "poi"),
+        "GET",
+        "/internal/v1/places",
+    )
+    online = await get_online_visitors(request)
     return {
         **request.app.state.auth_repository.account_metrics(),
         "analytics": analytics,
         "tickets": request.app.state.ticket_repository.sales_summary(),
+        "onlineVisitors": online["onlineVisitors"],
+        "placeCount": places["total"],
+        "visits": analytics["visitsLast30Days"],
+        "ratingCount": analytics["totalRatings"],
     }
 
 
@@ -282,6 +334,129 @@ async def save_rating(payload: RatingCreate, request: Request) -> dict:
         "/internal/v1/analytics/ratings",
         json=payload.model_dump(mode="json", by_alias=True),
     )
+
+
+@router.post("/analytics/presence", status_code=status.HTTP_204_NO_CONTENT)
+async def update_presence(payload: PresenceHeartbeat, request: Request) -> Response:
+    await request_service(
+        service_url(request, "analytics"),
+        "POST",
+        "/internal/v1/analytics/presence",
+        json=payload.model_dump(mode="json", by_alias=True),
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/analytics/presence/leave", status_code=status.HTTP_204_NO_CONTENT)
+async def leave_presence(payload: PresenceHeartbeat, request: Request) -> Response:
+    await request_service(
+        service_url(request, "analytics"),
+        "POST",
+        "/internal/v1/analytics/presence/leave",
+        json=payload.model_dump(mode="json", by_alias=True),
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/analytics/presence")
+async def get_online_visitors(request: Request) -> dict:
+    return await request_service(
+        service_url(request, "analytics"),
+        "GET",
+        "/internal/v1/analytics/presence",
+    )
+
+
+@router.get("/admin/analytics/online")
+async def get_admin_online_visitors(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    admin_user(request, authorization)
+    return await get_online_visitors(request)
+
+
+@router.get("/admin/users")
+def get_admin_users(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    admin_user(request, authorization)
+    items = request.app.state.auth_repository.list_users()
+    return {"items": items, "total": len(items)}
+
+
+@router.delete("/admin/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_admin_user(
+    user_id: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    current_admin = admin_user(request, authorization)
+    if user_id == current_admin["id"]:
+        raise HTTPException(status_code=422, detail="You cannot delete your own account.")
+    users = request.app.state.auth_repository.list_users()
+    target = next((user for user in users if user["id"] == user_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if target["isAdmin"] and sum(user["isAdmin"] for user in users) <= 1:
+        raise HTTPException(status_code=409, detail="The last admin account cannot be deleted.")
+    await request_service(
+        service_url(request, "tour"),
+        "DELETE",
+        f"/internal/v1/admin/tours/owner/{user_id}",
+    )
+    if not request.app.state.auth_repository.delete_user(user_id):
+        if any(user["id"] == user_id for user in request.app.state.auth_repository.list_users()):
+            raise HTTPException(status_code=409, detail="The last admin account cannot be deleted.")
+        raise HTTPException(status_code=404, detail="User not found.")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/admin/places", status_code=status.HTTP_201_CREATED)
+async def create_admin_place(
+    payload: Place,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    admin_user(request, authorization)
+    return await request_service(
+        service_url(request, "poi"),
+        "POST",
+        "/internal/v1/admin/places",
+        json=payload.model_dump(mode="json", by_alias=True),
+    )
+
+
+@router.put("/admin/places/{place_id}")
+async def update_admin_place(
+    place_id: str,
+    payload: Place,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    admin_user(request, authorization)
+    return await request_service(
+        service_url(request, "poi"),
+        "PUT",
+        f"/internal/v1/admin/places/{place_id}",
+        json=payload.model_dump(mode="json", by_alias=True),
+    )
+
+
+@router.delete("/admin/places/{place_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_admin_place(
+    place_id: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    admin_user(request, authorization)
+    await request_service(
+        service_url(request, "poi"),
+        "DELETE",
+        f"/internal/v1/admin/places/{place_id}",
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/places")

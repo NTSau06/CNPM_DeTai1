@@ -39,6 +39,10 @@ qua POI Service. Analytics Service lưu lượt ghé ẩn danh và đánh giá c
 Số lượt ghé, điểm đánh giá và mục đặt vé thử nghiệm hiển thị trong thông tin
 của từng địa điểm; trang quản trị tổng hợp thêm thống kê sử dụng. Xem
 [hướng dẫn backend](server/README.md)
+qua POI Service. Analytics Service lưu trạng thái online ẩn danh, lượt ghé và đánh giá của người dùng.
+Số lượt ghé và điểm đánh giá hiển thị trong thông tin của từng địa điểm. Trang
+quản trị cho phép xem tổng quan, quản lý tài khoản và danh mục địa điểm; ứng dụng
+không có nguồn dữ liệu bán vé. Xem [hướng dẫn backend](server/README.md)
 để chạy từng service không cần Docker và chạy kiểm thử.
 
 ### Trang quản trị
@@ -105,7 +109,7 @@ npm run backend:stop
 ```
 
 PID được lưu trong `server\var\run\`, log trong `server\var\logs\`; dữ liệu
-SQLite cục bộ nằm trong `server\var\`. Không chạy đồng thời cách này với
+SQL Server nằm ở `localhost\SQLEXPRESS` (database `QuangTriDB`). Không chạy đồng thời cách này với
 `npm run dev` (lệnh đó tự khởi chạy backend) hoặc Docker Compose, vì các phương
 thức này cùng sử dụng các cổng backend.
 
@@ -135,6 +139,22 @@ nhấn `Ctrl+C` để dừng Expo và các backend. Nếu biến `EXPO_PUBLIC_AP
 - [Bài thuyết minh](system-presentation-standalone.html): bài trình bày độc lập với ba phần, sơ đồ và đọc thuyết minh bằng bảy ngôn ngữ.
 - `clients/frontend`: React.js PWA; `clients/mobile`: Expo/React Native; `server`: FastAPI ba lớp và các service giao tiếp qua HTTP.
 - Trong thông tin mỗi địa điểm trên web có số lượt ghé do app ghi nhận trong 30 ngày gần nhất, điểm đánh giá và mục đặt vé thử nghiệm. Lượt ghé chỉ được ghi nhận khi người dùng bật hướng dẫn GPS; backend kiểm tra khoảng cách 85 m, không lưu tọa độ và đếm tối đa một lượt cho mỗi thiết bị/điểm/ngày. Đây là số liệu ước tính, không phải tổng khách thực tế; GPS có thể bị giả mạo. Đánh giá không xác minh danh tính. Vé đặt trong luồng thử nghiệm chưa được thanh toán hoặc xác nhận sử dụng.
+- Trong thông tin mỗi địa điểm trên web/mobile có số lượt ghé do app ghi nhận trong 30 ngày gần nhất và điểm đánh giá. Lượt ghé chỉ được ghi nhận khi người dùng bật hướng dẫn GPS; backend kiểm tra khoảng cách 85 m, không lưu tọa độ và đếm tối đa một lượt cho mỗi thiết bị/điểm/ngày. Đây là số liệu ước tính, không phải tổng khách thực tế; GPS có thể bị giả mạo. Đánh giá không xác minh danh tính. Chưa có nguồn dữ liệu bán vé nên ứng dụng không hiển thị số vé.
+- Bộ đếm online hiển thị số client web/mobile gửi heartbeat trong 5 phút gần nhất; mỗi trình duyệt hoặc cài đặt mobile được tính một lần. Backend chỉ lưu mã visitor đã băm và thời điểm hoạt động, không lưu IP. Trang quản trị ở `/admin` chỉ dành cho tài khoản được cấp quyền thủ công trong bảng `users` (`is_admin = 1`). Đăng ký tài khoản trước, xác minh đúng tài khoản admin ngoài ứng dụng, rồi cập nhật theo `id` đã xác minh trong cơ sở dữ liệu bảng `users` (SQL Server, database `QuangTriDB`); không cấp quyền chỉ dựa trên email vì đăng ký hiện chưa xác minh email. Cơ sở dữ liệu cục bộ mặc định ở `server\var\accounts.sqlite`; với Docker Compose, đường dẫn trong container là `/data/accounts.sqlite`.
+- Trang `/admin` có tổng lượt ghé 30 ngày gần nhất, đánh giá, số địa điểm và số client online; tab Tài khoản cho phép xóa tài khoản (cùng hành trình đã lưu), tab Địa điểm cho phép tạo/sửa/xóa nội dung. Không thể tự xóa tài khoản admin đang đăng nhập hoặc xóa địa điểm cuối cùng. Các thay đổi danh mục được lưu trong POI (SQL Server) và không bị ghi đè khi service khởi động lại.
+
+Để cấp quyền quản trị trong môi trường local, đăng ký tài khoản trước rồi xem `id`:
+
+```powershell
+sqlcmd -S .\SQLEXPRESS -E -d QuangTriDB -Q "SELECT id, email, is_admin FROM users"
+```
+
+Sau khi xác minh đúng tài khoản, cập nhật cờ theo `id`, sau đó đăng xuất và đăng nhập lại để giao diện nhận quyền mới:
+
+```powershell
+$adminId = "ID_DA_XAC_MINH"
+sqlcmd -S .\SQLEXPRESS -E -d QuangTriDB -Q "UPDATE users SET is_admin = 1 WHERE id = '$adminId'"
+```
 
 ## CI/CD
 

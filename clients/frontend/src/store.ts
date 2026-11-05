@@ -1,7 +1,7 @@
-// Quản lý trạng thái chung và khởi tạo/đồng bộ dữ liệu với IndexedDB, backend.
+﻿// Quản lý trạng thái chung và khởi tạo/đồng bộ dữ liệu với IndexedDB, backend.
 import { create } from 'zustand'
 import { cachePlaces, deleteOfflineMap, deleteTour, getCachedPlaces, getOfflineMap, readSetting, saveOfflineMap, saveTour, writeSetting } from './db'
-import { BackendApiError, createTour, deleteRemoteTour, fetchCurrentUser, fetchPlaces, fetchTours, getStoredAuthToken, logoutAccount, mergeRemotePlaces, storeAuthToken } from './api'
+import { BackendApiError, createTour, deleteRemoteTour, fetchCurrentUser, fetchPlaces, fetchTours, generateId, getStoredAuthToken, logoutAccount, mergeRemotePlaces, storeAuthToken, updateProfile } from './api'
 import { languages, places as bundledPlaces } from './data/places'
 import type { Language, OfflineMapPack, Place, SavedTour, UserProfile } from './types'
 
@@ -35,12 +35,15 @@ interface AppState {
   authToken: string | null
   storageError: AppErrorKey | null
   bootstrapped: boolean
+  authReady: boolean
   setLanguage: (language: Language) => void
+  setPlaces: (places: Place[]) => void
   setSelectedPlace: (id: string) => void
   setLocation: (location: [number, number] | null) => void
   setOnline: (online: boolean) => void
   signIn: (token: string, user: UserProfile) => Promise<void>
-  updateCurrentUser: (user: UserProfile) => void
+  updateCurrentUser: (user: UserProfile) => Promise<void>
+  replaceSession: (token: string) => void
   signOut: () => Promise<void>
   setRoutePlace: (id: string) => Promise<boolean>
   removeTour: (id: string) => Promise<void>
@@ -49,6 +52,7 @@ interface AppState {
   installOfflineMap: (pack: OfflineMapPack) => Promise<void>
   removeOfflineMap: () => Promise<void>
   bootstrap: () => Promise<void>
+  bootstrapInner: () => Promise<void>
   clearStorageError: () => void
 }
 
@@ -69,11 +73,21 @@ export const useAppStore = create<AppState>((set, get) => ({
   authToken: null,
   storageError: null,
   bootstrapped: false,
+  authReady: false,
   setLanguage: (language) => {
     set({ language })
     void writeSetting('language', language).catch(() => set({ storageError: 'savingError' }))
   },
   setSelectedPlace: (selectedPlaceId) => set({ selectedPlaceId }),
+  setPlaces: (places) => {
+    set((state) => ({
+      places,
+      selectedPlaceId: places.some((place) => place.id === state.selectedPlaceId)
+        ? state.selectedPlaceId
+        : places[0]?.id ?? state.selectedPlaceId,
+    }))
+    void cachePlaces(places).catch(() => set({ storageError: 'savingError' }))
+  },
   setLocation: (location) => set({ location }),
   setOnline: (online) => set({ online }),
   signIn: async (authToken, currentUser) => {
@@ -93,7 +107,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ storageError: 'backendUnavailable' })
     }
   },
-  updateCurrentUser: (currentUser) => set({ currentUser }),
+  updateCurrentUser: async (user) => {
+    const { authToken } = get()
+    if (!authToken) return
+    const currentUser = await updateProfile(authToken, user)
+    set({ currentUser })
+  },
+  replaceSession: (authToken) => {
+    storeAuthToken(authToken)
+    set({ authToken })
+  },
   signOut: async () => {
     const { authToken } = get()
     storeAuthToken(null)
@@ -142,7 +165,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         ? length(lineString(coordinates), { units: 'kilometers' })
         : 0
       const tour: SavedTour = {
-        id: activeTourId ?? crypto.randomUUID(),
+        id: activeTourId ?? generateId(),
         placeIds: nextRouteIds,
         createdAt: get().savedTours.find((item) => item.id === activeTourId)?.createdAt ?? Date.now(),
         distanceKm,
@@ -219,6 +242,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
   bootstrap: async () => {
+    try {
+      await get().bootstrapInner()
+    } finally {
+      // Đã xác định xong trạng thái đăng nhập (kể cả khi không có phiên hoặc lỗi).
+      set({ authReady: true })
+    }
+  },
+  bootstrapInner: async () => {
     try {
       await cachePlaces(bundledPlaces)
       const [cachedPlaces, offlineMap, language, offlineMode] = await Promise.all([

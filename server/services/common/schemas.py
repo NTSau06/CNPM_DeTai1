@@ -16,6 +16,17 @@ class LocalizedCopy(BaseModel):
     narration: str
 
 
+class PlaceDetailSection(BaseModel):
+    heading: str
+    body: str
+
+
+class PlaceDetailImage(BaseModel):
+    src: str
+    alt: str
+    caption: str
+
+
 class Place(BaseModel):
     id: str
     category: Category
@@ -23,6 +34,8 @@ class Place(BaseModel):
     duration: Annotated[int, Field(ge=1, le=240)]
     image: str
     localized_copy: dict[Locale, LocalizedCopy] = Field(alias="copy")
+    detail_sections: list[PlaceDetailSection] = Field(default_factory=list, alias="detailSections")
+    detail_image: PlaceDetailImage | None = Field(default=None, alias="detailImage")
 
 
 class PlaceCollection(BaseModel):

@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { languages } from '../data/places'
 import { translate } from '../i18n'
 import { getOfflinePlacePack } from '../db'
-import { getNarrationAudioUrl, getNarrationText, stopSpeaking } from '../speech'
+import { getNarrationAudioLanguage, getNarrationAudioUrl, getNarrationText, stopSpeaking } from '../speech'
 import { useAppStore } from '../store'
 import type { Language, Place } from '../types'
 import { AudioPlayer } from './AudioPlayer'
@@ -22,7 +22,7 @@ export function NarrationCard({ place, language, distanceMeters, onStartWalk, on
   const navigate = useNavigate()
   const location = useLocation()
   const [playing, setPlaying] = useState(false)
-  const [audioLanguage, setAudioLanguage] = useState(language)
+  const [audioLanguage, setAudioLanguage] = useState(() => getNarrationAudioLanguage(place.id, language))
   const [savedNarration, setSavedNarration] = useState<string | null>(null)
   const autoNarration = useAppStore((state) => state.autoNarration)
   const currentUser = useAppStore((state) => state.currentUser)
@@ -36,6 +36,10 @@ export function NarrationCard({ place, language, distanceMeters, onStartWalk, on
     ? savedNarration
     : localNarration
   const estimatedMinutes = Math.max(1, Math.ceil(audioText.length / 14 / 60))
+
+  useEffect(() => {
+    setAudioLanguage(getNarrationAudioLanguage(place.id, language))
+  }, [place.id, language])
 
   const changeRoute = () => {
     if (!currentUser) {

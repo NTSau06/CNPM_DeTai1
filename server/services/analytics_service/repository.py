@@ -1,106 +1,195 @@
-"""Lưu lượt ghé/đánh giá và tính thống kê từng địa điểm bằng SQLite."""
+"""Lưu lượt ghé/đánh giá và tính thống kê từng địa điểm bằng SQL Server."""
 from __future__ import annotations
 
 import hashlib
-import sqlite3
+import time
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from uuid import UUID
+
+import pyodbc
 
 from services.analytics_service.schemas import (
     AdminAnalyticsSummary,
     AdminPlaceAnalytics,
     AdminReview,
+    PresenceHeartbeat,
     PlaceAnalytics,
     RatingCreate,
     RatingReview,
     RatingSummary,
     VisitCreate,
 )
+from services.common.database import Database
+
+
+# Thiết bị không gửi heartbeat quá thời gian này sẽ bị coi là đã rời trang.
+PRESENCE_TTL_SECONDS = 30
 
 
 class AnalyticsRepository:
-    def __init__(self, database_path: Path) -> None:
-        self.database_path = database_path
+    def __init__(self, database: Database) -> None:
+        self.database = database
 
     def initialize(self) -> None:
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.database_path) as connection:
+        self.database.ensure_exists()
+        with self.database.connect() as connection:
             connection.execute(
                 """
-                CREATE TABLE IF NOT EXISTS visits (
-                    visitor_hash TEXT NOT NULL,
-                    place_id TEXT NOT NULL,
-                    visit_date TEXT NOT NULL,
+                IF OBJECT_ID(N'dbo.visits', N'U') IS NULL
+                CREATE TABLE dbo.visits (
+                    visitor_hash NVARCHAR(64) NOT NULL,
+                    place_id NVARCHAR(120) NOT NULL,
+                    visit_date NVARCHAR(10) NOT NULL,
                     PRIMARY KEY (visitor_hash, place_id, visit_date)
                 )
                 """
             )
             connection.execute(
                 """
-                CREATE TABLE IF NOT EXISTS ratings (
-                    visitor_hash TEXT NOT NULL,
-                    place_id TEXT NOT NULL,
-                    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
-                    review TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
+                IF OBJECT_ID(N'dbo.ratings', N'U') IS NULL
+                CREATE TABLE dbo.ratings (
+                    visitor_hash NVARCHAR(64) NOT NULL,
+                    place_id NVARCHAR(120) NOT NULL,
+                    rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+                    review NVARCHAR(MAX) NOT NULL,
+                    updated_at NVARCHAR(40) NOT NULL,
                     PRIMARY KEY (visitor_hash, place_id)
                 )
                 """
             )
+            connection.execute(
+                """
+                IF OBJECT_ID(N'dbo.visitor_presence', N'U') IS NULL
+                CREATE TABLE dbo.visitor_presence (
+                    visitor_hash NVARCHAR(64) NOT NULL PRIMARY KEY,
+                    last_seen_at BIGINT NOT NULL
+                )
+                """
+            )
+
+    def heartbeat(self, presence: PresenceHeartbeat) -> None:
+        last_seen_at = int(time.time())
+        visitor_hash = _visitor_hash(presence.visitor_id)
+        with self.database.connect() as connection:
+            updated = connection.execute(
+                "UPDATE visitor_presence SET last_seen_at = ? WHERE visitor_hash = ?",
+                last_seen_at,
+                visitor_hash,
+            ).rowcount
+            if updated == 0:
+                try:
+                    connection.execute(
+                        "INSERT INTO visitor_presence (visitor_hash, last_seen_at) VALUES (?, ?)",
+                        visitor_hash,
+                        last_seen_at,
+                    )
+                except pyodbc.IntegrityError:
+                    # Một heartbeat khác vừa chèn cùng visitor; cập nhật lại.
+                    connection.execute(
+                        "UPDATE visitor_presence SET last_seen_at = ? WHERE visitor_hash = ?",
+                        last_seen_at,
+                        visitor_hash,
+                    )
+            connection.execute(
+                "DELETE FROM visitor_presence WHERE last_seen_at < ?",
+                last_seen_at - PRESENCE_TTL_SECONDS,
+            )
+
+    def leave(self, presence: PresenceHeartbeat) -> None:
+        """Xóa thiết bị khỏi danh sách online ngay khi người dùng rời trang."""
+        with self.database.connect() as connection:
+            connection.execute(
+                "DELETE FROM visitor_presence WHERE visitor_hash = ?",
+                _visitor_hash(presence.visitor_id),
+            )
+
+    def online_visitor_count(self) -> int:
+        now = int(time.time())
+        with self.database.connect() as connection:
+            connection.execute(
+                "DELETE FROM visitor_presence WHERE last_seen_at < ?",
+                now - PRESENCE_TTL_SECONDS,
+            )
+            row = connection.execute(
+                "SELECT COUNT(*) FROM visitor_presence WHERE last_seen_at >= ?",
+                now - PRESENCE_TTL_SECONDS,
+            ).fetchone()
+        return int(row[0])
 
     def record_visit(self, visit: VisitCreate) -> bool:
         today = datetime.now(timezone.utc).date().isoformat()
-        with sqlite3.connect(self.database_path) as connection:
-            cursor = connection.execute(
-                """
-                INSERT OR IGNORE INTO visits (visitor_hash, place_id, visit_date)
-                VALUES (?, ?, ?)
-                """,
-                (_visitor_hash(visit.visitor_id), visit.place_id, today),
-            )
-        return cursor.rowcount == 1
+        with self.database.connect() as connection:
+            try:
+                cursor = connection.execute(
+                    """
+                    INSERT INTO visits (visitor_hash, place_id, visit_date)
+                    VALUES (?, ?, ?)
+                    """,
+                    _visitor_hash(visit.visitor_id),
+                    visit.place_id,
+                    today,
+                )
+            except pyodbc.IntegrityError:
+                return False
+            return cursor.rowcount == 1
 
     def save_rating(self, payload: RatingCreate) -> None:
         updated_at = datetime.now(timezone.utc).isoformat()
-        with sqlite3.connect(self.database_path) as connection:
-            connection.execute(
+        visitor_hash = _visitor_hash(payload.visitor_id)
+        review = payload.review.strip()
+        with self.database.connect() as connection:
+            exists = connection.execute(
                 """
-                INSERT INTO ratings (visitor_hash, place_id, rating, review, updated_at)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(visitor_hash, place_id) DO UPDATE SET
-                    rating = excluded.rating,
-                    review = excluded.review,
-                    updated_at = excluded.updated_at
+                SELECT 1 FROM ratings WITH (UPDLOCK, HOLDLOCK)
+                WHERE visitor_hash = ? AND place_id = ?
                 """,
-                (
-                    _visitor_hash(payload.visitor_id),
+                visitor_hash,
+                payload.place_id,
+            ).fetchone()
+            if exists:
+                connection.execute(
+                    """
+                    UPDATE ratings
+                    SET rating = ?, review = ?, updated_at = ?
+                    WHERE visitor_hash = ? AND place_id = ?
+                    """,
+                    payload.rating,
+                    review,
+                    updated_at,
+                    visitor_hash,
+                    payload.place_id,
+                )
+            else:
+                connection.execute(
+                    """
+                    INSERT INTO ratings (visitor_hash, place_id, rating, review, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    visitor_hash,
                     payload.place_id,
                     payload.rating,
-                    payload.review.strip(),
+                    review,
                     updated_at,
-                ),
-            )
+                )
 
     def rating_summary(self, place_id: str) -> RatingSummary:
-        with sqlite3.connect(self.database_path) as connection:
+        with self.database.connect() as connection:
             summary = connection.execute(
                 """
-                SELECT AVG(rating), COUNT(*)
+                SELECT AVG(CAST(rating AS FLOAT)), COUNT(*)
                 FROM ratings
                 WHERE place_id = ?
                 """,
-                (place_id,),
+                place_id,
             ).fetchone()
             rows = connection.execute(
                 """
-                SELECT rating, review, updated_at
+                SELECT TOP 20 rating, review, updated_at
                 FROM ratings
-                WHERE place_id = ? AND review != ''
+                WHERE place_id = ? AND review <> ''
                 ORDER BY updated_at DESC
-                LIMIT 20
                 """,
-                (place_id,),
+                place_id,
             ).fetchall()
         return RatingSummary(
             placeId=place_id,
@@ -115,22 +204,23 @@ class AnalyticsRepository:
     def place_analytics(self, place_id: str, period_days: int = 30) -> PlaceAnalytics:
         today = datetime.now(timezone.utc).date()
         start_date = (today - timedelta(days=period_days - 1)).isoformat()
-        with sqlite3.connect(self.database_path) as connection:
+        with self.database.connect() as connection:
             visits = connection.execute(
                 """
                 SELECT COUNT(*)
                 FROM visits
                 WHERE place_id = ? AND visit_date >= ?
                 """,
-                (place_id, start_date),
+                place_id,
+                start_date,
             ).fetchone()
             rating = connection.execute(
                 """
-                SELECT AVG(rating), COUNT(*)
+                SELECT AVG(CAST(rating AS FLOAT)), COUNT(*)
                 FROM ratings
                 WHERE place_id = ?
                 """,
-                (place_id,),
+                place_id,
             ).fetchone()
         return PlaceAnalytics(
             placeId=place_id,
@@ -142,13 +232,13 @@ class AnalyticsRepository:
     def admin_summary(self, period_days: int = 30) -> AdminAnalyticsSummary:
         today = datetime.now(timezone.utc).date()
         start_date = (today - timedelta(days=period_days - 1)).isoformat()
-        with sqlite3.connect(self.database_path) as connection:
+        with self.database.connect() as connection:
             visits_total = connection.execute(
                 "SELECT COUNT(*) FROM visits WHERE visit_date >= ?",
-                (start_date,),
+                start_date,
             ).fetchone()[0]
             rating_total, overall_average = connection.execute(
-                "SELECT COUNT(*), AVG(rating) FROM ratings"
+                "SELECT COUNT(*), AVG(CAST(rating AS FLOAT)) FROM ratings"
             ).fetchone()
             place_rows = connection.execute(
                 """
@@ -157,22 +247,21 @@ class AnalyticsRepository:
                 WHERE visit_date >= ?
                 GROUP BY place_id
                 """,
-                (start_date,),
+                start_date,
             ).fetchall()
             rating_rows = connection.execute(
                 """
-                SELECT place_id, AVG(rating), COUNT(*)
+                SELECT place_id, AVG(CAST(rating AS FLOAT)), COUNT(*)
                 FROM ratings
                 GROUP BY place_id
                 """
             ).fetchall()
             recent_rows = connection.execute(
                 """
-                SELECT place_id, rating, review, updated_at
+                SELECT TOP 8 place_id, rating, review, updated_at
                 FROM ratings
-                WHERE review != ''
+                WHERE review <> ''
                 ORDER BY updated_at DESC
-                LIMIT 8
                 """
             ).fetchall()
 

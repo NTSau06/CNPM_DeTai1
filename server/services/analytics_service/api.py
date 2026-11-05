@@ -6,6 +6,8 @@ from fastapi import APIRouter, Request
 from services.analytics_service.repository import AnalyticsRepository
 from services.analytics_service.schemas import (
     AdminAnalyticsSummary,
+    OnlineVisitorCount,
+    PresenceHeartbeat,
     PlaceAnalytics,
     RatingCreate,
     RatingSummary,
@@ -27,6 +29,25 @@ def health() -> dict[str, str]:
 @router.post("/internal/v1/analytics/visits", status_code=201)
 def record_visit(payload: VisitCreate, request: Request) -> dict[str, bool]:
     return {"recorded": repository(request).record_visit(payload)}
+
+
+@router.post("/internal/v1/analytics/presence", status_code=204)
+def heartbeat(payload: PresenceHeartbeat, request: Request) -> None:
+    repository(request).heartbeat(payload)
+
+
+@router.post("/internal/v1/analytics/presence/leave", status_code=204)
+def leave(payload: PresenceHeartbeat, request: Request) -> None:
+    repository(request).leave(payload)
+
+
+@router.get(
+    "/internal/v1/analytics/presence",
+    response_model=OnlineVisitorCount,
+    response_model_by_alias=True,
+)
+def online_visitor_count(request: Request) -> OnlineVisitorCount:
+    return OnlineVisitorCount(onlineVisitors=repository(request).online_visitor_count())
 
 
 @router.post("/internal/v1/analytics/ratings", status_code=201)

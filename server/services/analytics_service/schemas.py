@@ -14,6 +14,16 @@ class VisitCreate(BaseModel):
     visitor_id: Annotated[UUID, Field(alias="visitorId")]
 
 
+class PresenceHeartbeat(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    visitor_id: Annotated[UUID, Field(alias="visitorId")]
+
+
+class OnlineVisitorCount(BaseModel):
+    online_visitors: int = Field(alias="onlineVisitors")
+
+
 class RatingCreate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 

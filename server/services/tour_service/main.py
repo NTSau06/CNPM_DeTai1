@@ -3,24 +3,21 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import AsyncIterator
 
 from fastapi import FastAPI
 
+from services.common.database import Database
 from services.tour_service.api import router
 from services.tour_service.application import HttpPlaceResolver, TourPlanner
 from services.tour_service.repository import TourRepository
 
 
 def create_app(
-    database_path: Path | None = None,
+    database: Database | None = None,
     poi_service_url: str | None = None,
 ) -> FastAPI:
-    repository = TourRepository(
-        database_path
-        or Path(os.getenv("TOUR_DATABASE_PATH", "server/var/tour-service.sqlite"))
-    )
+    repository = TourRepository(database or Database())
     resolver = HttpPlaceResolver(
         poi_service_url or os.getenv("POI_SERVICE_URL", "http://localhost:8001")
     )

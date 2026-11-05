@@ -10,7 +10,7 @@ import { getOfflineMap } from '../db'
 import { translate } from '../i18n'
 import { makeOfflineStyle, makeOnlineStyle } from '../mapStyle'
 import { useAppStore } from '../store'
-import { categoryLabels, findPlace, places as allPlaces } from '../data/places'
+import { categoryLabels } from '../data/places'
 import type { Language, Place } from '../types'
 
 const protocol = new Protocol()
@@ -55,9 +55,7 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
       )
     })
   }, [places, language, mapSearch])
-  const selectedMapPlace = places.find((place) => place.id === selectedPlaceId)
-    ?? findPlace(selectedPlaceId)
-    ?? allPlaces[0]
+  const selectedMapPlace = places.find((place) => place.id === selectedPlaceId) ?? places[0]
   const currentProps = useRef({ places: mapPlaces, language, location })
   const selectPlace = (id: string) => {
     onSelectPlace(id)
@@ -185,7 +183,7 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
     if (!mapReady || !instance?.isStyleLoaded()) return
 
     const coordinates = routeIds
-      .map((id) => allPlaces.find((place) => place.id === id)?.coordinates)
+      .map((id) => places.find((place) => place.id === id)?.coordinates)
       .filter((coordinate): coordinate is [number, number] => coordinate !== undefined)
 
     if (coordinates.length < 2) {
@@ -222,14 +220,14 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
       })
 
     return () => controller.abort()
-  }, [mapReady, routeIds, online])
+  }, [mapReady, routeIds, online, places])
 
   useEffect(() => {
-    const selectedPlace = findPlace(selectedPlaceId)
+    const selectedPlace = places.find((place) => place.id === selectedPlaceId)
     if (selectedPlace && map.current?.isStyleLoaded()) {
       map.current.flyTo({ center: selectedPlace.coordinates, zoom: 14, duration: 600 })
     }
-  }, [selectedPlaceId])
+  }, [selectedPlaceId, places])
 
   useEffect(() => {
     const instance = map.current
@@ -252,7 +250,7 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
       return
     }
 
-    const destination = findPlace(selectedPlaceId)?.coordinates
+    const destination = places.find((place) => place.id === selectedPlaceId)?.coordinates
     if (!destination) {
       syncDirectionsRoute(instance, null)
       setDirectionsStatus('error')
@@ -281,7 +279,7 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
       })
 
     return () => controller.abort()
-  }, [mapReady, showDirections, location, selectedPlaceId, online, expanded])
+  }, [mapReady, showDirections, location, selectedPlaceId, online, expanded, places])
 
   useEffect(() => {
     if (!expanded) return

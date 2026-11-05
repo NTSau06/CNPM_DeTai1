@@ -1,47 +1,43 @@
-"""Kiểm thử API và số liệu dành cho trang quản trị."""
+"""Kiểm thử API và số liệu dành cho trang quản trị và bán vé."""
 from __future__ import annotations
-
-import sqlite3
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-from api_gateway.main import create_app as create_gateway_app
 from api_gateway.auth import AuthRepository
+from api_gateway.main import create_app as create_gateway_app
 from api_gateway.tickets import TicketRepository
+from services.common.database import Database
 
 
 def test_active_accounts_include_valid_sessions_and_count_accounts_once(
-    tmp_path: Path,
+    database: Database,
 ) -> None:
-    database_path = tmp_path / "accounts.sqlite"
-    repository = AuthRepository(database_path)
+    repository = AuthRepository(database)
     repository.initialize()
     repository.register("Test User", "user@example.com", "0123456789", "valid-password")
     repository.login("user@example.com", "valid-password")
 
-    with sqlite3.connect(database_path) as connection:
+    with database.connect() as connection:
         connection.execute("UPDATE auth_sessions SET last_seen_at = 0")
 
     assert repository.account_metrics()["activeAccountCount"] == 1
 
-    with sqlite3.connect(database_path) as connection:
+    with database.connect() as connection:
         connection.execute("UPDATE auth_sessions SET expires_at = 0")
 
     assert repository.account_metrics()["activeAccountCount"] == 0
 
 
 def test_ticket_prices_keep_admin_updates_after_gateway_reinitializes(
-    tmp_path: Path,
+    database: Database,
 ) -> None:
-    database_path = tmp_path / "accounts.sqlite"
-    AuthRepository(database_path).initialize()
-    repository = TicketRepository(database_path)
+    AuthRepository(database).initialize()
+    repository = TicketRepository(database)
     repository.initialize()
     repository.set_price("phong-nha-cave", 100_000)
 
-    restarted_repository = TicketRepository(database_path)
+    restarted_repository = TicketRepository(database)
     restarted_repository.initialize()
 
     assert next(
@@ -52,7 +48,7 @@ def test_ticket_prices_keep_admin_updates_after_gateway_reinitializes(
 
 
 def test_admin_overview_is_protected_and_counts_active_accounts(
-    tmp_path: Path,
+    database: Database,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def fake_request_service(
@@ -63,14 +59,19 @@ def test_admin_overview_is_protected_and_counts_active_accounts(
         params: dict[str, str | None] | None = None,
         json: dict | None = None,
     ) -> dict:
-        assert path == "/internal/v1/analytics/admin/summary"
-        return {
-            "visitsLast30Days": 2,
-            "totalRatings": 1,
-            "averageRating": 4.0,
-            "places": [],
-            "latestReviews": [],
-        }
+        if path == "/internal/v1/analytics/admin/summary":
+            return {
+                "visitsLast30Days": 2,
+                "totalRatings": 1,
+                "averageRating": 4.0,
+                "places": [],
+                "latestReviews": [],
+            }
+        if path == "/internal/v1/places":
+            return {"items": [], "total": 14}
+        if path == "/internal/v1/analytics/presence":
+            return {"onlineVisitors": 1}
+        raise AssertionError(f"Unexpected path: {path}")
 
     monkeypatch.setattr("api_gateway.api.request_service", fake_request_service)
     app = create_gateway_app(
@@ -80,7 +81,7 @@ def test_admin_overview_is_protected_and_counts_active_accounts(
             "narration": "narration",
             "analytics": "analytics",
         },
-        tmp_path / "accounts.sqlite",
+        database,
         admin_email="admin@example.com",
         admin_password="long-admin-password",
     )
@@ -109,11 +110,7 @@ def test_admin_overview_is_protected_and_counts_active_accounts(
         assert client.get(
             "/api/v1/admin/overview",
             headers={"Authorization": f"Bearer {user_token}"},
-        ).status_code == 401
-        assert client.get(
-            "/api/v1/auth/me",
-            headers={"Authorization": f"Bearer {admin_token}"},
-        ).status_code == 401
+        ).status_code == 403
         overview = client.get(
             "/api/v1/admin/overview",
             headers={"Authorization": f"Bearer {admin_token}"},
@@ -126,22 +123,7 @@ def test_admin_overview_is_protected_and_counts_active_accounts(
     assert overview.json()["tickets"]["totalTicketsSold"] == 0
 
 
-def test_legacy_admin_is_migrated_to_separate_database(tmp_path: Path) -> None:
-    user_database = tmp_path / "accounts.sqlite"
-    legacy_repository = AuthRepository(user_database)
-    legacy_repository.initialize()
-    legacy_repository.register(
-        "Legacy Administrator",
-        "admin@example.com",
-        "",
-        "long-admin-password",
-    )
-    with sqlite3.connect(user_database) as connection:
-        connection.execute(
-            "UPDATE users SET role = 'admin' WHERE email = ?",
-            ("admin@example.com",),
-        )
-
+def test_configured_admin_is_not_counted_as_normal_user(database: Database) -> None:
     app = create_gateway_app(
         {
             "poi": "poi",
@@ -149,7 +131,7 @@ def test_legacy_admin_is_migrated_to_separate_database(tmp_path: Path) -> None:
             "narration": "narration",
             "analytics": "analytics",
         },
-        user_database,
+        database,
         admin_email="admin@example.com",
         admin_password="long-admin-password",
     )
@@ -158,68 +140,14 @@ def test_legacy_admin_is_migrated_to_separate_database(tmp_path: Path) -> None:
             "/api/v1/admin/login",
             json={"email": "admin@example.com", "password": "long-admin-password"},
         )
-        user_login = client.post(
-            "/api/v1/auth/login",
-            json={"email": "admin@example.com", "password": "long-admin-password"},
-        )
         assert admin.status_code == 200
-        assert user_login.status_code == 401
-        assert app.state.admin_auth_repository.database_path != user_database
+        assert admin.json()["user"]["isAdmin"] is True
         assert app.state.auth_repository.account_metrics()["accountCount"] == 0
-
-    with sqlite3.connect(user_database) as connection:
-        assert connection.execute(
-            "SELECT COUNT(*) FROM users WHERE email = ?",
-            ("admin@example.com",),
-        ).fetchone()[0] == 0
-    with sqlite3.connect(app.state.admin_auth_repository.database_path) as connection:
-        assert connection.execute(
-            "SELECT COUNT(*) FROM admins WHERE email = ?",
-            ("admin@example.com",),
-        ).fetchone()[0] == 1
-
-
-def test_user_and_admin_can_share_email_without_sharing_credentials(
-    tmp_path: Path,
-) -> None:
-    app = create_gateway_app(
-        {
-            "poi": "poi",
-            "tour": "tour",
-            "narration": "narration",
-            "analytics": "analytics",
-        },
-        tmp_path / "accounts.sqlite",
-        admin_email="shared@example.com",
-        admin_password="long-admin-password",
-    )
-    with TestClient(app) as client:
-        user = client.post(
-            "/api/v1/auth/register",
-            json={
-                "fullName": "Shared Email User",
-                "email": "shared@example.com",
-                "password": "different-user-password",
-            },
-        )
-        admin = client.post(
-            "/api/v1/admin/login",
-            json={"email": "shared@example.com", "password": "long-admin-password"},
-        )
-        assert user.status_code == 201
-        assert admin.status_code == 200
-        assert client.get(
-            "/api/v1/admin/overview",
-            headers={"Authorization": f"Bearer {user.json()['token']}"},
-        ).status_code == 401
-        assert client.get(
-            "/api/v1/auth/me",
-            headers={"Authorization": f"Bearer {admin.json()['token']}"},
-        ).status_code == 401
+        assert app.state.auth_repository.account_metrics()["activeAccountCount"] == 0
 
 
 def test_ticket_orders_require_login_and_admin_controls_price(
-    tmp_path: Path,
+    database: Database,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def fake_request_service(
@@ -242,7 +170,7 @@ def test_ticket_orders_require_login_and_admin_controls_price(
             "narration": "narration",
             "analytics": "analytics",
         },
-        tmp_path / "accounts.sqlite",
+        database,
         admin_email="admin@example.com",
         admin_password="long-admin-password",
     )
@@ -261,8 +189,6 @@ def test_ticket_orders_require_login_and_admin_controls_price(
         ).json()
         assert user.get("token")
         assert admin.get("token")
-        user_headers = {"Authorization": f"******"}
-        admin_headers = {"Authorization": f"******"}
         user_headers = {"Authorization": "Bearer " + user["token"]}
         admin_headers = {"Authorization": "Bearer " + admin["token"]}
         assert client.get("/api/v1/auth/me", headers=user_headers).status_code == 200
@@ -275,7 +201,7 @@ def test_ticket_orders_require_login_and_admin_controls_price(
             },
         ).json()
         other_headers = {"Authorization": "Bearer " + other_user["token"]}
-        assert client.get("/api/v1/admin/tickets", headers=user_headers).status_code == 401
+        assert client.get("/api/v1/admin/tickets", headers=user_headers).status_code == 403
 
         assert client.post(
             "/api/v1/tickets/orders",
@@ -287,7 +213,7 @@ def test_ticket_orders_require_login_and_admin_controls_price(
             "/api/v1/admin/tickets/prices/phong-nha-cave",
             headers=user_headers,
             json={"priceVnd": 100000},
-        ).status_code == 401
+        ).status_code == 403
         assert client.put(
             "/api/v1/admin/tickets/prices/phong-nha-cave",
             headers=admin_headers,

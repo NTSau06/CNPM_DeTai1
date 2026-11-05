@@ -5,6 +5,7 @@ import { AlertCircle, Bookmark, ChevronDown, Compass, Map, MapPinned, Menu, Moni
 import { translate } from './i18n'
 import { languages } from './data/places'
 import { useAppStore } from './store'
+import { getVisitorId, leaveOnlinePresence, updateOnlinePresence } from './api'
 import { AppShell } from './components/AppShell'
 import { DeviceEntryPage } from './pages/DeviceEntryPage'
 import { sendSessionHeartbeat } from './api'
@@ -13,13 +14,16 @@ const ExplorePage = lazy(() => import('./pages/ExplorePage').then((module) => ({
 const SavedPage = lazy(() => import('./pages/SavedPage').then((module) => ({ default: module.SavedPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })))
 const UserPage = lazy(() => import('./pages/UserPage').then((module) => ({ default: module.UserPage })))
-const AdminPage = lazy(() => import('./admin/AdminPage').then((module) => ({ default: module.AdminPage })))
+const OnlineDashboardPage = lazy(() => import('./pages/OnlineDashboardPage').then((module) => ({ default: module.OnlineDashboardPage })))
+const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage').then((module) => ({ default: module.AdminLoginPage })))
+
+// Gửi heartbeat đủ nhanh để số online cập nhật gần như tức thì (máy chủ giữ 30 giây).
+const PRESENCE_INTERVAL_MS = 5_000
 
 export default function App() {
   const location = useLocation()
   const language = useAppStore((state) => state.language)
   const savedTourCount = useAppStore((state) => state.savedTours.length)
-  const online = useAppStore((state) => state.online)
   const currentUser = useAppStore((state) => state.currentUser)
   const authToken = useAppStore((state) => state.authToken)
   const storageError = useAppStore((state) => state.storageError)
@@ -27,6 +31,48 @@ export default function App() {
   const [navigationOpen, setNavigationOpen] = useState(false)
   const [toast, setToast] = useState<{ id: number; message: string } | null>(null)
   const navigationRef = useRef<HTMLDivElement>(null)
+  const isAdminRoute = location.pathname.startsWith('/admin')
+
+  useEffect(() => {
+    // Trang admin không tự tính là thiết bị người dùng đang truy cập.
+    if (isAdminRoute) return
+    let visitorId: string | null = null
+    let timer: number | undefined
+    const update = async () => {
+      try {
+        visitorId ??= await getVisitorId()
+        await updateOnlinePresence(visitorId)
+      } catch {
+        // Bỏ qua lỗi mạng tạm thời; lần heartbeat kế tiếp sẽ thử lại.
+      }
+    }
+    const stop = () => {
+      window.clearInterval(timer)
+      timer = undefined
+    }
+    const start = () => {
+      stop()
+      void update()
+      timer = window.setInterval(() => { void update() }, PRESENCE_INTERVAL_MS)
+    }
+    const leave = () => {
+      stop()
+      if (visitorId) leaveOnlinePresence(visitorId)
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') start()
+      else leave()
+    }
+
+    if (document.visibilityState === 'visible') start()
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('pagehide', leave)
+    return () => {
+      leave()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('pagehide', leave)
+    }
+  }, [isAdminRoute])
 
   useEffect(() => {
     if (!navigationOpen) return
@@ -103,11 +149,15 @@ export default function App() {
     { to: '/settings', label: translate(language, 'settings'), icon: Settings2 },
   ]
 
-  if (location.pathname.startsWith('/admin')) {
+  if (isAdminRoute) {
     return (
       <AppShell>
-        <Suspense fallback={<div className="page-loading" role="status">Đang mở trang quản trị…</div>}>
-          <AdminPage />
+        <Suspense fallback={<div className="page-loading" aria-label={translate(language, 'loading')}><span className="skeleton page-skeleton-title" /><span className="skeleton page-skeleton-line" /><span className="skeleton page-skeleton-block" /></div>}>
+          <Routes>
+            <Route path="/admin/login" element={<AdminLoginPage />} />
+            <Route path="/admin" element={<OnlineDashboardPage />} />
+            <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
+          </Routes>
         </Suspense>
       </AppShell>
     )
@@ -121,10 +171,10 @@ export default function App() {
           <span className="brand-name">Quảng Trị</span>
         </NavLink>
         <div className="topbar-right">
-          <span className={`connection-pill ${online ? 'is-online' : 'is-offline'}`}>
-            <span className="status-dot" />
-            {translate(language, online ? 'online' : 'offlineStatus')}
-          </span>
+          <NavLink className="device-picker-link" to="/" title="Chọn thiết bị">
+            <MonitorSmartphone size={15} aria-hidden="true" />
+            <span>Thiết bị</span>
+          </NavLink>
           <div className="header-navigation" ref={navigationRef}>
             <button
               className="header-navigation-toggle"

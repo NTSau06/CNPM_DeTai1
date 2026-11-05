@@ -1,13 +1,14 @@
 // Liệt kê, mở và xóa các hành trình đã lưu.
 import { ArrowLeft, ArrowRight, Bookmark, Clock3, MapPin, Route, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { findPlace, localizedTitle } from '../data/places'
+import { localizedTitle } from '../data/places'
 import { translate } from '../i18n'
 import { useAppStore } from '../store'
 
 export function SavedPage() {
   const language = useAppStore((state) => state.language)
   const tours = useAppStore((state) => state.savedTours)
+  const places = useAppStore((state) => state.places)
   const removeTour = useAppStore((state) => state.removeTour)
   const currentUser = useAppStore((state) => state.currentUser)
 
@@ -36,7 +37,7 @@ export function SavedPage() {
       ) : (
         <div className="saved-tour-list">
           {tours.map((tour, index) => {
-            const savedPlaces = tour.placeIds.map((id) => findPlace(id)).filter((place) => place !== undefined)
+            const savedPlaces = tour.placeIds.map((id) => places.find((place) => place.id === id)).filter((place) => place !== undefined)
             const first = savedPlaces[0]
             return (
               <article className="saved-tour-card" key={tour.id}>

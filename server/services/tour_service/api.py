@@ -47,3 +47,12 @@ def delete_tour(
 ) -> Response:
     planner(request).delete_tour(tour_id, user_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete(
+    "/internal/v1/admin/tours/owner/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_owner_tours(user_id: str, request: Request) -> Response:
+    planner(request).delete_owner_tours(user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -9,7 +9,7 @@ import { PlaceRatingPanel } from '../components/PlaceRatingPanel'
 import { TicketPurchasePanel } from '../components/TicketPurchasePanel'
 import { RitualGuidancePanel } from '../components/RitualGuidancePanel'
 import { getOfflinePlacePack } from '../db'
-import { categoryKeys, categoryLabels, findPlace, languages, localizedTitle, places as bundledPlaces } from '../data/places'
+import { categoryKeys, categoryLabels, languages, localizedTitle, places as bundledPlaces } from '../data/places'
 import { translate } from '../i18n'
 import { getNarrationAudioUrl, getNarrationText, speakWithAudio, speechAvailable, stopSpeaking } from '../speech'
 import { useAppStore } from '../store'
@@ -37,7 +37,7 @@ export function ExplorePage() {
   const submittedVisits = useRef(new Set<string>())
   const watchId = useRef<number | null>(null)
   const placeDetailsRef = useRef<HTMLDetailsElement>(null)
-  const selectedPlace = findPlace(selectedPlaceId) ?? places[0] ?? bundledPlaces[0]
+  const selectedPlace = places.find((place) => place.id === selectedPlaceId) ?? places[0] ?? bundledPlaces[0]
   const selectedLanguage = languages.find((item) => item.code === language)
 
   useEffect(() => {
@@ -270,7 +270,7 @@ export function ExplorePage() {
             <div className="place-story-heading">
               <span className="eyebrow"><span className="eyebrow-line" /> KHÁM PHÁ ĐỊA ĐIỂM</span>
               <h2>Câu chuyện của nơi này</h2>
-              <p>Nội dung được biên tập trực tiếp trong dữ liệu mã nguồn của từng địa điểm.</p>
+              <p>Khám phá những câu chuyện và hình ảnh đặc trưng của địa phương.</p>
             </div>
             <div className="place-story-layout">
               <div className="place-story-sections">
@@ -281,10 +281,12 @@ export function ExplorePage() {
                   </section>
                 ))}
               </div>
-              <figure className="place-story-image">
-                <img src={offlineImageUrl ?? selectedPlace.detailImage.src} alt={selectedPlace.detailImage.alt} loading="lazy" />
-                <figcaption>{selectedPlace.detailImage.caption}</figcaption>
-              </figure>
+              {selectedPlace.detailImage.src && (
+                <figure className="place-story-image">
+                  <img src={offlineImageUrl ?? selectedPlace.detailImage.src} alt={selectedPlace.detailImage.alt} loading="lazy" />
+                  <figcaption>{selectedPlace.detailImage.caption}</figcaption>
+                </figure>
+              )}
             </div>
           </section>
           <PlaceRatingPanel placeId={selectedPlace.id} />

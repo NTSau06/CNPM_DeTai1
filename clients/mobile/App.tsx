@@ -6,6 +6,7 @@ import * as Speech from 'expo-speech'
 import { StatusBar } from 'expo-status-bar'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AppState,
   Alert,
   ActivityIndicator,
   Modal,
@@ -46,6 +47,7 @@ type Collection<T> = { items: T[]; total: number }
 const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 const PLACES_KEY = 'quang-tri:places:v1'
 const AUTH_KEY = 'quang-tri:auth-token:v1'
+const PRESENCE_KEY = 'quang-tri:presence-id:v1'
 const TOURS_KEY = 'quang-tri:tours:v2'
 const RETIRED_PLACE_IDS = new Set(['truong-son-cemetery'])
 const locales: Language[] = ['vi', 'en', 'ja', 'fr', 'zh-CN', 'ko-KR', 'es']
@@ -179,6 +181,47 @@ export default function App() {
   useEffect(() => {
     const timer = setInterval(() => setVietnamHour(getVietnamHour()), 60_000)
     return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    let visitorId: string | null = null
+    const heartbeat = async () => {
+      if (AppState.currentState !== 'active') return
+      try {
+        if (!visitorId) visitorId = await AsyncStorage.getItem(PRESENCE_KEY)
+        if (!visitorId) {
+          visitorId = Crypto.randomUUID()
+          await AsyncStorage.setItem(PRESENCE_KEY, visitorId)
+        }
+        await api('/analytics/presence', {
+          method: 'POST',
+          body: JSON.stringify({ visitorId }),
+        })
+      } catch {
+        if (active) setMessage(words[languageRef.current].error)
+      }
+    }
+
+    const leave = () => {
+      if (!visitorId) return
+      void api('/analytics/presence/leave', {
+        method: 'POST',
+        body: JSON.stringify({ visitorId }),
+      }).catch(() => undefined)
+    }
+
+    void heartbeat()
+    const timer = setInterval(() => { void heartbeat() }, 5_000)
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void heartbeat()
+      else leave()
+    })
+    return () => {
+      active = false
+      clearInterval(timer)
+      subscription.remove()
+    }
   }, [])
 
   const refreshPlaces = useCallback(async () => {

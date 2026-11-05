@@ -1,8 +1,8 @@
-// Đăng ký, đăng nhập và quản lý hồ sơ tài khoản.
+﻿// Đăng ký, đăng nhập và quản lý hồ sơ tài khoản.
 import { useState, type FormEvent } from 'react'
 import { Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, LogOut, Mail, MapPin, Phone, UserRound } from 'lucide-react'
-import { loginAccount, registerAccount } from '../api'
+import { ArrowLeft, Check, KeyRound, LogOut, Mail, MapPin, Phone, UserRound } from 'lucide-react'
+import { changePassword, loginAccount, registerAccount } from '../api'
 import { useAppStore } from '../store'
 import type { UserProfile } from '../types'
 
@@ -10,6 +10,7 @@ export function UserPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const currentUser = useAppStore((state) => state.currentUser)
+  const authReady = useAppStore((state) => state.authReady)
   const signIn = useAppStore((state) => state.signIn)
   const updateCurrentUser = useAppStore((state) => state.updateCurrentUser)
   const signOut = useAppStore((state) => state.signOut)
@@ -19,8 +20,11 @@ export function UserPage() {
   const [feedback, setFeedback] = useState('')
   const [saved, setSaved] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [profileError, setProfileError] = useState('')
+  const [passwordMessage, setPasswordMessage] = useState<{ ok: boolean; text: string } | null>(null)
+  const replaceSession = useAppStore((state) => state.replaceSession)
 
-  if (isProfile && !currentUser) return <Navigate to="/login" replace />
+  if (isProfile && !currentUser) return authReady ? <Navigate to="/login" replace /> : null
   if (!isProfile && currentUser) return <Navigate to="/profile" replace />
 
   const onSubmitAuth = async (event: FormEvent<HTMLFormElement>) => {
@@ -60,7 +64,12 @@ export function UserPage() {
           : '/explore'
         navigate(returnTo, { replace: true })
       } else {
-        navigate('/profile', { replace: true })
+        const returnTo = typeof navigationState?.returnTo === 'string'
+          && navigationState.returnTo.startsWith('/')
+          && !navigationState.returnTo.startsWith('//')
+          ? navigationState.returnTo
+          : '/profile'
+        navigate(returnTo, { replace: true })
       }
     } catch (error) {
       setFeedback(getAuthErrorMessage(error))
@@ -69,20 +78,57 @@ export function UserPage() {
     }
   }
 
-  const onSaveProfile = (event: FormEvent<HTMLFormElement>) => {
+  const onSaveProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!currentUser) return
     const values = new FormData(event.currentTarget)
-    updateCurrentUser({
-      ...currentUser,
-      fullName: String(values.get('fullName') ?? '').trim(),
-      phone: String(values.get('phone') ?? '').trim(),
-      birthDate: String(values.get('birthDate') ?? ''),
-      gender: values.get('gender') as UserProfile['gender'],
-      address: String(values.get('address') ?? '').trim(),
-    })
-    setSaved(true)
-    window.setTimeout(() => setSaved(false), 2500)
+    setProfileError('')
+    try {
+      await updateCurrentUser({
+        ...currentUser,
+        fullName: String(values.get('fullName') ?? '').trim(),
+        phone: String(values.get('phone') ?? '').trim(),
+        birthDate: String(values.get('birthDate') ?? ''),
+        gender: values.get('gender') as UserProfile['gender'],
+        address: String(values.get('address') ?? '').trim(),
+      })
+      setSaved(true)
+      window.setTimeout(() => setSaved(false), 2500)
+    } catch {
+      setProfileError('Không lưu được hồ sơ. Hãy kiểm tra kết nối và thử lại.')
+    }
+  }
+
+  const onChangePassword = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const form = event.currentTarget
+    const values = new FormData(form)
+    const currentPassword = String(values.get('currentPassword') ?? '')
+    const newPassword = String(values.get('newPassword') ?? '')
+    if (newPassword.length < 8) {
+      setPasswordMessage({ ok: false, text: 'Mật khẩu mới cần có ít nhất 8 ký tự.' })
+      return
+    }
+    if (newPassword !== values.get('confirmNewPassword')) {
+      setPasswordMessage({ ok: false, text: 'Mật khẩu xác nhận chưa khớp.' })
+      return
+    }
+    const token = useAppStore.getState().authToken
+    if (!token) return
+    try {
+      const result = await changePassword(token, currentPassword, newPassword)
+      replaceSession(result.token)
+      form.reset()
+      setPasswordMessage({ ok: true, text: 'Đã đổi mật khẩu. Các thiết bị khác sẽ cần đăng nhập lại.' })
+    } catch (error) {
+      const status = typeof error === 'object' && error !== null && 'status' in error ? error.status : undefined
+      setPasswordMessage({
+        ok: false,
+        text: status === 403 ? 'Mật khẩu hiện tại không đúng.'
+          : status === 422 ? 'Mật khẩu mới phải khác mật khẩu hiện tại.'
+          : 'Không đổi được mật khẩu. Hãy thử lại.',
+      })
+    }
   }
 
   if (isProfile && currentUser) {
@@ -101,7 +147,7 @@ export function UserPage() {
               <LogOut size={15} /> Đăng xuất
             </button>
           </div>
-          <form className="user-form profile-form" onSubmit={onSaveProfile}>
+          <form className="user-form profile-form" onSubmit={(event) => { void onSaveProfile(event) }}>
             <label>Họ và tên
               <span className="input-with-icon"><UserRound size={16} /><input name="fullName" required maxLength={80} defaultValue={currentUser.fullName} autoComplete="name" /></span>
             </label>
@@ -127,8 +173,25 @@ export function UserPage() {
               <span className="input-with-icon"><MapPin size={16} /><input name="address" maxLength={160} defaultValue={currentUser.address} autoComplete="street-address" placeholder="Tỉnh/thành phố, quốc gia" /></span>
             </label>
             <div className="profile-actions">
-              {saved && <span className="profile-saved" role="status"><Check size={15} /> Đã cập nhật trong phiên này</span>}
+              {saved && <span className="profile-saved" role="status"><Check size={15} /> Đã lưu thông tin</span>}
               <button className="user-submit" type="submit">Lưu thông tin</button>
+            </div>
+            {profileError && <p className="user-feedback" role="alert">{profileError}</p>}
+          </form>
+          <form className="user-form profile-form" onSubmit={(event) => { void onChangePassword(event) }}>
+            <h2 className="profile-address"><KeyRound size={16} /> Đổi mật khẩu</h2>
+            <label>Mật khẩu hiện tại
+              <input name="currentPassword" type="password" required minLength={8} autoComplete="current-password" />
+            </label>
+            <label>Mật khẩu mới
+              <input name="newPassword" type="password" required minLength={8} autoComplete="new-password" placeholder="Ít nhất 8 ký tự" />
+            </label>
+            <label>Xác nhận mật khẩu mới
+              <input name="confirmNewPassword" type="password" required minLength={8} autoComplete="new-password" />
+            </label>
+            <div className="profile-actions">
+              {passwordMessage && <p className="user-feedback" role="status">{passwordMessage.text}</p>}
+              <button className="user-submit" type="submit">Đổi mật khẩu</button>
             </div>
           </form>
         </div>

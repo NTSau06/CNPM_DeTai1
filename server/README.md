@@ -1,8 +1,8 @@
-# Backend services — Quảng Trị
+﻿# Backend services — Quảng Trị
 
 The backend is a runnable three-layer application split into an API gateway and
 four independently started services. It uses FastAPI, Pydantic, HTTPX and
-SQLite so the class project can run locally without provisioning a database.
+SQL Server (default `localhost\SQLEXPRESS`, database `QuangTriDB`, auto-created; override with `SQLSERVER_CONNECTION_STRING`). Requires ODBC Driver 18 for SQL Server.
 
 ## Run the full stack
 
@@ -34,7 +34,7 @@ npm run backend:stop
 ```
 
 The services run in the background. Their process IDs are stored in
-`server\var\run\` and logs are written to `server\var\logs\`. Local SQLite
+`server\var\run\` and logs are written to `server\var\logs\`. Local SQL Server
 databases are stored in `server\var\`. Run the frontend separately with
 `npm --prefix clients\frontend run dev`. Do not combine this method with
 `npm run dev` or Docker Compose, which also starts the backend services.
@@ -70,7 +70,7 @@ start with the same 14 places and seven reviewed locale copies.
   in `services/*/api.py` handle HTTP, DTO validation and status codes.
 - **Business/application:** `PlaceCatalog`, `TourPlanner` and
   `NarrationReader` implement catalog, tour and narration use cases.
-- **Data access:** POI, tour and analytics repositories own SQLite access and
+- **Data access:** POI, tour and analytics repositories own SQL Server access and
   seed/data serialization.
 - **POI Service:** serves the canonical catalog and resolves tour stop IDs.
 - **Tour Service:** calls POI Service over HTTP before calculating and saving a
@@ -91,9 +91,7 @@ Email-and-password registration/login is provided by the Gateway. Passwords are
 stored as salted scrypt hashes, and issued bearer sessions expire after 30 days.
 Tour list, create and delete endpoints require a valid account session; each
 saved tour is scoped to its owner. The web and mobile clients restore the session
-and account's tours on reload. This is a course-project authentication implementation, not a
-substitute for a production identity provider, HTTPS, rate limiting or account
-recovery.
+and account's tours on reload. Signed-in users can persist their profile with `PUT /api/v1/auth/me` and change\r\ntheir password with `POST /api/v1/auth/change-password` (all previous sessions are\r\nrevoked and a fresh token is returned). This is a course-project authentication\r\nimplementation, not a substitute for a production identity provider, HTTPS, rate\r\nlimiting or email-based account recovery.
 
 Ticket orders are an authenticated test flow, not real payment processing.
 Administrators configure a positive VND price per place; a blank price disables

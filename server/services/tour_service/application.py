@@ -88,6 +88,9 @@ class TourPlanner:
     def delete_tour(self, tour_id: str, owner_id: str | None = None) -> bool:
         return self.repository.delete(tour_id, owner_id)
 
+    def delete_owner_tours(self, owner_id: str) -> int:
+        return self.repository.delete_for_owner(owner_id)
+
 
 def _haversine_km(
     first: tuple[float, float], second: tuple[float, float]

@@ -43,6 +43,7 @@ export interface UserProfile {
   fullName: string
   email: string
   phone: string
+  isAdmin?: boolean
   birthDate: string
   gender: 'female' | 'male' | 'other' | 'prefer-not-to-say' | ''
   address: string
