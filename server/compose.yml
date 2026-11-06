@@ -1,5 +1,26 @@
-# Khởi chạy Gateway và các backend service cùng kiểm tra sức khỏe, dữ liệu lưu trữ.
+# Khởi chạy Gateway, các backend service và SQL Server cùng kiểm tra sức khỏe, dữ liệu lưu trữ.
 services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-QuangTri@2026!}
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "if [ -x /opt/mssql-tools18/bin/sqlcmd ]; then /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q \"SELECT 1\"; elif [ -x /opt/mssql-tools/bin/sqlcmd ]; then /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\"; else bash -c '</dev/tcp/127.0.0.1/1433'; fi",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 15s
+    restart: unless-stopped
+
   api-gateway:
     build:
       context: ..
@@ -12,11 +33,13 @@ services:
       ANALYTICS_SERVICE_URL: http://analytics-service:8004
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      SQLSERVER_CONNECTION_STRING: ${SQLSERVER_CONNECTION_STRING}
+      SQLSERVER_CONNECTION_STRING: ${SQLSERVER_CONNECTION_STRING:-DRIVER=ODBC Driver 18 for SQL Server;SERVER=sqlserver,1433;DATABASE=QuangTriDB;UID=sa;PWD=QuangTri@2026!;TrustServerCertificate=yes;}
       CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:19006,http://localhost:8081,http://127.0.0.1:8081
     ports:
       - "8000:8000"
     depends_on:
+      sqlserver:
+        condition: service_healthy
       poi-service:
         condition: service_healthy
       tour-service:
@@ -45,9 +68,12 @@ services:
       dockerfile: server/Dockerfile
     command: uvicorn services.poi_service.main:app --host 0.0.0.0 --port 8001
     environment:
-      SQLSERVER_CONNECTION_STRING: ${SQLSERVER_CONNECTION_STRING}
+      SQLSERVER_CONNECTION_STRING: ${SQLSERVER_CONNECTION_STRING:-DRIVER=ODBC Driver 18 for SQL Server;SERVER=sqlserver,1433;DATABASE=QuangTriDB;UID=sa;PWD=QuangTri@2026!;TrustServerCertificate=yes;}
     expose:
       - "8001"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -67,11 +93,13 @@ services:
       dockerfile: server/Dockerfile
     command: uvicorn services.tour_service.main:app --host 0.0.0.0 --port 8002
     environment:
-      SQLSERVER_CONNECTION_STRING: ${SQLSERVER_CONNECTION_STRING}
+      SQLSERVER_CONNECTION_STRING: ${SQLSERVER_CONNECTION_STRING:-DRIVER=ODBC Driver 18 for SQL Server;SERVER=sqlserver,1433;DATABASE=QuangTriDB;UID=sa;PWD=QuangTri@2026!;TrustServerCertificate=yes;}
       POI_SERVICE_URL: http://poi-service:8001
     expose:
       - "8002"
     depends_on:
+      sqlserver:
+        condition: service_healthy
       poi-service:
         condition: service_healthy
     healthcheck:
@@ -118,9 +146,12 @@ services:
       dockerfile: server/Dockerfile
     command: uvicorn services.analytics_service.main:app --host 0.0.0.0 --port 8004
     environment:
-      SQLSERVER_CONNECTION_STRING: ${SQLSERVER_CONNECTION_STRING}
+      SQLSERVER_CONNECTION_STRING: ${SQLSERVER_CONNECTION_STRING:-DRIVER=ODBC Driver 18 for SQL Server;SERVER=sqlserver,1433;DATABASE=QuangTriDB;UID=sa;PWD=QuangTri@2026!;TrustServerCertificate=yes;}
     expose:
       - "8004"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -133,3 +164,6 @@ services:
       timeout: 3s
       retries: 12
     restart: unless-stopped
+
+volumes:
+  sqlserver-data:

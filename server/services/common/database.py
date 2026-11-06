@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from contextlib import contextmanager
 from typing import Iterator
 
@@ -27,8 +28,10 @@ class Database:
     """Giữ chuỗi kết nối SQL Server và cung cấp kết nối có commit/rollback tự động."""
 
     def __init__(self, connection_string: str | None = None) -> None:
-        self.connection_string = connection_string or os.getenv(
-            CONNECTION_STRING_ENV, DEFAULT_CONNECTION_STRING
+        self.connection_string = (
+            connection_string
+            or os.getenv(CONNECTION_STRING_ENV)
+            or DEFAULT_CONNECTION_STRING
         )
         self._ensured = False
 
@@ -49,14 +52,19 @@ class Database:
                 lambda m: f"{m.group(1)}DATABASE=master", self.connection_string, count=1
             )
             with pyodbc.connect(master, autocommit=True) as connection:
-                try:
-                    connection.execute(
-                        f"IF DB_ID(N'{name}') IS NULL CREATE DATABASE [{name}]"
-                    )
-                except pyodbc.Error:
-                    # Service khác có thể vừa tạo xong; chỉ báo lỗi nếu vẫn chưa có.
-                    if connection.execute(f"SELECT DB_ID(N'{name}')").fetchone()[0] is None:
-                        raise
+                for attempt in range(10):
+                    try:
+                        connection.execute(
+                            f"IF DB_ID(N'{name}') IS NULL CREATE DATABASE [{name}]"
+                        )
+                        break
+                    except pyodbc.Error:
+                        # Service khác có thể đang tạo hoặc vừa tạo xong; đợi ngắn rồi kiểm tra lại.
+                        if connection.execute(f"SELECT DB_ID(N'{name}')").fetchone()[0] is not None:
+                            break
+                        if attempt == 9:
+                            raise
+                        time.sleep(0.5)
         self._ensured = True
 
     @contextmanager

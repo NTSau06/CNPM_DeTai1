@@ -36,12 +36,42 @@ jobs:
           cache: pip
           cache-dependency-path: server/requirements-dev.txt
 
+      - name: Install ODBC Driver 18 for SQL Server
+        run: |
+          if [ ! -f /etc/apt/sources.list.d/microsoft-prod.list ] && [ ! -f /etc/apt/sources.list.d/mssql-release.list ]; then
+            curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor --yes -o /usr/share/keyrings/microsoft-prod.gpg
+            . /etc/os-release
+            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/${VERSION_ID}/prod ${VERSION_CODENAME} main" | sudo tee /etc/apt/sources.list.d/microsoft-prod.list
+          fi
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 unixodbc
+
       - name: Install backend dependencies
         run: python -m pip install -r server/requirements-dev.txt
+
+      - name: Start SQL Server for tests
+        env:
+          SQLSERVER_MASTER_CONNECTION_STRING: DRIVER={ODBC Driver 18 for SQL Server};SERVER=127.0.0.1,1433;DATABASE=master;UID=sa;PWD=QuangTri@2026!;TrustServerCertificate=yes;
+        run: |
+          docker compose -f server/compose.yml up sqlserver --wait --wait-timeout 120 -d
+          python - <<'PY'
+          import os, time, pyodbc
+          conn_str = os.environ["SQLSERVER_MASTER_CONNECTION_STRING"]
+          for attempt in range(30):
+              try:
+                  with pyodbc.connect(conn_str, autocommit=True, timeout=3) as conn:
+                      conn.execute("SELECT 1").fetchone()
+                  break
+              except pyodbc.Error:
+                  if attempt == 29:
+                      raise
+                  time.sleep(2)
+          PY
 
       - name: Run unit and API tests
         env:
           PYTHONPATH: server
+          SQLSERVER_CONNECTION_STRING: DRIVER={ODBC Driver 18 for SQL Server};SERVER=127.0.0.1,1433;DATABASE=QuangTriDB;UID=sa;PWD=QuangTri@2026!;TrustServerCertificate=yes;
         run: python -m pytest server/tests/test_services.py -q
 
       - name: Start the complete service stack
@@ -54,7 +84,7 @@ jobs:
 
       - name: Stop the service stack
         if: always()
-        run: docker compose -f server/compose.yml down --remove-orphans
+        run: docker compose -f server/compose.yml down -v --remove-orphans
 
   publish:
     name: Publish backend container image
