@@ -46,6 +46,7 @@ interface AppState {
   replaceSession: (token: string) => void
   signOut: () => Promise<void>
   setRoutePlace: (id: string) => Promise<boolean>
+  setRouteOrder: (placeIds: string[]) => Promise<boolean>
   removeTour: (id: string) => Promise<void>
   setAutoNarration: (enabled: boolean) => void
   setUseOfflineMap: (enabled: boolean) => void
@@ -177,6 +178,59 @@ export const useAppStore = create<AppState>((set, get) => ({
       const remoteTour = await createTour(tour, authToken)
       set((state) => ({
         routeIds: nextRouteIds,
+        activeTourId: remoteTour.id,
+        savedTours: [remoteTour, ...state.savedTours.filter((item) => item.id !== remoteTour.id)],
+        storageError: null,
+      }))
+      localStorage.setItem(draftTourStorageKey(currentUser.id), remoteTour.id)
+      try {
+        await saveTour(remoteTour)
+      } catch {
+        set({ storageError: 'savingError' })
+      }
+      return true
+    } catch {
+      set({ storageError: 'backendUnavailable' })
+      return false
+    } finally {
+      set({ isSavingRoute: false })
+    }
+  },
+  setRouteOrder: async (placeIds) => {
+    const { routeIds, places: allPlaces, authToken, currentUser, activeTourId, isSavingRoute } = get()
+    if (
+      !authToken ||
+      !currentUser ||
+      isSavingRoute ||
+      placeIds.length !== routeIds.length ||
+      new Set(placeIds).size !== routeIds.length ||
+      placeIds.some((id) => !routeIds.includes(id))
+    ) return false
+    if (placeIds.every((id, index) => id === routeIds[index])) return true
+
+    set({ isSavingRoute: true })
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      set({ isSavingRoute: false, storageError: 'backendUnavailable' })
+      return false
+    }
+    try {
+      const { length, lineString } = await import('@turf/turf')
+      const coordinates = placeIds
+        .map((placeId) => allPlaces.find((place) => place.id === placeId)?.coordinates)
+        .filter((coordinate): coordinate is [number, number] => coordinate !== undefined)
+      const tour: SavedTour = {
+        id: activeTourId ?? generateId(),
+        placeIds,
+        createdAt: get().savedTours.find((item) => item.id === activeTourId)?.createdAt ?? Date.now(),
+        distanceKm: coordinates.length > 1 ? length(lineString(coordinates), { units: 'kilometers' }) : 0,
+        durationMinutes: placeIds.reduce(
+          (total, placeId) => total + (allPlaces.find((place) => place.id === placeId)?.duration ?? 0),
+          0,
+        ),
+      }
+      const remoteTour = await createTour(tour, authToken)
+      set((state) => ({
+        routeIds: placeIds,
         activeTourId: remoteTour.id,
         savedTours: [remoteTour, ...state.savedTours.filter((item) => item.id !== remoteTour.id)],
         storageError: null,

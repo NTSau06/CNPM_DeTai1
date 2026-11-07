@@ -128,6 +128,12 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .map-controls { position: absolute; z-index: 5; right: 12px; top: 13px; display: flex; flex-direction: column; gap: 1px; overflow: hidden; border: 1px solid #e5e1d7; border-radius: 6px; background: #fffefa; box-shadow: 0 2px 9px #303b3215; }
 .map-controls button { width: 34px; height: 33px; display: grid; place-items: center; border: 0; color: #59695a; background: #fffefa; }
 .map-controls button:hover { background: #f1f1e9; }
+.map-controls button[aria-expanded="true"] { color: #fff; background: #4a604d; }
+.map-route-planner { position: absolute; z-index: 4; top: 13px; right: 56px; width: min(280px, calc(100% - 78px)); display: grid; gap: 10px; padding: 13px; border: 1px solid #e5e1d7; border-radius: 6px; background: #fffefaF5; box-shadow: 0 2px 12px #303b3220; }
+.map-route-planner label { display: grid; gap: 5px; color: #526754; font-size: 10px; font-weight: 700; }
+.map-route-planner select { width: 100%; min-width: 0; padding: 8px; border: 1px solid #dedbd1; border-radius: 4px; color: #435446; background: #fff; font: inherit; font-size: 11px; }
+.map-route-planner button { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 9px; border: 0; border-radius: 4px; color: #fff; background: #4a604d; font: inherit; font-size: 10px; font-weight: 700; cursor: pointer; }
+.map-route-planner button:disabled { cursor: not-allowed; opacity: .5; }
 .map-control-divider { height: 1px; background: #e9e6dd; }
 .poi-map-label { display: flex; align-items: center; gap: 5px; max-width: 155px; padding: 4px 7px; overflow: hidden; border: 1px solid #d8d8ca; border-radius: 15px; color: #455b49; background: #fffef2ee; box-shadow: 0 2px 7px #303b3220; cursor: pointer; white-space: nowrap; }
 .poi-map-label.selected { border-color: #a96647; color: white; background: #b97555; }
@@ -275,12 +281,16 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .narration-auto-toggle { display: block; margin: 8px 0 0 auto; padding: 3px 0; border: 0; color: #8b7966; background: transparent; font-size: 8px; text-decoration: underline; text-underline-offset: 2px; }
 .inline-warning { color: #a96c4f; font-size: 10px; }
 
-.route-summary { display: flex; align-items: center; gap: 12px; margin-top: 13px; padding: 12px 15px; border: 1px solid #e8e3d8; border-radius: 6px; background: #efeee6; }
+.route-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 13px; padding: 12px 15px; border: 1px solid #e8e3d8; border-radius: 6px; background: #efeee6; }
 .route-summary-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: #9e7151; background: #e1d9c9; }
 .route-summary-copy { display: flex; flex: 1; flex-direction: column; gap: 3px; }
 .route-summary-copy strong { color: #4e604f; font-family: var(--serif); font-size: 12px; }
 .route-summary-copy strong span, .route-summary-copy small span { color: #bf805c; }
 .route-summary-copy small { color: #8d9085; font-size: 9px; }
+.optimize-route-button { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 11px; border: 1px solid #c8d0c4; border-radius: 4px; color: #4a604d; background: #fffefa; font-size: 9px; font-weight: 700; white-space: nowrap; }
+.optimize-route-button:disabled { cursor: wait; opacity: .65; }
+.route-optimization-status { flex: 1 0 100%; margin: 0; color: #5f7b5e; font-size: 10px; }
+.route-optimization-status.is-error { color: #925b42; }
 .route-saved-message { margin: 9px 0 0; color: #5f7b5e; font-size: 10px; }
 .save-route-button { display: flex; align-items: center; gap: 6px; padding: 9px 11px; border: 0; border-radius: 4px; color: white; background: #4a604d; font-size: 9px; font-weight: 700; }
 .walk-fab { position: fixed; z-index: 15; right: 29px; bottom: 23px; display: flex; align-items: center; gap: 8px; padding: 12px 16px; border: 0; border-radius: 24px; color: #fffefa; background: #455d49; box-shadow: 0 4px 14px #3f514341; font-size: 10px; font-weight: 700; }

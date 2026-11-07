@@ -1,11 +1,11 @@
 // Hiển thị bản đồ, marker địa điểm và các tuyến đường bằng MapLibre.
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import { GeoJSONSource, type Map as MapLibreMap, type MapLayerMouseEvent } from 'maplibre-gl'
 import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { Protocol, PMTiles } from 'pmtiles'
 import { lineString, point } from '@turf/turf'
-import { ArrowRight, LoaderCircle, LocateFixed, MapPinned, Maximize2, Minimize2, Minus, Plus, Search, X } from 'lucide-react'
+import { ArrowRight, LoaderCircle, LocateFixed, MapPinned, Maximize2, Minimize2, Minus, Plus, Route, Search, X } from 'lucide-react'
 import { getOfflineMap } from '../db'
 import { translate } from '../i18n'
 import { makeOfflineStyle, makeOnlineStyle } from '../mapStyle'
@@ -45,6 +45,10 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
   const [routeStatus, setRouteStatus] = useState<'loading' | 'offline' | 'error' | null>(null)
   const [directionsStatus, setDirectionsStatus] = useState<'locating' | 'loading' | 'offline' | 'error' | 'unsupported' | null>(null)
   const [showDirections, setShowDirections] = useState(false)
+  const [placeRoutePlannerOpen, setPlaceRoutePlannerOpen] = useState(false)
+  const [fromPlaceId, setFromPlaceId] = useState(() => places.find((place) => place.id !== selectedPlaceId)?.id ?? '')
+  const [toPlaceId, setToPlaceId] = useState(selectedPlaceId)
+  const [placeRoute, setPlaceRoute] = useState<[string, string] | null>(null)
   const mapPlaces = useMemo(() => {
     const query = mapSearch.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase()
     if (!query) return places
@@ -233,13 +237,13 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
     const instance = map.current
     if (!mapReady || !instance?.isStyleLoaded()) return
 
-    if (!showDirections) {
+    if (!showDirections && !placeRoute) {
       syncDirectionsRoute(instance, null)
       setDirectionsStatus(null)
       return
     }
 
-    if (!location) {
+    if (showDirections && !location) {
       setDirectionsStatus('error')
       return
     }
@@ -250,8 +254,14 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
       return
     }
 
+    const placeCoordinates = placeRoute?.map((id) => places.find((place) => place.id === id)?.coordinates)
     const destination = places.find((place) => place.id === selectedPlaceId)?.coordinates
-    if (!destination) {
+    const coordinates = placeRoute
+      ? placeCoordinates?.every((coordinate): coordinate is [number, number] => coordinate !== undefined)
+        ? placeCoordinates
+        : null
+      : location && destination ? [location, destination] : null
+    if (!coordinates) {
       syncDirectionsRoute(instance, null)
       setDirectionsStatus('error')
       return
@@ -261,7 +271,7 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
     setDirectionsStatus('loading')
     syncDirectionsRoute(instance, null)
 
-    void fetchRoadRoute([location, destination], controller.signal)
+    void fetchRoadRoute(coordinates, controller.signal)
       .then((roadCoordinates) => {
         if (controller.signal.aborted || map.current !== instance) return
         syncDirectionsRoute(instance, roadCoordinates)
@@ -279,7 +289,7 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
       })
 
     return () => controller.abort()
-  }, [mapReady, showDirections, location, selectedPlaceId, online, expanded, places])
+  }, [mapReady, showDirections, placeRoute, location, selectedPlaceId, online, expanded, places])
 
   useEffect(() => {
     if (!expanded) return
@@ -340,6 +350,8 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
   }
 
   const toggleDirections = () => {
+    setPlaceRoute(null)
+    setPlaceRoutePlannerOpen(false)
     if (showDirections) {
       setShowDirections(false)
       return
@@ -356,6 +368,26 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
         setShowDirections(true)
       })
       .catch(handleLocationError)
+  }
+
+  const openPlaceRoutePlanner = () => {
+    setShowDirections(false)
+    setPlaceRoute(null)
+    setDirectionsStatus(null)
+    setFromPlaceId(places.find((place) => place.id !== selectedPlaceId)?.id ?? places[0]?.id ?? '')
+    setToPlaceId(selectedPlaceId)
+    setPlaceRoutePlannerOpen((open) => !open)
+  }
+
+  const submitPlaceRoute = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!fromPlaceId || !toPlaceId || fromPlaceId === toPlaceId) {
+      setDirectionsStatus('error')
+      return
+    }
+    setShowDirections(false)
+    setPlaceRoute([fromPlaceId, toPlaceId])
+    setPlaceRoutePlannerOpen(false)
   }
 
   return (
@@ -436,9 +468,32 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
               : directionsStatus === 'unsupported'
                 ? translate(language, 'gpsUnsupported')
                 : directionsStatus === 'error'
-                ? showDirections ? translate(language, 'routeError') : translate(language, 'gpsError')
+                ? showDirections || placeRoute ? translate(language, 'routeError') : translate(language, 'gpsError')
                 : translate(language, 'routeLoading')}
         </div>
+      )}
+      {placeRoutePlannerOpen && (
+        <form className="map-route-planner" onSubmit={submitPlaceRoute}>
+          <label>
+            <span>{translate(language, 'routeOrigin')}</span>
+            <select value={fromPlaceId} onChange={(event) => setFromPlaceId(event.target.value)} required>
+              {places.map((place) => (
+                <option key={place.id} value={place.id}>{place.copy[language].title}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{translate(language, 'routeDestination')}</span>
+            <select value={toPlaceId} onChange={(event) => setToPlaceId(event.target.value)} required>
+              {places.map((place) => (
+                <option key={place.id} value={place.id}>{place.copy[language].title}</option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" disabled={!fromPlaceId || !toPlaceId || fromPlaceId === toPlaceId}>
+            <Route size={14} />{translate(language, 'showRoute')}
+          </button>
+        </form>
       )}
       <div className="map-controls" aria-label="Map controls">
         <button onClick={() => setExpanded((value) => !value)} aria-label={expanded ? 'Exit full screen map' : 'Expand map'} title={expanded ? 'Exit full screen' : 'Expand map'}>
@@ -448,6 +503,7 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
         <button onClick={() => map.current?.zoomOut()} aria-label="Zoom out"><Minus size={18} /></button>
         <span className="map-control-divider" />
         <button onClick={centerOnLocation} aria-label={translate(language, 'locate')} title={translate(language, 'locate')}><LocateFixed size={17} /></button>
+        <button onClick={openPlaceRoutePlanner} aria-label={translate(language, 'placeDirections')} title={translate(language, 'placeDirections')} aria-expanded={placeRoutePlannerOpen}><Route size={17} /></button>
         <button onClick={toggleDirections} aria-label={translate(language, showDirections ? 'hideDirections' : 'directions')} title={translate(language, showDirections ? 'hideDirections' : 'directions')}><MapPinned size={17} /></button>
       </div>
       <div className="map-caption"><span className="map-caption-dot" /> QUANG TRI · QUANG BINH</div>

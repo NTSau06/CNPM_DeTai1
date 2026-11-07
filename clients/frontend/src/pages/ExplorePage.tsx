@@ -1,6 +1,6 @@
 // Trang khám phá: tìm/lọc địa điểm, xem bản đồ, GPS, hành trình và thuyết minh.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDownRight, ArrowRight, BookmarkPlus, ChevronDown, ChevronRight, Clock3, Compass, LocateFixed, MapPin, Search, Sparkles, Volume2 } from 'lucide-react'
+import { ArrowDownRight, ArrowRight, BookmarkPlus, ChevronDown, ChevronRight, Clock3, Compass, LocateFixed, LoaderCircle, MapPin, Search, Sparkles, Volume2 } from 'lucide-react'
 import { distance, point } from '@turf/turf'
 import { NavLink } from 'react-router-dom'
 import { getVisitorId, recordVisit } from '../api'
@@ -12,6 +12,7 @@ import { getOfflinePlacePack } from '../db'
 import { categoryKeys, categoryLabels, languages, localizedTitle, places as bundledPlaces } from '../data/places'
 import { translate } from '../i18n'
 import { getNarrationAudioUrl, getNarrationText, speakWithAudio, speechAvailable, stopSpeaking } from '../speech'
+import { optimizeRouteOrder } from '../routeOptimization'
 import { useAppStore } from '../store'
 import type { Category } from '../types'
 
@@ -23,8 +24,11 @@ export function ExplorePage() {
   const selectedPlaceId = useAppStore((state) => state.selectedPlaceId)
   const setSelectedPlace = useAppStore((state) => state.setSelectedPlace)
   const routeIds = useAppStore((state) => state.routeIds)
+  const setRouteOrder = useAppStore((state) => state.setRouteOrder)
+  const isSavingRoute = useAppStore((state) => state.isSavingRoute)
   const savedTours = useAppStore((state) => state.savedTours)
   const location = useAppStore((state) => state.location)
+  const online = useAppStore((state) => state.online)
   const setLocation = useAppStore((state) => state.setLocation)
   const autoNarration = useAppStore((state) => state.autoNarration)
   const setAutoNarration = useAppStore((state) => state.setAutoNarration)
@@ -33,6 +37,11 @@ export function ExplorePage() {
   const [placesExpanded, setPlacesExpanded] = useState(false)
   const [gpsMessage, setGpsMessage] = useState('')
   const [offlineImageUrl, setOfflineImageUrl] = useState<string | null>(null)
+  const [optimizingRoute, setOptimizingRoute] = useState(false)
+  const [routeOptimizationResult, setRouteOptimizationResult] = useState<{
+    routeKey: string
+    status: 'optimized' | 'error' | 'offline'
+  } | null>(null)
   const spokenPlaces = useRef(new Set<string>())
   const submittedVisits = useRef(new Set<string>())
   const watchId = useRef<number | null>(null)
@@ -155,6 +164,41 @@ export function ExplorePage() {
     const previous = routePlaces[index - 1]
     return total + distance(point(previous.coordinates), point(place.coordinates), { units: 'kilometers' })
   }, 0) : 0
+  const routeKey = routeIds.join('|')
+  const visibleOptimizationResult = routeOptimizationResult?.routeKey === routeKey
+    ? routeOptimizationResult.status
+    : null
+
+  const optimizeRoute = async () => {
+    if (routePlaces.length < 2 || optimizingRoute || isSavingRoute) return
+    if (!online) {
+      setRouteOptimizationResult({ routeKey, status: 'offline' })
+      return
+    }
+
+    setOptimizingRoute(true)
+    setRouteOptimizationResult(null)
+    const originalRouteKey = routeKey
+    try {
+      const hasCurrentLocation = location !== null
+      const origin = location ?? routePlaces[0].coordinates
+      const stops = hasCurrentLocation ? routePlaces : routePlaces.slice(1)
+      const optimizedStops = await optimizeRouteOrder(origin, stops, new AbortController().signal)
+      const optimizedIds = hasCurrentLocation
+        ? optimizedStops
+        : [routePlaces[0].id, ...optimizedStops]
+      const saved = await setRouteOrder(optimizedIds)
+      if (!saved) {
+        setRouteOptimizationResult({ routeKey: originalRouteKey, status: 'error' })
+        return
+      }
+      setRouteOptimizationResult({ routeKey: optimizedIds.join('|'), status: 'optimized' })
+    } catch {
+      setRouteOptimizationResult({ routeKey: originalRouteKey, status: 'error' })
+    } finally {
+      setOptimizingRoute(false)
+    }
+  }
 
   return (
     <div className="explore-page">
@@ -298,7 +342,33 @@ export function ExplorePage() {
         <section className="route-summary">
           <div className="route-summary-icon"><BookmarkPlus size={18} /></div>
           <div className="route-summary-copy"><strong>{translate(language, 'route')} <span>·</span> {routeIds.length} {translate(language, 'stopCount')}</strong><small>{routeDistance.toFixed(1)} {translate(language, 'distanceUnit')} <span>·</span> {routePlaces.reduce((total, place) => total + place.duration, 0)} {translate(language, 'minute')}</small></div>
+          {routeIds.length > 1 && (
+            <button
+              type="button"
+              className="optimize-route-button"
+              onClick={() => void optimizeRoute()}
+              disabled={optimizingRoute || isSavingRoute}
+              aria-busy={optimizingRoute}
+            >
+              {optimizingRoute
+                ? <LoaderCircle className="loading-spinner" size={14} />
+                : <Sparkles size={14} />}
+              {translate(language, optimizingRoute ? 'optimizingRoute' : 'optimizeRoute')}
+            </button>
+          )}
           <NavLink to="/saved" className="save-route-button">{language === 'vi' ? 'Đã tự lưu' : 'Saved'} <BookmarkPlus size={15} /></NavLink>
+          {visibleOptimizationResult && (
+            <p
+              className={`route-optimization-status${visibleOptimizationResult === 'error' ? ' is-error' : ''}`}
+              role={visibleOptimizationResult === 'error' ? 'alert' : 'status'}
+            >
+              {translate(language, visibleOptimizationResult === 'optimized'
+                ? 'routeOptimized'
+                : visibleOptimizationResult === 'offline'
+                  ? 'routeOffline'
+                  : 'routeOptimizationError')}
+            </p>
+          )}
         </section>
       )}
 

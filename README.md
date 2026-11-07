@@ -114,6 +114,12 @@ Có 2 cách cấp quyền tài khoản Admin:
   sqlcmd -S .\SQLEXPRESS -E -d QuangTriDB -Q "UPDATE users SET is_admin = 1 WHERE id = '$adminId'"
   ```
 
+### Chỉ đường và tối ưu lộ trình
+
+Thêm ít nhất hai điểm vào hành trình để hiện nút **Tối ưu lộ trình**. Ứng dụng sắp xếp các điểm theo khoảng cách đường bộ ngắn nhất, ưu tiên vị trí hiện tại nếu ứng dụng đã xác định được vị trí; nếu chưa có vị trí, điểm đầu tiên trong hành trình được giữ làm điểm xuất phát. Thứ tự mới được lưu vào hành trình và tuyến đường bộ hiển thị trên bản đồ. Cần có kết nối mạng để tính khoảng cách và tìm tuyến đường.
+
+Để chỉ đường giữa hai địa danh bất kỳ, nhấn nút **Chỉ đường giữa hai địa danh** trên bản đồ, chọn điểm xuất phát và điểm đến rồi nhấn **Tìm đường**. Tuyến đường bộ sẽ hiển thị trên bản đồ; thao tác này không cần bật GPS. Nút **Chỉ đường đến điểm này** vẫn dùng để vẽ tuyến từ vị trí hiện tại đến địa điểm đang chọn.
+
 ### Ngoại tuyến và hướng dẫn ứng xử
 
 - Trên web, mở **Ngoại tuyến** để tải gói cho từng địa điểm/ngôn ngữ. Gói gồm lời thuyết minh, nội dung câu chuyện và ảnh chi tiết trong bộ nhớ IndexedDB; có thể gỡ từng gói. Audio player phát MP3 đã có cho địa điểm/ngôn ngữ tương ứng; nếu chưa có bản thu, ứng dụng dùng TTS của trình duyệt. Các MP3 trong ứng dụng web được cache để phát khi ngoại tuyến.
