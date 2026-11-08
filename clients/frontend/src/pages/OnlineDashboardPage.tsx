@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Navigate, NavLink, useNavigate } from 'react-router-dom'
-import { ArrowLeft, LogOut, Map, MapPin, Pencil, Plus, Shield, Ticket, Trash2, Users } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BookOpen, ChartNoAxesColumn, Clock3, Home, Lightbulb, LogOut, Map, MapPin, Menu, Pencil, Plus, Ticket, Trash2, Users, X } from 'lucide-react'
 import {
   createAdminPlace,
   deleteAdminPlace,
@@ -96,6 +96,7 @@ export function OnlineDashboardPage() {
   const [form, setForm] = useState<PlaceForm | null>(null)
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({})
   const [savingPricePlaceId, setSavingPricePlaceId] = useState<string | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const refresh = useCallback(async () => {
     if (!authToken) return
@@ -293,72 +294,152 @@ export function OnlineDashboardPage() {
     setMessage('')
   }
 
+  const placeNames = Object.fromEntries(places.map((place) => [place.id, place.copy.vi?.title ?? place.id]))
+  const popularPlaces = (overview?.analytics.places ?? [])
+    .filter((place) => place.visits > 0)
+    .sort((a, b) => b.visits - a.visits)
+    .slice(0, 6)
+  const maxPlaceVisits = Math.max(...popularPlaces.map((place) => place.visits), 1)
+
   return (
-    <div className="admin-standalone">
-      <header className="topbar admin-topbar">
-        <div className="brand">
-          <span className="brand-mark"><Map size={19} strokeWidth={1.8} /></span>
-          <span className="brand-name">Quảng Trị · Quản trị</span>
+    <div className={`admin-standalone admin-dashboard-shell${sidebarOpen ? ' sidebar-open' : ''}`}>
+      <aside className="admin-sidebar" aria-label="Điều hướng quản trị">
+        <NavLink to="/admin" className="admin-sidebar-brand" onClick={() => setTab('overview')}>
+          <span className="admin-sidebar-logo"><Map size={25} strokeWidth={1.8} /></span>
+          <strong>Quảng Trị</strong>
+          <small>Thuyết minh tự động<br />đa ngôn ngữ</small>
+        </NavLink>
+        <nav className="admin-sidebar-nav">
+          <span className="admin-sidebar-label">KHÔNG GIAN QUẢN TRỊ</span>
+          {([
+            ['overview', 'Tổng quan', Home, 'Tổng hợp hoạt động và số liệu'],
+            ['places', 'Quản lý địa điểm', MapPin, 'Thêm, sửa và xóa địa điểm'],
+            ['tickets', 'Quản lý vé', Ticket, 'Cập nhật giá và theo dõi vé'],
+            ['users', 'Quản lý người dùng', Users, 'Xem và quản lý tài khoản'],
+          ] as const).map(([key, label, Icon, description]) => (
+            <button
+              className={`admin-sidebar-link${tab === key ? ' active' : ''}`}
+              key={key}
+              onClick={() => { setTab(key); setSidebarOpen(false) }}
+              title={description}
+              type="button"
+            >
+              <Icon size={17} strokeWidth={1.8} />
+              <span>{label}</span>
+              {tab === key && <span className="admin-sidebar-active-mark" />}
+            </button>
+          ))}
+        </nav>
+        <div className="admin-sidebar-bottom">
+          <NavLink to="/explore" className="admin-sidebar-link">
+            <ArrowLeft size={17} /><span>Trang người dùng</span>
+          </NavLink>
+          <button className="admin-sidebar-link admin-sidebar-logout" type="button" onClick={() => { void onSignOutAdmin() }}>
+            <LogOut size={17} /><span>Đăng xuất</span>
+          </button>
+          <div className="admin-sidebar-note"><Activity size={15} /><span>Hệ thống quản lý du lịch số Quảng Trị</span></div>
         </div>
-        <div className="topbar-right">
+      </aside>
+      {sidebarOpen && <button className="admin-sidebar-backdrop" type="button" aria-label="Đóng menu" onClick={() => setSidebarOpen(false)} />}
+      <header className="topbar admin-topbar admin-dashboard-topbar">
+        <div className="admin-topbar-left">
+          <button className="admin-menu-toggle" type="button" aria-label={sidebarOpen ? 'Đóng menu' : 'Mở menu'} aria-expanded={sidebarOpen} onClick={() => setSidebarOpen((open) => !open)}>
+            {sidebarOpen ? <X size={19} /> : <Menu size={19} />}
+          </button>
+          <span className="admin-breadcrumb">Quảng Trị <span>·</span> Quản trị</span>
+        </div>
+        <div className="topbar-right admin-dashboard-topbar-right">
           <span className={`connection-pill ${online ? 'is-online' : 'is-offline'}`}>
             <span className="status-dot" />
             {online ? 'Đang kết nối' : 'Ngoại tuyến'}
           </span>
-          <span className="online-visitors" title="Số thiết bị người dùng đang mở trang">
-            <Users size={13} aria-hidden="true" />
-            <span>{overview ? overview.onlineVisitors.toLocaleString('vi-VN') : '—'}</span>
-            <span className="online-visitors-label">Đang kết nối</span>
+          <span className="admin-online-count" title="Số thiết bị người dùng đang mở trang">
+            <Users size={14} aria-hidden="true" /><strong>{overview ? overview.onlineVisitors.toLocaleString('vi-VN') : '—'}</strong><span>đang online</span>
           </span>
-          <NavLink to="/explore" className="device-picker-link" title="Mở trang người dùng">
-            <ArrowLeft size={14} />
-            <span>Trang người dùng</span>
-          </NavLink>
-          <span className="device-picker-link" title={adminUser.email}>
-            <Shield size={14} />
+          <span className="admin-account-chip" title={adminUser.email}>
+            <span className="admin-account-avatar">{adminUser.fullName.slice(0, 2).toUpperCase()}</span>
             <span>{adminUser.fullName}</span>
           </span>
-          <button className="signout-button" type="button" onClick={() => { void onSignOutAdmin() }}>
-            <LogOut size={14} /> Đăng xuất
-          </button>
         </div>
       </header>
-      <main className="main-content">
+      <main className="main-content admin-dashboard-main">
         <section className="admin-page">
-          <header className="admin-page-heading">
-            <span className="user-eyebrow">QUẢN TRỊ HỆ THỐNG</span>
-            <h1>Trang quản trị</h1>
-            <p>Thống kê truy cập, tài khoản và nội dung địa điểm.</p>
-          </header>
-
-      <nav className="admin-tabs" aria-label="Chức năng quản trị">
-        {([
-          ['overview', 'Tổng quan'],
-          ['tickets', 'Vé tham quan'],
-          ['users', 'Tài khoản'],
-          ['places', 'Địa điểm'],
-        ] as const).map(([key, label]) => (
-          <button className={tab === key ? 'active' : ''} key={key} onClick={() => setTab(key)} type="button">
-            {label}
+      {tab === 'overview' ? (
+        <section className="admin-welcome-banner">
+          <div className="admin-welcome-copy">
+            <span className="admin-welcome-script">Chào mừng trở lại!</span>
+            <h1>Trang quản trị hệ thống</h1>
+            <p>Quản lý và phát triển nền tảng thuyết minh du lịch Quảng Trị</p>
+          </div>
+          <div className="admin-welcome-actions">
+            <span><Clock3 size={15} /> Báo cáo cập nhật tự động</span>
+            <button className="admin-refresh" disabled={loading || busy} onClick={() => void refresh()} type="button">
+              {loading ? 'Đang tải…' : 'Làm mới dữ liệu'}
+            </button>
+          </div>
+        </section>
+      ) : (
+        <header className="admin-page-heading">
+          <span className="user-eyebrow">QUẢN TRỊ HỆ THỐNG</span>
+          <h1>{tab === 'places' ? 'Quản lý địa điểm' : tab === 'tickets' ? 'Quản lý vé tham quan' : 'Quản lý tài khoản'}</h1>
+          <p>Quản lý dữ liệu và nội dung trên nền tảng du lịch số Quảng Trị.</p>
+          <button className="admin-refresh" disabled={loading || busy} onClick={() => void refresh()} type="button">
+            {loading ? 'Đang tải…' : 'Làm mới dữ liệu'}
           </button>
-        ))}
-        <button className="admin-refresh" disabled={loading || busy} onClick={() => void refresh()} type="button">
-          {loading ? 'Đang tải…' : 'Làm mới'}
-        </button>
-      </nav>
-
+        </header>
+      )}
       {message && <p className="admin-message" role="status">{message}</p>}
       {loading ? <p className="admin-message">Đang tải dữ liệu quản trị…</p> : (
         <>
           {tab === 'overview' && overview && (
+            <>
             <div className="admin-stat-grid">
-              <article className="admin-stat-card"><Users size={18} /><span>Thiết bị online</span><strong>{overview.onlineVisitors.toLocaleString('vi-VN')}</strong><small>Đang mở trang, tự giảm khi rời đi</small></article>
-              <article className="admin-stat-card"><MapPin size={18} /><span>Lượt ghé</span><strong>{overview.visits.toLocaleString('vi-VN')}</strong><small>30 ngày gần nhất · ghi nhận qua app</small></article>
-              <article className="admin-stat-card"><Users size={18} /><span>Tài khoản</span><strong>{users.length.toLocaleString('vi-VN')}</strong><small>{overview.activeAccountCount.toLocaleString('vi-VN')} đang có phiên hoạt động</small></article>
-              <article className="admin-stat-card"><MapPin size={18} /><span>Địa điểm</span><strong>{overview.placeCount.toLocaleString('vi-VN')}</strong><small>{overview.ratingCount.toLocaleString('vi-VN')} lượt đánh giá</small></article>
-              <article className="admin-stat-card"><Ticket size={18} /><span>Vé đã bán</span><strong>{(overview.tickets?.totalTicketsSold ?? 0).toLocaleString('vi-VN')}</strong><small>{(overview.tickets?.totalOrders ?? 0).toLocaleString('vi-VN')} đơn đặt vé</small></article>
-              <article className="admin-stat-card"><Ticket size={18} /><span>Doanh thu thử nghiệm</span><strong>{(overview.tickets?.totalRevenueVnd ?? 0).toLocaleString('vi-VN')} ₫</strong><small>Tổng giá trị đơn đặt vé</small></article>
+              <article className="admin-stat-card stat-places"><span className="admin-stat-icon"><MapPin size={20} /></span><span className="admin-stat-label">Địa điểm</span><strong>{overview.placeCount.toLocaleString('vi-VN')}</strong><small>Điểm đến đang được quản lý</small></article>
+              <article className="admin-stat-card stat-users"><span className="admin-stat-icon"><Users size={20} /></span><span className="admin-stat-label">Người dùng</span><strong>{overview.accountCount.toLocaleString('vi-VN')}</strong><small>{overview.activeAccountCount.toLocaleString('vi-VN')} phiên đang hoạt động</small></article>
+              <article className="admin-stat-card stat-visits"><span className="admin-stat-icon"><MapPin size={20} /></span><span className="admin-stat-label">Lượt ghé</span><strong>{overview.visits.toLocaleString('vi-VN')}</strong><small>Ghi nhận trong 30 ngày gần nhất</small></article>
+              <article className="admin-stat-card stat-ratings"><span className="admin-stat-icon"><BookOpen size={20} /></span><span className="admin-stat-label">Đánh giá</span><strong>{overview.ratingCount.toLocaleString('vi-VN')}</strong><small>Đánh giá của du khách</small></article>
             </div>
+            <div className="admin-overview-grid">
+              <section className="admin-panel admin-analytics-panel">
+                <div className="admin-panel-heading">
+                  <div className="admin-overview-title"><span className="admin-panel-icon"><ChartNoAxesColumn size={17} /></span><div><h2>Điểm đến được quan tâm</h2><small>Lượt ghé theo địa điểm · 30 ngày gần nhất</small></div></div>
+                  <button className="admin-panel-link" type="button" onClick={() => setTab('places')}>Quản lý địa điểm <ArrowRight size={14} /></button>
+                </div>
+                {popularPlaces.length > 0 ? (
+                  <div className="admin-visit-chart" aria-label="Lượt ghé theo địa điểm trong 30 ngày gần nhất">
+                    {popularPlaces.map((place, index) => (
+                      <div className="admin-visit-row" key={place.placeId}>
+                        <span className="admin-visit-name" title={placeNames[place.placeId] ?? place.placeId}>{placeNames[place.placeId] ?? place.placeId}</span>
+                        <span className="admin-visit-track"><span className={`admin-visit-bar chart-color-${index + 1}`} style={{ width: `${Math.max(4, place.visits / maxPlaceVisits * 100)}%` }} /></span>
+                        <strong>{place.visits.toLocaleString('vi-VN')}</strong>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="admin-empty-state">Chưa có lượt ghé được ghi nhận trong 30 ngày gần nhất.</p>}
+              </section>
+              <section className="admin-panel admin-reviews-panel">
+                <div className="admin-panel-heading">
+                  <div className="admin-overview-title"><span className="admin-panel-icon review-icon"><BookOpen size={17} /></span><div><h2>Đánh giá gần đây</h2><small>Phản hồi mới từ du khách</small></div></div>
+                  <span className="admin-review-count">{overview.analytics.latestReviews.length}</span>
+                </div>
+                {overview.analytics.latestReviews.length > 0 ? (
+                  <div className="admin-recent-reviews">
+                    {overview.analytics.latestReviews.slice(0, 5).map((review, index) => (
+                      <article className="admin-review-row" key={`${review.placeId}-${review.createdAt}-${index}`}>
+                        <span className={`admin-review-avatar review-color-${index + 1}`}>{review.rating}★</span>
+                        <span className="admin-review-copy"><strong>{placeNames[review.placeId] ?? review.placeId}</strong><span>{review.review}</span><small>{formatAdminDate(review.createdAt)}</small></span>
+                      </article>
+                    ))}
+                  </div>
+                ) : <p className="admin-empty-state">Chưa có nhận xét mới từ du khách.</p>}
+              </section>
+            </div>
+            <section className="admin-dashboard-tip">
+              <span className="admin-tip-icon"><Lightbulb size={22} /></span>
+              <div><strong>Mẹo sử dụng</strong><p>Thêm và cập nhật điểm đến để giữ bản đồ du lịch luôn đầy đủ thông tin.</p></div>
+              <button type="button" onClick={() => setTab('places')}>Quản lý địa điểm <ArrowRight size={14} /></button>
+            </section>
+            </>
           )}
 
           {tab === 'tickets' && (
@@ -511,4 +592,11 @@ function LocalizedFields({
       <label className="admin-form-wide">{label} · Thuyết minh<textarea required={required} rows={3} value={value.narration} onChange={(event) => update('narration', event.target.value)} /></label>
     </div>
   )
+}
+
+function formatAdminDate(value: string) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? 'Thời gian không xác định'
+    : date.toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' })
 }
