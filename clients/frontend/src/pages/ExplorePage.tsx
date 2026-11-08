@@ -1,6 +1,6 @@
 // Trang khám phá: tìm/lọc địa điểm, xem bản đồ, GPS, hành trình và thuyết minh.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDownRight, ArrowRight, BookmarkPlus, ChevronDown, ChevronRight, Clock3, Compass, LocateFixed, LoaderCircle, MapPin, Search, Sparkles, Volume2 } from 'lucide-react'
+import { ArrowDownRight, ArrowRight, BookmarkPlus, ChevronDown, Clock3, Compass, Globe2, Headphones, Heart, Landmark, Leaf, LocateFixed, LoaderCircle, MapPin, Play, Search, Sparkles, Volume2, Waves } from 'lucide-react'
 import { distance, point } from '@turf/turf'
 import { NavLink } from 'react-router-dom'
 import { getVisitorId, recordVisit } from '../api'
@@ -75,6 +75,13 @@ export function ExplorePage() {
     const matchesSearch = !query || title.includes(query) || place.copy.vi.title.toLowerCase().includes(query) || place.copy.en.title.toLowerCase().includes(query)
     return matchesSearch && (category === 'all' || place.category === category)
   }), [places, language, search, category])
+  const featuredPlaces = useMemo(() => {
+    const featuredIds = ['bao-ninh-beach', 'cua-tung-beach', 'da-nhay']
+    const preferred = featuredIds
+      .map((id) => filteredPlaces.find((place) => place.id === id))
+      .filter((place) => place !== undefined)
+    return [...preferred, ...filteredPlaces.filter((place) => !featuredIds.includes(place.id))]
+  }, [filteredPlaces])
 
   const distanceMeters = location
     ? distance(point(location), point(selectedPlace.coordinates), { units: 'meters' })
@@ -203,17 +210,28 @@ export function ExplorePage() {
 
   return (
     <div className="explore-page">
-      <section className="welcome-row">
-        <div>
-          <div className="eyebrow"><span className="eyebrow-line" />{translate(language, 'greeting')}</div>
-          <h1>{translate(language, 'title')}</h1>
-          <p>{translate(language, 'introduction')}</p>
+      <section className="explore-hero">
+        <div className="explore-hero-inner">
+          <div className="hero-copy">
+            <span className="hero-script">{language === 'vi' ? 'Khám phá' : 'Discover'}</span>
+            <h1>{language === 'vi' ? 'Quảng Trị' : translate(language, 'title')}</h1>
+            <p>{language === 'vi' ? 'Qua thuyết minh tự động – bằng ngôn ngữ của bạn' : translate(language, 'introduction')}</p>
+            <div className="hero-highlights">
+              <span><Headphones size={17} />{language === 'vi' ? <>Thuyết minh AI<br />đa ngôn ngữ</> : <>Multilingual AI<br />audio guide</>}</span>
+              <span><MapPin size={17} />{language === 'vi' ? <>Bản đồ tương tác<br />thông minh</> : <>Interactive<br />travel map</>}</span>
+              <span><Landmark size={17} />{language === 'vi' ? <>Khám phá di tích<br />và danh thắng</> : <>Discover local<br />landmarks</>}</span>
+            </div>
+            <button type="button" className="hero-cta" onClick={() => document.getElementById('explore-map')?.scrollIntoView({ behavior: 'smooth' })}>
+              <Play size={14} fill="currentColor" />{language === 'vi' ? 'Bắt đầu khám phá' : 'Start exploring'}<ArrowRight size={15} />
+            </button>
+          </div>
+          <p className="hero-quote">{language === 'vi' ? <>“Quảng Trị – vùng đất của lịch sử<br />và khát vọng hòa bình”</> : <>“Quang Tri – a land of history<br />and the hope for peace”</>}</p>
         </div>
-        <div className="welcome-stamp"><span>17°10′</span><small>QUẢNG TRỊ<br />QUẢNG BÌNH</small><span className="stamp-flower">✳</span></div>
       </section>
 
-      <div className="explore-grid">
-        <section className="map-column">
+      <div className="explore-content">
+        <div className="explore-grid">
+        <section className="map-column" id="explore-map">
           <div className="map-search-bar">
             <Search size={17} />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={translate(language, 'search')} aria-label={translate(language, 'search')} />
@@ -240,7 +258,7 @@ export function ExplorePage() {
           </div>
         </section>
 
-        <aside className="places-column">
+        <aside className="places-column" id="explore-featured">
           <button
             className="places-head"
             type="button"
@@ -248,40 +266,83 @@ export function ExplorePage() {
             aria-controls="explore-place-list"
             onClick={() => setPlacesExpanded((expanded) => !expanded)}
           >
-            <div><div className="eyebrow small"><span className="eyebrow-line" /> QUANG TRI · QUANG BINH</div><h2>{translate(language, 'nearby')}</h2></div>
+            <div><div className="eyebrow small"><span className="eyebrow-line" /> QUANG TRI · QUANG BINH</div><h2><span className="featured-heading-icon"><Sparkles size={15} fill="currentColor" /></span>{language === 'vi' ? 'Điểm đến nổi bật' : 'Featured destinations'}</h2></div>
             <span className="places-head-actions">
               <span className="count-badge">{filteredPlaces.length}</span>
               <ChevronDown className={`places-disclosure${placesExpanded ? ' expanded' : ''}`} size={16} />
             </span>
           </button>
-          {placesExpanded && (
-            <div className="place-list" id="explore-place-list">
-              {filteredPlaces.map((place, index) => {
+          <div className="place-list" id="explore-place-list">
+              {(placesExpanded ? filteredPlaces : featuredPlaces.slice(0, 3)).map((place, index) => {
                 const active = selectedPlace.id === place.id
                 return (
                   <button key={place.id} className={`place-row${active ? ' active' : ''}`} onClick={() => setSelectedPlace(place.id)}>
-                    <span className={`place-number ${active ? 'active' : ''}`}>{String(index + 1).padStart(2, '0')}</span>
+                    <span className={`featured-place-thumb illustration-${place.image}`} aria-hidden="true" />
                     <span className="place-row-copy">
+                      <span className="featured-place-number">{String(index + 1).padStart(2, '0')}</span>
                       <strong>{localizedTitle(place, language)}</strong>
                       <small>{place.copy[language].subtitle}</small>
                       <span className="place-meta"><Clock3 size={12} /> {place.duration} {translate(language, 'minute')} <i /> {categoryLabels[language][place.category]}</span>
                     </span>
-                    <ChevronRight className="place-chevron" size={16} />
+                    <span className="featured-place-play"><Play size={12} fill="currentColor" /></span>
                   </button>
                 )
               })}
               {filteredPlaces.length === 0 && <div className="empty-search">{translate(language, 'noResults')}</div>}
-            </div>
+          </div>
+          {filteredPlaces.length > 3 && (
+            <button type="button" className="featured-see-all" onClick={() => setPlacesExpanded((expanded) => !expanded)}>
+              {placesExpanded
+                ? language === 'vi' ? 'Thu gọn danh sách' : 'Show featured only'
+                : language === 'vi' ? 'Xem tất cả điểm đến' : 'View all destinations'}<ArrowRight size={14} />
+            </button>
           )}
           <NavLink to="/saved" className="all-stops-link">{translate(language, 'savedTitle')} <ArrowRight size={14} /></NavLink>
-          <div className="side-quote">
-            <span>“</span><p>Đi chậm để nghe miền đất kể chuyện.</p><small>NOTES FROM THE REGION</small>
-          </div>
         </aside>
+        </div>
+        <section className="home-benefits" id="explore-info" aria-label="Điểm nổi bật">
+          <div><Leaf size={24} /><span><strong>{language === 'vi' ? 'Trải nghiệm hiện đại' : 'A modern experience'}</strong><small>{language === 'vi' ? 'với công nghệ AI' : 'powered by AI'}</small></span></div>
+          <div><Globe2 size={24} /><span><strong>{language === 'vi' ? 'Hỗ trợ đa ngôn ngữ' : 'Multiple languages'}</strong><small>{language === 'vi' ? 'Việt – Anh – Nhật – Hàn...' : 'Vietnamese, English, Japanese...'}</small></span></div>
+          <div><Landmark size={24} /><span><strong>{language === 'vi' ? 'Khám phá dễ dàng' : 'Explore with ease'}</strong><small>{language === 'vi' ? 'mọi lúc, mọi nơi' : 'anytime, anywhere'}</small></span></div>
+          <div><Heart size={24} /><span><strong>{language === 'vi' ? 'Góp phần quảng bá' : 'Celebrate local heritage'}</strong><small>{language === 'vi' ? 'văn hóa – du lịch Quảng Trị' : 'culture and tourism in Quang Tri'}</small></span></div>
+          <Waves className="benefit-wave" size={38} aria-hidden="true" />
+        </section>
+        {routeIds.length > 0 && (
+          <section className="route-summary">
+            <div className="route-summary-icon"><BookmarkPlus size={18} /></div>
+            <div className="route-summary-copy"><strong>{translate(language, 'route')} <span>·</span> {routeIds.length} {translate(language, 'stopCount')}</strong><small>{routeDistance.toFixed(1)} {translate(language, 'distanceUnit')} <span>·</span> {routePlaces.reduce((total, place) => total + place.duration, 0)} {translate(language, 'minute')}</small></div>
+            {routeIds.length > 1 && (
+              <button
+                type="button"
+                className="optimize-route-button"
+                onClick={() => void optimizeRoute()}
+                disabled={optimizingRoute || isSavingRoute}
+                aria-busy={optimizingRoute}
+              >
+                {optimizingRoute
+                  ? <LoaderCircle className="loading-spinner" size={14} />
+                  : <Sparkles size={14} />}
+                {translate(language, optimizingRoute ? 'optimizingRoute' : 'optimizeRoute')}
+              </button>
+            )}
+            <NavLink to="/saved" className="save-route-button">{language === 'vi' ? 'Đã tự lưu' : 'Saved'} <BookmarkPlus size={15} /></NavLink>
+            {visibleOptimizationResult && (
+              <p
+                className={`route-optimization-status${visibleOptimizationResult === 'error' ? ' is-error' : ''}`}
+                role={visibleOptimizationResult === 'error' ? 'alert' : 'status'}
+              >
+                {translate(language, visibleOptimizationResult === 'optimized'
+                  ? 'routeOptimized'
+                  : visibleOptimizationResult === 'offline'
+                    ? 'routeOffline'
+                    : 'routeOptimizationError')}
+              </p>
+            )}
+          </section>
+        )}
       </div>
 
-      <div className="detail-grid">
-        <details className="place-detail-page" ref={placeDetailsRef}>
+      <details className="place-detail-page" ref={placeDetailsRef}>
         <summary className="selected-place-panel">
           <div className={`place-illustration illustration-${selectedPlace.image}`}>
             <span className="illustration-flag">A SMALL STORY</span>
@@ -302,9 +363,6 @@ export function ExplorePage() {
             <p>{selectedPlace.copy[language].subtitle}</p>
             <span className="selected-location"><MapPin size={13} /> QUẢNG TRỊ · QUẢNG BÌNH</span>
           </div>
-          <NarrationCard place={selectedPlace} language={language} distanceMeters={distanceMeters} onStartWalk={startWalk} onStopWalk={stopWalk} />
-          <RitualGuidancePanel place={selectedPlace} language={language} />
-          <TicketPurchasePanel placeId={selectedPlace.id} />
           <section className="place-language-card" lang={language}>
             <h2>{selectedLanguage?.label ?? language}</h2>
             <h3>{selectedPlace.copy[language].title}</h3>
@@ -334,46 +392,13 @@ export function ExplorePage() {
               )}
             </div>
           </section>
+          <NarrationCard place={selectedPlace} language={language} distanceMeters={distanceMeters} onStartWalk={startWalk} onStopWalk={stopWalk} />
+          <RitualGuidancePanel place={selectedPlace} language={language} />
+          <TicketPurchasePanel placeId={selectedPlace.id} />
+          <ItineraryPlanner places={places} />
           <PlaceRatingPanel placeId={selectedPlace.id} />
         </article>
-        </details>
-      </div>
-
-      <ItineraryPlanner places={places} />
-
-      {routeIds.length > 0 && (
-        <section className="route-summary">
-          <div className="route-summary-icon"><BookmarkPlus size={18} /></div>
-          <div className="route-summary-copy"><strong>{translate(language, 'route')} <span>·</span> {routeIds.length} {translate(language, 'stopCount')}</strong><small>{routeDistance.toFixed(1)} {translate(language, 'distanceUnit')} <span>·</span> {routePlaces.reduce((total, place) => total + place.duration, 0)} {translate(language, 'minute')}</small></div>
-          {routeIds.length > 1 && (
-            <button
-              type="button"
-              className="optimize-route-button"
-              onClick={() => void optimizeRoute()}
-              disabled={optimizingRoute || isSavingRoute}
-              aria-busy={optimizingRoute}
-            >
-              {optimizingRoute
-                ? <LoaderCircle className="loading-spinner" size={14} />
-                : <Sparkles size={14} />}
-              {translate(language, optimizingRoute ? 'optimizingRoute' : 'optimizeRoute')}
-            </button>
-          )}
-          <NavLink to="/saved" className="save-route-button">{language === 'vi' ? 'Đã tự lưu' : 'Saved'} <BookmarkPlus size={15} /></NavLink>
-          {visibleOptimizationResult && (
-            <p
-              className={`route-optimization-status${visibleOptimizationResult === 'error' ? ' is-error' : ''}`}
-              role={visibleOptimizationResult === 'error' ? 'alert' : 'status'}
-            >
-              {translate(language, visibleOptimizationResult === 'optimized'
-                ? 'routeOptimized'
-                : visibleOptimizationResult === 'offline'
-                  ? 'routeOffline'
-                  : 'routeOptimizationError')}
-            </p>
-          )}
-        </section>
-      )}
+      </details>
 
       <button className={`walk-fab${autoNarration ? ' is-active' : ''}`} onClick={autoNarration ? stopWalk : startWalk}>
         {autoNarration ? <Volume2 size={17} /> : <Compass size={17} />}

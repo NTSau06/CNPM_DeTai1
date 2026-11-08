@@ -1,7 +1,7 @@
 // Kết nối các trang, điều hướng chính và trạng thái dùng chung của ứng dụng web.
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { AlertCircle, Bookmark, ChevronDown, Compass, Map, MapPinned, Menu, MonitorSmartphone, Settings2, X } from 'lucide-react'
+import { AlertCircle, Bookmark, ChevronDown, Compass, House, Map, MapPinned, Menu, MonitorSmartphone, Settings2, X } from 'lucide-react'
 import { translate } from './i18n'
 import { languages } from './data/places'
 import { useAppStore } from './store'
@@ -165,11 +165,24 @@ export default function App() {
 
   return (
     <AppShell>
-      <header className="topbar">
+      <header className={`topbar${location.pathname === '/explore' ? ' topbar-explore' : ''}`}>
         <NavLink to="/explore" className="brand" aria-label="Quảng Trị">
           <span className="brand-mark"><Map size={19} strokeWidth={1.8} /></span>
-          <span className="brand-name">Quảng Trị</span>
+          <span className="brand-copy">
+            <span className="brand-name">Quảng Trị</span>
+            <small>{language === 'vi' ? 'Thuyết minh tự động đa ngôn ngữ' : 'Multilingual audio guide'}</small>
+          </span>
         </NavLink>
+        {location.pathname === '/explore' && (
+          <nav className="home-main-nav" aria-label="Điều hướng trang chủ">
+            <NavLink to="/explore" end className={({ isActive }) => `home-main-nav-link${isActive ? ' active' : ''}`}>
+              <House size={14} />{language === 'vi' ? 'Trang chủ' : 'Home'}
+            </NavLink>
+            <a className="home-main-nav-link" href="#explore-featured"><Compass size={14} />{language === 'vi' ? 'Khám phá Quảng Trị' : 'Explore Quang Tri'}</a>
+            <a className="home-main-nav-link" href="#explore-map"><MapPinned size={14} />{language === 'vi' ? 'Bản đồ du lịch' : 'Travel map'}</a>
+            <a className="home-main-nav-link" href="#explore-info"><Map size={14} />{language === 'vi' ? 'Giới thiệu' : 'About'}</a>
+          </nav>
+        )}
         <div className="topbar-right">
           <NavLink className="device-picker-link" to="/" title="Chọn thiết bị">
             <MonitorSmartphone size={15} aria-hidden="true" />
@@ -222,7 +235,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="main-content">
+      <main className={`main-content${location.pathname === '/explore' ? ' explore-main-content' : ''}`}>
         {storageError && (
           <button className="storage-alert" onClick={clearStorageError} role="alert">
             {translate(language, storageError)} <span aria-hidden="true">×</span>
