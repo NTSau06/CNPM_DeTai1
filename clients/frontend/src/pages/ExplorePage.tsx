@@ -8,6 +8,7 @@ import { NarrationCard } from '../components/NarrationCard'
 import { PlaceRatingPanel } from '../components/PlaceRatingPanel'
 import { TicketPurchasePanel } from '../components/TicketPurchasePanel'
 import { RitualGuidancePanel } from '../components/RitualGuidancePanel'
+import { ItineraryPlanner } from '../components/ItineraryPlanner'
 import { getOfflinePlacePack } from '../db'
 import { categoryKeys, categoryLabels, languages, localizedTitle, places as bundledPlaces } from '../data/places'
 import { translate } from '../i18n'
@@ -337,6 +338,8 @@ export function ExplorePage() {
         </article>
         </details>
       </div>
+
+      <ItineraryPlanner places={places} />
 
       {routeIds.length > 0 && (
         <section className="route-summary">

@@ -36,7 +36,10 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
   const offlineMap = useAppStore((state) => state.offlineMap)
   const online = useAppStore((state) => state.online)
   const location = useAppStore((state) => state.location)
-  const routeIds = useAppStore((state) => state.routeIds)
+  const allPlaces = useAppStore((state) => state.places)
+  const routeIds = useAppStore((state) => state.suggestedRouteIds.length > 0
+    ? state.suggestedRouteIds
+    : state.routeIds)
   const error = useAppStore((state) => state.storageError)
   const [mapReady, setMapReady] = useState(false)
   const [expanded, setExpanded] = useState(false)
@@ -187,7 +190,7 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
     if (!mapReady || !instance?.isStyleLoaded()) return
 
     const coordinates = routeIds
-      .map((id) => places.find((place) => place.id === id)?.coordinates)
+      .map((id) => allPlaces.find((place) => place.id === id)?.coordinates)
       .filter((coordinate): coordinate is [number, number] => coordinate !== undefined)
 
     if (coordinates.length < 2) {
@@ -224,7 +227,7 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
       })
 
     return () => controller.abort()
-  }, [mapReady, routeIds, online, places])
+  }, [mapReady, routeIds, online, allPlaces])
 
   useEffect(() => {
     const selectedPlace = places.find((place) => place.id === selectedPlaceId)

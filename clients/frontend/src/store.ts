@@ -23,6 +23,7 @@ interface AppState {
   places: Place[]
   selectedPlaceId: string
   routeIds: string[]
+  suggestedRouteIds: string[]
   activeTourId: string | null
   isSavingRoute: boolean
   savedTours: SavedTour[]
@@ -47,6 +48,7 @@ interface AppState {
   signOut: () => Promise<void>
   setRoutePlace: (id: string) => Promise<boolean>
   setRouteOrder: (placeIds: string[]) => Promise<boolean>
+  setSuggestedRoute: (placeIds: string[]) => void
   removeTour: (id: string) => Promise<void>
   setAutoNarration: (enabled: boolean) => void
   setUseOfflineMap: (enabled: boolean) => void
@@ -62,6 +64,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   places: bundledPlaces,
   selectedPlaceId: 'phong-nha-cave',
   routeIds: [],
+  suggestedRouteIds: [],
   activeTourId: null,
   isSavingRoute: false,
   savedTours: [],
@@ -135,6 +138,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const nextRouteIds = routeIds.includes(id)
       ? routeIds.filter((placeId) => placeId !== id)
       : [...routeIds, id]
+    set({ suggestedRouteIds: [] })
     set({ isSavingRoute: true })
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       set({ isSavingRoute: false, storageError: 'backendUnavailable' })
@@ -208,6 +212,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     ) return false
     if (placeIds.every((id, index) => id === routeIds[index])) return true
 
+    set({ suggestedRouteIds: [] })
     set({ isSavingRoute: true })
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       set({ isSavingRoute: false, storageError: 'backendUnavailable' })
@@ -249,6 +254,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ isSavingRoute: false })
     }
   },
+  setSuggestedRoute: (suggestedRouteIds) => set({ suggestedRouteIds }),
   removeTour: async (id) => {
     try {
       const { authToken, activeTourId, currentUser } = get()
