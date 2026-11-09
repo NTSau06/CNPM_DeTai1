@@ -36,6 +36,7 @@ export function ExplorePage() {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<Category | 'all'>('all')
   const [placesExpanded, setPlacesExpanded] = useState(false)
+  const [mapFocusRequest, setMapFocusRequest] = useState(0)
   const [gpsMessage, setGpsMessage] = useState('')
   const [offlineImageUrl, setOfflineImageUrl] = useState<string | null>(null)
   const [optimizingRoute, setOptimizingRoute] = useState(false)
@@ -166,6 +167,12 @@ export function ExplorePage() {
     if (placeDetailsRef.current) placeDetailsRef.current.open = true
   }
 
+  const selectFeaturedPlace = (placeId: string) => {
+    setSelectedPlace(placeId)
+    setMapFocusRequest((request) => request + 1)
+    document.getElementById('explore-map')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
   const routePlaces = routeIds.map((id) => places.find((place) => place.id === id)).filter((place) => place !== undefined)
   const routeDistance = routePlaces.length > 1 ? routePlaces.reduce((total, place, index) => {
     if (index === 0) return total
@@ -247,6 +254,7 @@ export function ExplorePage() {
               places={filteredPlaces}
               language={language}
               selectedPlaceId={selectedPlaceId}
+              focusRequest={mapFocusRequest}
               onSelectPlace={setSelectedPlace}
               onShowPlaceDetails={showPlaceDetails}
             />
@@ -276,7 +284,7 @@ export function ExplorePage() {
               {(placesExpanded ? filteredPlaces : featuredPlaces.slice(0, 3)).map((place, index) => {
                 const active = selectedPlace.id === place.id
                 return (
-                  <button key={place.id} className={`place-row${active ? ' active' : ''}`} onClick={() => setSelectedPlace(place.id)}>
+                  <button key={place.id} className={`place-row${active ? ' active' : ''}`} onClick={() => selectFeaturedPlace(place.id)}>
                     <span className={`featured-place-thumb illustration-${place.image}`} aria-hidden="true" />
                     <span className="place-row-copy">
                       <span className="featured-place-number">{String(index + 1).padStart(2, '0')}</span>
