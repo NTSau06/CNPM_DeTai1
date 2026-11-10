@@ -178,6 +178,10 @@ export function ExplorePage() {
 >>>>>>> 7a85730654805884997c6a0149da6f800500f701
   }
 
+  const closePlaceDetails = () => {
+    if (placeDetailsRef.current) placeDetailsRef.current.open = false
+  }
+
   const routePlaces = routeIds.map((id) => places.find((place) => place.id === id)).filter((place) => place !== undefined)
   const routeDistance = routePlaces.length > 1 ? routePlaces.reduce((total, place, index) => {
     if (index === 0) return total
