@@ -22,14 +22,19 @@ interface MapViewProps {
   places: Place[]
   language: Language
   selectedPlaceId: string
+  focusRequest: number
   onSelectPlace: (id: string) => void
   onShowPlaceDetails: () => void
 }
 
-export function MapView({ places, language, selectedPlaceId, onSelectPlace, onShowPlaceDetails }: MapViewProps) {
+export function MapView({ places, language, selectedPlaceId, focusRequest, onSelectPlace, onShowPlaceDetails }: MapViewProps) {
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<MapLibreMap | null>(null)
   const placeMarkers = useRef(new Map<string, maplibregl.Marker>())
+  const previousSelectedPlaceId = useRef(selectedPlaceId)
+  const previousFocusRequest = useRef(focusRequest)
+  const selectedPlaceNeedsFocus = useRef(true)
+  const cameraFocusVersion = useRef(0)
   const selectedId = useRef(selectedPlaceId)
   const onSelect = useRef(onSelectPlace)
   const offline = useAppStore((state) => state.useOfflineMap)
@@ -206,6 +211,7 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
     }
 
     const controller = new AbortController()
+    const focusVersionAtStart = cameraFocusVersion.current
     setRouteStatus('loading')
     syncRoadRoute(instance, null)
 
@@ -213,6 +219,10 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
       .then((roadCoordinates) => {
         if (controller.signal.aborted || map.current !== instance) return
         syncRoadRoute(instance, roadCoordinates)
+        if (cameraFocusVersion.current !== focusVersionAtStart) {
+          setRouteStatus(null)
+          return
+        }
         const bounds = roadCoordinates.reduce(
           (routeBounds, coordinate) => routeBounds.extend(coordinate),
           new maplibregl.LngLatBounds(roadCoordinates[0], roadCoordinates[0]),
@@ -230,11 +240,27 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
   }, [mapReady, routeIds, online, allPlaces])
 
   useEffect(() => {
-    const selectedPlace = places.find((place) => place.id === selectedPlaceId)
-    if (selectedPlace && map.current?.isStyleLoaded()) {
-      map.current.flyTo({ center: selectedPlace.coordinates, zoom: 14, duration: 600 })
+    if (previousSelectedPlaceId.current !== selectedPlaceId) {
+      previousSelectedPlaceId.current = selectedPlaceId
+      selectedPlaceNeedsFocus.current = true
+      setPreviewVisible(true)
     }
-  }, [selectedPlaceId, places])
+    if (previousFocusRequest.current !== focusRequest) {
+      previousFocusRequest.current = focusRequest
+      selectedPlaceNeedsFocus.current = true
+      setPreviewVisible(true)
+    }
+
+    if (!selectedPlaceNeedsFocus.current || !mapReady) return
+    const selectedPlace = places.find((place) => place.id === selectedPlaceId)
+    const instance = map.current
+    if (!selectedPlace || !instance?.isStyleLoaded()) return
+
+    cameraFocusVersion.current += 1
+    instance.stop()
+    instance.flyTo({ center: selectedPlace.coordinates, zoom: 15, duration: 600 })
+    selectedPlaceNeedsFocus.current = false
+  }, [selectedPlaceId, focusRequest, places, mapReady])
 
   useEffect(() => {
     const instance = map.current
@@ -271,6 +297,7 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
     }
 
     const controller = new AbortController()
+    const focusVersionAtStart = cameraFocusVersion.current
     setDirectionsStatus('loading')
     syncDirectionsRoute(instance, null)
 
@@ -278,6 +305,10 @@ export function MapView({ places, language, selectedPlaceId, onSelectPlace, onSh
       .then((roadCoordinates) => {
         if (controller.signal.aborted || map.current !== instance) return
         syncDirectionsRoute(instance, roadCoordinates)
+        if (cameraFocusVersion.current !== focusVersionAtStart) {
+          setDirectionsStatus(null)
+          return
+        }
         const bounds = roadCoordinates.reduce(
           (routeBounds, coordinate) => routeBounds.extend(coordinate),
           new maplibregl.LngLatBounds(roadCoordinates[0], roadCoordinates[0]),
