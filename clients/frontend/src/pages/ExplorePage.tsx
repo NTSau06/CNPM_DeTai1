@@ -167,15 +167,10 @@ export function ExplorePage() {
     if (placeDetailsRef.current) placeDetailsRef.current.open = true
   }
 
-<<<<<<< HEAD
-  const closePlaceDetails = () => {
-    if (placeDetailsRef.current) placeDetailsRef.current.open = false
-=======
   const selectFeaturedPlace = (placeId: string) => {
     setSelectedPlace(placeId)
     setMapFocusRequest((request) => request + 1)
     document.getElementById('explore-map')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
->>>>>>> 7a85730654805884997c6a0149da6f800500f701
   }
 
   const closePlaceDetails = () => {
