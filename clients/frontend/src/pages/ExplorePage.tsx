@@ -1,6 +1,6 @@
 // Trang khám phá: tìm/lọc địa điểm, xem bản đồ, GPS, hành trình và thuyết minh.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDownRight, ArrowRight, BookmarkPlus, ChevronDown, Clock3, Compass, Globe2, Headphones, Heart, Landmark, Leaf, LocateFixed, LoaderCircle, MapPin, Play, Search, Sparkles, Volume2, Waves } from 'lucide-react'
+import { ArrowRight, BookmarkPlus, Camera, ChevronDown, ChevronLeft, ChevronRight, Clock3, Compass, Globe2, Headphones, Heart, Home, Landmark, Leaf, LocateFixed, LoaderCircle, MapPin, Play, Search, Sparkles, Volume2, Waves } from 'lucide-react'
 import { distance, point } from '@turf/turf'
 import { NavLink } from 'react-router-dom'
 import { getVisitorId, recordVisit } from '../api'
@@ -164,6 +164,10 @@ export function ExplorePage() {
 
   const showPlaceDetails = () => {
     if (placeDetailsRef.current) placeDetailsRef.current.open = true
+  }
+
+  const closePlaceDetails = () => {
+    if (placeDetailsRef.current) placeDetailsRef.current.open = false
   }
 
   const routePlaces = routeIds.map((id) => places.find((place) => place.id === id)).filter((place) => place !== undefined)
@@ -343,60 +347,81 @@ export function ExplorePage() {
       </div>
 
       <details className="place-detail-page" ref={placeDetailsRef}>
-        <summary className="selected-place-panel">
-          <div className={`place-illustration illustration-${selectedPlace.image}`}>
-            <span className="illustration-flag">A SMALL STORY</span>
-            <div className="illustration-number">0{places.findIndex((place) => place.id === selectedPlace.id) + 1}</div>
-            <ArrowDownRight className="illustration-arrow" size={24} />
-          </div>
-          <div className="selected-place-copy">
-            <span className="selected-kicker">{categoryLabels[language][selectedPlace.category]} <i /> {selectedPlace.duration} {translate(language, 'minute')}</span>
+        <summary
+          className="selected-place-panel place-detail-hero"
+          style={{ backgroundImage: `linear-gradient(90deg, #073e31f2 0%, #0c5844c9 34%, #123d3440 67%, #102d2730 100%), url("${offlineImageUrl ?? selectedPlace.detailImage.src}")` }}
+        >
+          <div className="place-detail-hero-copy">
+            <span className="place-detail-location-chip"><MapPin size={13} /> Quảng Trị</span>
             <h2>{localizedTitle(selectedPlace, language)}</h2>
             <p>{selectedPlace.copy[language].subtitle}</p>
-            <span className="selected-location"><MapPin size={13} /> QUẢNG TRỊ · QUẢNG BÌNH</span>
+            <div className="place-detail-hero-tags">
+              <span><Sparkles size={13} />{categoryLabels[language][selectedPlace.category]}</span>
+              <span><Clock3 size={13} />{selectedPlace.duration} {translate(language, 'minute')}</span>
+              <span><MapPin size={13} />Quảng Trị · Quảng Bình</span>
+            </div>
           </div>
+          <span className="place-detail-hero-count">{String(places.findIndex((place) => place.id === selectedPlace.id) + 1).padStart(2, '0')} <i>/ {String(places.length).padStart(2, '0')}</i><span className="place-detail-hero-close"><ChevronLeft size={15} /> Quay lại bản đồ</span></span>
         </summary>
         <article className="place-detail-content">
-          <div className="place-detail-heading">
-            <span className="eyebrow"><span className="eyebrow-line" /> {categoryLabels[language][selectedPlace.category]} · {selectedPlace.duration} {translate(language, 'minute')}</span>
-            <h1>{localizedTitle(selectedPlace, language)}</h1>
-            <p>{selectedPlace.copy[language].subtitle}</p>
-            <span className="selected-location"><MapPin size={13} /> QUẢNG TRỊ · QUẢNG BÌNH</span>
-          </div>
-          <section className="place-language-card" lang={language}>
-            <h2>{selectedLanguage?.label ?? language}</h2>
-            <h3>{selectedPlace.copy[language].title}</h3>
-            <p className="place-language-subtitle">{selectedPlace.copy[language].subtitle}</p>
-            <p>{selectedPlace.copy[language].narration}</p>
-          </section>
-          <section className="place-story" lang="vi">
-            <div className="place-story-heading">
-              <span className="eyebrow"><span className="eyebrow-line" /> KHÁM PHÁ ĐỊA ĐIỂM</span>
-              <h2>Câu chuyện của nơi này</h2>
-              <p>Khám phá những câu chuyện và hình ảnh đặc trưng của địa phương.</p>
-            </div>
-            <div className="place-story-layout">
-              <div className="place-story-sections">
-                {selectedPlace.detailSections.map((section, index) => (
-                  <section className="place-story-section" key={`${selectedPlace.id}-${index}`}>
-                    <span className="place-story-number">{String(index + 1).padStart(2, '0')}</span>
-                    <div><h3>{section.heading}</h3><p>{section.body}</p></div>
-                  </section>
-                ))}
+          <div className="place-detail-layout">
+            <div className="place-detail-main-column">
+              <nav className="place-detail-breadcrumbs" aria-label="Đường dẫn">
+                <button type="button" onClick={closePlaceDetails}><Home size={14} /> Trang chủ</button>
+                <ChevronRight size={13} />
+                <span>Du lịch Quảng Trị</span>
+                <ChevronRight size={13} />
+                <span aria-current="page">{localizedTitle(selectedPlace, language)}</span>
+              </nav>
+              <div className="place-detail-heading" lang={language}>
+                <span className="eyebrow"><span className="eyebrow-line" /> {categoryLabels[language][selectedPlace.category]}</span>
+                <h1>{localizedTitle(selectedPlace, language)}</h1>
+                <p>{selectedPlace.copy[language].narration}</p>
               </div>
               {selectedPlace.detailImage.src && (
-                <figure className="place-story-image">
+                <figure className="place-detail-feature-image">
                   <img src={offlineImageUrl ?? selectedPlace.detailImage.src} alt={selectedPlace.detailImage.alt} loading="lazy" />
-                  <figcaption>{selectedPlace.detailImage.caption}</figcaption>
+                  <figcaption><span><Camera size={13} /> {selectedPlace.detailImage.caption || selectedPlace.detailImage.alt}</span></figcaption>
                 </figure>
               )}
+              <section className="place-story" lang="vi">
+                <div className="place-story-heading">
+                  <span className="eyebrow"><span className="eyebrow-line" /> KHÁM PHÁ ĐỊA ĐIỂM</span>
+                  <h2>Câu chuyện của nơi này</h2>
+                  <p>Khám phá những câu chuyện và hình ảnh đặc trưng của địa phương.</p>
+                </div>
+                <div className="place-story-sections">
+                  {selectedPlace.detailSections.map((section, index) => (
+                    <section className="place-story-section" key={`${selectedPlace.id}-${index}`}>
+                      <span className="place-story-number">{String(index + 1).padStart(2, '0')}</span>
+                      <div><h3>{section.heading}</h3><p>{section.body}</p></div>
+                    </section>
+                  ))}
+                </div>
+              </section>
             </div>
+            <aside className="place-detail-sidebar">
+              <section className="place-detail-side-card">
+                <h2><span className="place-detail-side-icon"><Play size={12} fill="currentColor" /></span> Nghe bài viết</h2>
+                <NarrationCard place={selectedPlace} language={language} distanceMeters={distanceMeters} onStartWalk={startWalk} onStopWalk={stopWalk} />
+              </section>
+              <PlaceRatingPanel placeId={selectedPlace.id} />
+              <section className="place-detail-related">
+                <h2><MapPin size={16} /> Thông tin liên quan</h2>
+                <div>
+                  <span>Du lịch Quảng Trị</span>
+                  <span>{categoryLabels[language][selectedPlace.category]}</span>
+                  <span>Địa điểm nổi bật</span>
+                  <span>{selectedLanguage?.label ?? language}</span>
+                </div>
+              </section>
+              <TicketPurchasePanel placeId={selectedPlace.id} />
+              <RitualGuidancePanel place={selectedPlace} language={language} />
+            </aside>
+          </div>
+          <section className="place-detail-itinerary">
+            <ItineraryPlanner places={places} />
           </section>
-          <NarrationCard place={selectedPlace} language={language} distanceMeters={distanceMeters} onStartWalk={startWalk} onStopWalk={stopWalk} />
-          <RitualGuidancePanel place={selectedPlace} language={language} />
-          <TicketPurchasePanel placeId={selectedPlace.id} />
-          <ItineraryPlanner places={places} />
-          <PlaceRatingPanel placeId={selectedPlace.id} />
         </article>
       </details>
 

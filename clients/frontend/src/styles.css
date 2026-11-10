@@ -992,3 +992,102 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .admin-dashboard-shell .admin-page-heading h1 { font-size: 22px; }
   .admin-dashboard-shell .admin-page-heading .admin-refresh { position: static; margin-top: 11px; }
 }
+
+.place-detail-page[open] { padding: 18px max(18px, calc((100vw - 1440px) / 2)) 42px; background: #f3f6f2; }
+.place-detail-page[open] > summary.place-detail-hero { position: relative; width: 100%; max-width: 1440px; min-height: 232px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; overflow: hidden; margin: 0 auto 20px; padding: 25px 34px; border: 0; border-radius: 17px; color: #fff; background-color: #14503d; background-position: center, center 52%; background-repeat: no-repeat; background-size: cover; box-shadow: 0 7px 22px #244a351c; cursor: pointer; }
+.place-detail-hero-copy { position: relative; z-index: 1; width: min(760px, 85%); }
+.place-detail-location-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border: 1px solid #ffffff36; border-radius: 18px; color: #fff; background: #ffffff19; font-size: 10px; font-weight: 600; }
+.place-detail-hero-copy h2 { margin: 12px 0 2px; color: #fff; font-family: var(--serif); font-size: clamp(32px, 4vw, 52px); font-weight: 500; letter-spacing: -.5px; line-height: 1.08; text-shadow: 0 2px 8px #132a244a; }
+.place-detail-hero-copy > p { margin: 5px 0 13px; color: #eff8f2; font-family: var(--serif); font-size: clamp(14px, 1.5vw, 19px); }
+.place-detail-hero-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.place-detail-hero-tags > span { min-height: 27px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid #ffffff24; border-radius: 16px; color: #f3faf5; background: #153f3485; font-size: 9px; }
+.place-detail-hero-count { position: relative; z-index: 1; display: grid; justify-items: end; gap: 11px; color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; text-shadow: 0 1px 5px #142b2477; }
+.place-detail-hero-count > i { color: #e2eee7; font-size: 10px; font-style: normal; font-weight: 500; }
+.place-detail-hero-close { display: inline-flex; align-items: center; gap: 4px; padding: 7px 10px; border: 1px solid #ffffff61; border-radius: 18px; color: #fff; background: #133b327c; font-size: 9px; font-weight: 600; }
+.place-detail-content { width: 100%; max-width: 1440px; margin: 0 auto; }
+.place-detail-layout { display: grid; grid-template-columns: minmax(0, 1.82fr) minmax(300px, .92fr); align-items: start; gap: 16px; }
+.place-detail-main-column, .place-detail-sidebar { min-width: 0; padding: 20px; border: 1px solid #e6ebe6; border-radius: 15px; background: #fff; box-shadow: 0 4px 16px #183e2b09; }
+.place-detail-breadcrumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-bottom: 15px; color: #7d8980; font-size: 9px; }
+.place-detail-breadcrumbs > svg { color: #a4aea6; transform: rotate(180deg); }
+.place-detail-breadcrumbs button { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; color: #365846; background: transparent; font-size: inherit; font-weight: 600; }
+.place-detail-breadcrumbs button:hover { color: #1c6a43; }
+.place-detail-breadcrumbs [aria-current="page"] { overflow: hidden; color: #66746a; text-overflow: ellipsis; white-space: nowrap; }
+.place-detail-heading { padding: 0 0 14px; }
+.place-detail-heading .eyebrow { color: #667e69; }
+.place-detail-heading h1 { margin: 5px 0 7px; color: #164c39; font-family: var(--serif); font-size: clamp(28px, 3vw, 39px); font-weight: 600; letter-spacing: -.5px; }
+.place-detail-heading > p { margin: 0; color: #52635a; font-family: inherit; font-size: 13px; line-height: 1.75; }
+.place-detail-feature-image { position: relative; overflow: hidden; margin: 0; border-radius: 13px; background: #e8eee8; }
+.place-detail-feature-image > img { display: block; width: 100%; max-height: 440px; aspect-ratio: 2.12 / 1; object-fit: cover; }
+.place-detail-feature-image > figcaption { position: absolute; top: 14px; left: 14px; max-width: calc(100% - 28px); }
+.place-detail-feature-image > figcaption > span { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid #ffffff38; border-radius: 18px; color: #fff; background: #164a3dc9; font-size: 9px; font-weight: 600; }
+.place-detail-main-column .place-story { margin-top: 22px; }
+.place-detail-main-column .place-story-heading { margin-bottom: 12px; }
+.place-detail-main-column .place-story-heading h2 { color: #174e3c; }
+.place-detail-main-column .place-story-sections { gap: 8px; }
+.place-detail-main-column .place-story-section { grid-template-columns: 30px 1fr; gap: 9px; padding: 13px; border-color: #e8eee9; border-radius: 10px; background: #fbfcfa; }
+.place-detail-main-column .place-story-number { color: #609470; font-family: inherit; font-size: 12px; font-weight: 700; }
+.place-detail-main-column .place-story-section h3 { color: #344f3c; font-family: inherit; font-size: 13px; }
+.place-detail-main-column .place-story-section p { color: #68766d; font-family: inherit; font-size: 11px; line-height: 1.7; }
+.place-detail-sidebar { display: grid; gap: 12px; }
+.place-detail-side-card { padding: 14px; border: 1px solid #e8eee9; border-radius: 12px; background: #fff; }
+.place-detail-side-card > h2, .place-detail-related > h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 11px; color: #345642; font-family: var(--serif); font-size: 14px; font-weight: 600; }
+.place-detail-side-icon { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #82b932; }
+.place-detail-sidebar .narration-card { padding: 12px; border-color: #eef0ed; border-radius: 10px; }
+.place-detail-sidebar .narration-head { align-items: flex-start; flex-direction: column; gap: 10px; }
+.place-detail-sidebar .narration-head-actions { width: 100%; justify-content: space-between; }
+.place-detail-sidebar .narration-copy { max-height: 110px; height: auto; margin: 10px 0; color: #66746a; font-size: 10px; line-height: 1.6; }
+.place-detail-sidebar .audio-language select { max-width: 145px; }
+.place-detail-sidebar .rating-panel { grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 0; padding: 15px; border-color: #e7ede6; border-radius: 12px; box-shadow: 0 4px 14px #253c2e08; }
+.place-detail-sidebar .rating-panel-heading h2 { margin: 6px 0 4px; color: #345642; font-family: var(--serif); font-size: 16px; }
+.place-detail-sidebar .rating-panel-heading p { font-size: 9px; line-height: 1.5; }
+.place-detail-sidebar .rating-review-list { max-height: 135px; overflow-y: auto; }
+.place-detail-sidebar .rating-review p { font-size: 10px; }
+.place-detail-sidebar .rating-form { gap: 7px; }
+.place-detail-sidebar .rating-form textarea { min-height: 56px; }
+.place-detail-sidebar .rating-submit { min-width: 132px; border-radius: 18px; }
+.place-detail-related { padding: 14px; border: 1px solid #e3eddf; border-radius: 12px; background: linear-gradient(145deg, #f1f7e9, #f8faf2); }
+.place-detail-related > h2 { margin-bottom: 10px; }
+.place-detail-related > h2 svg { color: #427a3b; }
+.place-detail-related > div { display: flex; flex-wrap: wrap; gap: 7px; }
+.place-detail-related > div > span { padding: 7px 10px; border: 1px solid #e4ebdf; border-radius: 17px; color: #526750; background: #ffffffa8; font-size: 9px; }
+.place-detail-sidebar .ticket-purchase-panel { margin-top: 0; padding: 14px; border-color: #e7ede6; border-radius: 12px; }
+.place-detail-sidebar .experience-grid { margin-top: 0; }
+.place-detail-sidebar .experience-card { padding: 14px; border-radius: 12px; }
+.place-detail-itinerary { margin-top: 14px; }
+.place-detail-itinerary .itinerary-planner { margin-top: 0; border-color: #e6ebe6; border-radius: 13px; box-shadow: 0 4px 16px #183e2b09; }
+
+@media (max-width: 900px) {
+  .place-detail-page[open] { padding-right: 16px; padding-left: 16px; }
+  .place-detail-layout { grid-template-columns: minmax(0, 1fr); }
+  .place-detail-sidebar { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .place-detail-sidebar > .place-detail-related { grid-column: 1 / -1; }
+  .place-detail-sidebar > .ticket-purchase-panel, .place-detail-sidebar > .experience-grid { align-self: stretch; }
+}
+
+@media (max-width: 600px) {
+  .place-detail-page[open] { inset: 62px 0 0; padding: 10px 10px 25px; }
+  .place-detail-page[open] > summary.place-detail-hero { min-height: 205px; gap: 8px; margin-bottom: 11px; padding: 18px 15px; border-radius: 13px; background-position: center, 59% center; }
+  .place-detail-hero-copy { width: 100%; }
+  .place-detail-hero-copy h2 { max-width: 88%; margin-top: 10px; font-size: clamp(27px, 8vw, 37px); }
+  .place-detail-hero-copy > p { max-width: 95%; font-size: 13px; }
+  .place-detail-hero-tags { gap: 5px; }
+  .place-detail-hero-tags > span { min-height: 24px; padding: 0 7px; font-size: 8px; }
+  .place-detail-hero-tags > span:last-child { display: none; }
+  .place-detail-hero-count { position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 8px; font-size: 9px; }
+  .place-detail-hero-close { padding: 5px 7px; font-size: 8px; }
+  .place-detail-content { width: 100%; }
+  .place-detail-layout { gap: 10px; }
+  .place-detail-main-column, .place-detail-sidebar { padding: 13px; border-radius: 12px; }
+  .place-detail-breadcrumbs { gap: 5px; margin-bottom: 12px; font-size: 8px; }
+  .place-detail-heading h1 { font-size: 27px; }
+  .place-detail-heading > p { font-size: 11px; }
+  .place-detail-feature-image > img { aspect-ratio: 1.35 / 1; }
+  .place-detail-feature-image > figcaption { top: 9px; left: 9px; }
+  .place-detail-feature-image > figcaption > span { padding: 6px 8px; font-size: 8px; }
+  .place-detail-main-column .place-story { margin-top: 18px; }
+  .place-detail-main-column .place-story-heading h2 { font-size: 22px; }
+  .place-detail-sidebar { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .place-detail-sidebar > .place-detail-related { grid-column: auto; }
+  .place-detail-sidebar > .ticket-purchase-panel, .place-detail-sidebar > .experience-grid { grid-column: auto; }
+  .place-detail-itinerary .itinerary-planner { padding: 14px; }
+}
