@@ -450,7 +450,7 @@ export function mergeRemotePlaces(localPlaces: Place[], remotePlaces: ApiPlace[]
       duration: remote.duration,
       image: remote.image,
       copy: { ...place.copy, ...remote.copy },
-      detailSections: remote.detailSections ?? place.detailSections,
+      detailSections: remote.detailSections?.length ? remote.detailSections : place.detailSections,
       detailImage: remote.detailImage ?? place.detailImage,
     }]
   })

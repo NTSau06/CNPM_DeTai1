@@ -684,7 +684,12 @@ export const places: Place[] = basePlaces.map((place) => {
   const details = placeDetails[place.id]
   if (!details) throw new Error(`Missing detail content for place "${place.id}".`)
 
-  return { ...place, copy: { ...place.copy, ...addedCopy }, detailSections: details.sections, detailImage: details.image }
+  return {
+    ...place,
+    copy: { ...place.copy, ...addedCopy },
+    detailSections: details.sections,
+    detailImage: details.image,
+  }
 })
 
 export const findPlace = (id: string) => places.find((place) => place.id === id)

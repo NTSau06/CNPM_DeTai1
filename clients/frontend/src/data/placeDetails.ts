@@ -148,3 +148,72 @@ export const placeDetails: Record<string, PlaceDetails> = {
     image: { src: new URL('../../image/suoi_nuoc_moc.jfif', import.meta.url).href, alt: 'Cảnh quan rừng xanh tại khu vực Phong Nha', caption: 'Thiên nhiên xanh vùng Phong Nha' },
   },
 }
+
+export interface PlaceVisitorDetails {
+  location: string
+  introduction: string
+  activities: string[]
+  food?: string
+  historicalValue?: string
+  bestTime: string
+  highlight: string
+}
+
+export const placeVisitorDetails: Record<string, PlaceVisitorDetails> = {
+  'bao-ninh-village': {
+    location: 'Bán đảo Bảo Ninh, khu vực Đồng Hới, tỉnh Quảng Trị (trước đây thuộc tỉnh Quảng Bình).',
+    introduction: 'Làng biển Bảo Ninh là địa điểm mang nét đẹp bình dị của vùng biển miền Trung. Nơi đây nổi bật với bãi cát dài, làn nước biển trong xanh và cuộc sống mộc mạc của người dân làng chài. Du khách có thể tìm hiểu hoạt động đánh bắt hải sản và nét văn hóa truyền thống của ngư dân địa phương.',
+    activities: ['Ngắm bình minh và hoàng hôn trên biển.', 'Quan sát hoạt động đánh bắt cá của ngư dân.', 'Đi dạo và chụp ảnh tại bãi biển.', 'Tìm hiểu cuộc sống của người dân làng chài.', 'Thưởng thức hải sản tươi sống.'],
+    food: 'Tôm, cua, ghẹ, mực, cá biển và các món hải sản địa phương.',
+    bestTime: 'Buổi sáng sớm hoặc chiều mát.',
+    highlight: 'Không gian biển yên bình, mang đậm nét văn hóa và đời sống của người dân miền biển.',
+  },
+  'cua-tung-beach': {
+    location: 'Khu vực Cửa Tùng, tỉnh Quảng Trị.',
+    introduction: 'Bãi biển Cửa Tùng là một trong những bãi biển nổi tiếng của miền Trung, từng được mệnh danh là “Nữ hoàng của các bãi tắm”. Nơi đây sở hữu bờ cát thoáng đãng, cảnh biển đẹp và không khí trong lành, thích hợp cho hoạt động nghỉ dưỡng và tham quan.',
+    activities: ['Tắm biển và thư giãn.', 'Đi dạo dọc bờ biển.', 'Ngắm bình minh và hoàng hôn.', 'Chụp ảnh phong cảnh.', 'Thưởng thức hải sản địa phương.'],
+    food: 'Cá biển, tôm, mực và các món hải sản tươi sống.',
+    bestTime: 'Từ tháng 4 đến tháng 8, tùy tình hình thời tiết.',
+    highlight: 'Cảnh quan biển đẹp, không gian thoáng đãng và phù hợp với du lịch nghỉ dưỡng.',
+  },
+  'da-nhay-beach': {
+    location: 'Khu vực Thanh Trạch, tỉnh Quảng Trị (trước đây thuộc tỉnh Quảng Bình).',
+    introduction: 'Bãi Đá Nhảy là thắng cảnh thiên nhiên nổi tiếng với những khối đá có hình dạng và kích thước khác nhau nằm sát bờ biển. Qua thời gian, tác động của sóng biển và gió đã tạo nên những hình thù độc đáo, mang đến cảnh quan thiên nhiên đặc sắc.',
+    activities: ['Khám phá các khối đá tự nhiên.', 'Ngắm cảnh biển và sóng vỗ vào bờ đá.', 'Chụp ảnh phong cảnh.', 'Đi dạo và tận hưởng không khí biển.', 'Ngắm bình minh và hoàng hôn.'],
+    food: 'Hải sản địa phương, tôm, cua, ghẹ và các món cá biển.',
+    bestTime: 'Buổi sáng hoặc chiều mát.',
+    highlight: 'Những khối đá tự nhiên với hình dáng độc đáo kết hợp cùng cảnh biển tạo nên vẻ đẹp riêng biệt.',
+  },
+  'dark-cave': {
+    location: 'Khu vực Phong Nha – Kẻ Bàng, tỉnh Quảng Trị (trước đây thuộc tỉnh Quảng Bình).',
+    introduction: 'Sông Chày – Hang Tối là địa điểm du lịch sinh thái nổi tiếng với cảnh quan sông nước, núi rừng và hệ thống hang động tự nhiên. Sông Chày gây ấn tượng với dòng nước xanh ngọc bích, bao quanh bởi núi đá vôi và rừng cây. Hang Tối mang vẻ đẹp hoang sơ với hệ thống thạch nhũ tự nhiên.',
+    activities: ['Ngắm cảnh dòng Sông Chày xanh ngọc.', 'Khám phá Hang Tối.', 'Tìm hiểu cấu tạo và vẻ đẹp của hang động.', 'Trải nghiệm các hoạt động vui chơi dưới nước.', 'Chụp ảnh phong cảnh núi rừng và sông nước.'],
+    food: 'Gà đồi, cá suối và các món ăn dân dã địa phương.',
+    bestTime: 'Từ tháng 4 đến tháng 8, tùy tình hình thời tiết.',
+    highlight: 'Sự kết hợp giữa dòng sông xanh, núi đá vôi và hang động tự nhiên tạo nên trải nghiệm khám phá thiên nhiên đặc sắc.',
+  },
+  'dong-hoi-market': {
+    location: 'Khu vực trung tâm Đồng Hới, tỉnh Quảng Trị (trước đây thuộc tỉnh Quảng Bình).',
+    introduction: 'Chợ Đồng Hới là khu chợ truyền thống nổi tiếng, nơi tập trung hoạt động mua bán và trao đổi hàng hóa của người dân địa phương. Chợ có nhiều gian hàng kinh doanh thực phẩm, hải sản tươi sống, đặc sản và các mặt hàng phục vụ đời sống hằng ngày.',
+    activities: ['Khám phá không khí mua bán tại chợ.', 'Tham quan các gian hàng hải sản.', 'Tìm hiểu văn hóa sinh hoạt của người dân địa phương.', 'Thưởng thức các món ăn truyền thống.', 'Mua đặc sản địa phương về làm quà.'],
+    food: 'Bánh bột lọc, cháo canh Quảng Bình, bánh bèo, hải sản tươi sống và hải sản khô.',
+    bestTime: 'Buổi sáng là thời điểm thích hợp để tham quan và khám phá các gian hàng thực phẩm.',
+    highlight: 'Là địa điểm giúp du khách tìm hiểu văn hóa địa phương và khám phá các món ăn đặc sản của vùng đất Quảng Bình.',
+  },
+  'hien-luong-bridge': {
+    location: 'Khu di tích đôi bờ Hiền Lương – Bến Hải, tỉnh Quảng Trị.',
+    introduction: 'Cầu Hiền Lương là địa danh lịch sử quan trọng, bắc qua sông Bến Hải. Nơi đây gắn liền với sự kiện đất nước tạm thời bị chia cắt thành hai miền sau Hiệp định Genève năm 1954. Trong giai đoạn 1954–1975, sông Bến Hải trở thành giới tuyến quân sự tạm thời giữa hai miền Nam – Bắc.',
+    activities: ['Tham quan cầu Hiền Lương.', 'Tìm hiểu lịch sử về vĩ tuyến 17.', 'Tham quan cột cờ giới tuyến.', 'Khám phá nhà trưng bày các hiện vật lịch sử.', 'Ngắm cảnh sông Bến Hải và chụp ảnh lưu niệm.'],
+    historicalValue: 'Cầu Hiền Lương là biểu tượng gắn liền với quá trình đấu tranh thống nhất đất nước, thể hiện khát vọng hòa bình và đoàn tụ dân tộc.',
+    bestTime: 'Có thể tham quan quanh năm.',
+    highlight: 'Đây là địa điểm có giá trị lịch sử và giáo dục truyền thống, giúp du khách hiểu hơn về lịch sử dân tộc Việt Nam.',
+  },
+  'nhat-le-beach': {
+    location: 'Khu vực Đồng Hới, tỉnh Quảng Trị (trước đây thuộc tỉnh Quảng Bình).',
+    introduction: 'Biển Nhật Lệ là một trong những bãi biển nổi tiếng của khu vực Đồng Hới. Nơi đây được biết đến với bãi cát trắng, làn nước biển xanh và không gian thoáng đãng. Bãi biển nằm gần cửa sông Nhật Lệ, tạo nên cảnh quan thiên nhiên hài hòa giữa sông và biển.',
+    activities: ['Tắm biển và thư giãn.', 'Đi dạo dọc bờ biển.', 'Ngắm bình minh và hoàng hôn.', 'Chụp ảnh phong cảnh.', 'Thưởng thức hải sản tại các nhà hàng ven biển.'],
+    food: 'Mực, tôm, cua, ghẹ, cá biển và các món đặc sản địa phương.',
+    bestTime: 'Từ tháng 4 đến tháng 8, tùy tình hình thời tiết.',
+    highlight: 'Bãi biển có cảnh quan đẹp, gần trung tâm thành phố Đồng Hới, thuận tiện cho việc tham quan, nghỉ dưỡng và thưởng thức ẩm thực địa phương.',
+  },
+}

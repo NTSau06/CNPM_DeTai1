@@ -11,6 +11,7 @@ import { RitualGuidancePanel } from '../components/RitualGuidancePanel'
 import { ItineraryPlanner } from '../components/ItineraryPlanner'
 import { getOfflinePlacePack } from '../db'
 import { categoryKeys, categoryLabels, languages, localizedTitle, places as bundledPlaces } from '../data/places'
+import { placeVisitorDetails } from '../data/placeDetails'
 import { translate } from '../i18n'
 import { getNarrationAudioUrl, getNarrationText, speakWithAudio, speechAvailable, stopSpeaking } from '../speech'
 import { optimizeRouteOrder } from '../routeOptimization'
@@ -392,18 +393,36 @@ export function ExplorePage() {
                   <figcaption><span><Camera size={13} /> {selectedPlace.detailImage.caption || selectedPlace.detailImage.alt}</span></figcaption>
                 </figure>
               )}
-              <section className="place-story" lang="vi">
-                <div className="place-story-heading">
-                  <span className="eyebrow"><span className="eyebrow-line" /> KHÁM PHÁ ĐỊA ĐIỂM</span>
-                  <h2>Câu chuyện của nơi này</h2>
-                  <p>Khám phá những câu chuyện và hình ảnh đặc trưng của địa phương.</p>
+              <section className="place-visitor-info" lang="vi">
+                <div className="place-visitor-info-heading">
+                  <span className="eyebrow"><span className="eyebrow-line" /> THÔNG TIN HỮU ÍCH</span>
+                  <h2>Thông tin tham quan</h2>
+                  <p>Thông tin và gợi ý hữu ích để bạn chuẩn bị cho chuyến tham quan.</p>
                 </div>
-                <div className="place-story-sections">
+                <div className="place-visitor-details">
+                  {placeVisitorDetails[selectedPlace.id] && (
+                    <>
+                      <div className="place-visitor-detail"><h3>Vị trí</h3><p>{placeVisitorDetails[selectedPlace.id].location}</p></div>
+                      <div className="place-visitor-detail"><h3>Giới thiệu</h3><p>{placeVisitorDetails[selectedPlace.id].introduction}</p></div>
+                      <div className="place-visitor-detail">
+                        <h3>Hoạt động tham quan</h3>
+                        <ul>{placeVisitorDetails[selectedPlace.id].activities.map((activity) => <li key={activity}>{activity}</li>)}</ul>
+                      </div>
+                      {placeVisitorDetails[selectedPlace.id].food && (
+                        <div className="place-visitor-detail"><h3>Ẩm thực</h3><p>{placeVisitorDetails[selectedPlace.id].food}</p></div>
+                      )}
+                      {placeVisitorDetails[selectedPlace.id].historicalValue && (
+                        <div className="place-visitor-detail"><h3>Giá trị lịch sử</h3><p>{placeVisitorDetails[selectedPlace.id].historicalValue}</p></div>
+                      )}
+                      <div className="place-visitor-detail"><h3>Thời điểm thích hợp</h3><p>{placeVisitorDetails[selectedPlace.id].bestTime}</p></div>
+                      <div className="place-visitor-detail"><h3>Điểm nổi bật</h3><p>{placeVisitorDetails[selectedPlace.id].highlight}</p></div>
+                    </>
+                  )}
                   {selectedPlace.detailSections.map((section, index) => (
-                    <section className="place-story-section" key={`${selectedPlace.id}-${index}`}>
-                      <span className="place-story-number">{String(index + 1).padStart(2, '0')}</span>
-                      <div><h3>{section.heading}</h3><p>{section.body}</p></div>
-                    </section>
+                    <div className="place-visitor-detail" key={`${selectedPlace.id}-${index}`}>
+                      <h3>{section.heading}</h3>
+                      <p>{section.body}</p>
+                    </div>
                   ))}
                 </div>
               </section>
