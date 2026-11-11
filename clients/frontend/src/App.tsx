@@ -19,6 +19,8 @@ const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage').then((module)
 
 // Gửi heartbeat đủ nhanh để số online cập nhật gần như tức thì (máy chủ giữ 30 giây).
 const PRESENCE_INTERVAL_MS = 5_000
+const exploreSections = ['explore-home', 'explore-featured', 'explore-map', 'explore-info'] as const
+type ExploreSection = (typeof exploreSections)[number]
 
 export default function App() {
   const location = useLocation()
@@ -30,8 +32,40 @@ export default function App() {
   const clearStorageError = useAppStore((state) => state.clearStorageError)
   const [navigationOpen, setNavigationOpen] = useState(false)
   const [toast, setToast] = useState<{ id: number; message: string } | null>(null)
+  const [activeExploreSection, setActiveExploreSection] = useState<ExploreSection>('explore-home')
   const navigationRef = useRef<HTMLDivElement>(null)
   const isAdminRoute = location.pathname.startsWith('/admin')
+
+  useEffect(() => {
+    if (location.pathname !== '/explore') return
+
+    let frame = 0
+    const updateActiveSection = () => {
+      const topbarBottom = document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? 72
+      const threshold = topbarBottom + 48
+      let activeSection: ExploreSection = 'explore-home'
+
+      for (const section of exploreSections) {
+        const element = document.getElementById(section)
+        if (element && element.getBoundingClientRect().top <= threshold) activeSection = section
+      }
+
+      setActiveExploreSection((current) => current === activeSection ? current : activeSection)
+    }
+    const scheduleUpdate = () => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(updateActiveSection)
+    }
+
+    updateActiveSection()
+    window.addEventListener('scroll', scheduleUpdate, { passive: true })
+    window.addEventListener('resize', scheduleUpdate)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', scheduleUpdate)
+      window.removeEventListener('resize', scheduleUpdate)
+    }
+  }, [location.pathname])
 
   useEffect(() => {
     // Trang admin không tự tính là thiết bị người dùng đang truy cập.
@@ -175,12 +209,34 @@ export default function App() {
         </NavLink>
         {location.pathname === '/explore' && (
           <nav className="home-main-nav" aria-label="Điều hướng trang chủ">
-            <NavLink to="/explore" end className={({ isActive }) => `home-main-nav-link${isActive ? ' active' : ''}`}>
+            <a
+              className={`home-main-nav-link${activeExploreSection === 'explore-home' ? ' active' : ''}`}
+              href="#explore-home"
+              aria-current={activeExploreSection === 'explore-home' ? 'location' : undefined}
+            >
               <House size={14} />{language === 'vi' ? 'Trang chủ' : 'Home'}
-            </NavLink>
-            <a className="home-main-nav-link" href="#explore-featured"><Compass size={14} />{language === 'vi' ? 'Khám phá Quảng Trị' : 'Explore Quang Tri'}</a>
-            <a className="home-main-nav-link" href="#explore-map"><MapPinned size={14} />{language === 'vi' ? 'Bản đồ du lịch' : 'Travel map'}</a>
-            <a className="home-main-nav-link" href="#explore-info"><Map size={14} />{language === 'vi' ? 'Giới thiệu' : 'About'}</a>
+            </a>
+            <a
+              className={`home-main-nav-link${activeExploreSection === 'explore-featured' ? ' active' : ''}`}
+              href="#explore-featured"
+              aria-current={activeExploreSection === 'explore-featured' ? 'location' : undefined}
+            >
+              <Compass size={14} />{language === 'vi' ? 'Khám phá Quảng Trị' : 'Explore Quang Tri'}
+            </a>
+            <a
+              className={`home-main-nav-link${activeExploreSection === 'explore-map' ? ' active' : ''}`}
+              href="#explore-map"
+              aria-current={activeExploreSection === 'explore-map' ? 'location' : undefined}
+            >
+              <MapPinned size={14} />{language === 'vi' ? 'Bản đồ du lịch' : 'Travel map'}
+            </a>
+            <a
+              className={`home-main-nav-link${activeExploreSection === 'explore-info' ? ' active' : ''}`}
+              href="#explore-info"
+              aria-current={activeExploreSection === 'explore-info' ? 'location' : undefined}
+            >
+              <Map size={14} />{language === 'vi' ? 'Giới thiệu' : 'About'}
+            </a>
           </nav>
         )}
         <div className="topbar-right">
