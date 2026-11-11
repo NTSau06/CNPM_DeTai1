@@ -1,7 +1,8 @@
 // Kết nối các trang, điều hướng chính và trạng thái dùng chung của ứng dụng web.
+import type React from 'react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { AlertCircle, Bookmark, ChevronDown, Compass, House, Map, MapPinned, Menu, MonitorSmartphone, Settings2, X } from 'lucide-react'
+import { AlertCircle, Bookmark, ChevronDown, Compass, House, Info, Map, MapPinned, Menu, MonitorSmartphone, Settings2, X } from 'lucide-react'
 import { translate } from './i18n'
 import { languages } from './data/places'
 import { useAppStore } from './store'
@@ -21,6 +22,12 @@ const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage').then((module)
 const PRESENCE_INTERVAL_MS = 5_000
 const exploreSections = ['explore-home', 'explore-featured', 'explore-map', 'explore-info'] as const
 type ExploreSection = (typeof exploreSections)[number]
+const homeNavItems: { id: ExploreSection; icon: typeof House; vi: string; en: string }[] = [
+  { id: 'explore-home', icon: House, vi: 'Trang chủ', en: 'Home' },
+  { id: 'explore-featured', icon: Compass, vi: 'Khám phá Quảng Trị', en: 'Explore Quang Tri' },
+  { id: 'explore-map', icon: MapPinned, vi: 'Bản đồ du lịch', en: 'Travel map' },
+  { id: 'explore-info', icon: Info, vi: 'Giới thiệu', en: 'About' },
+]
 
 export default function App() {
   const location = useLocation()
@@ -49,6 +56,9 @@ export default function App() {
         const element = document.getElementById(section)
         if (element && element.getBoundingClientRect().top <= threshold) activeSection = section
       }
+      // Khi đã cuộn tới cuối trang, mục cuối (Giới thiệu) luôn được đánh dấu.
+      const atPageBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4
+      if (atPageBottom) activeSection = exploreSections[exploreSections.length - 1]
 
       setActiveExploreSection((current) => current === activeSection ? current : activeSection)
     }
@@ -176,6 +186,18 @@ export default function App() {
     }
   }, [])
 
+  const goToExploreSection = (event: React.MouseEvent<HTMLAnchorElement>, id: ExploreSection) => {
+    event.preventDefault()
+    // Đóng trang chi tiết địa điểm (lớp phủ) nếu đang mở để mục được chọn hiện ra.
+    document.querySelectorAll<HTMLDetailsElement>('.place-detail-page[open]').forEach((details) => { details.open = false })
+    setNavigationOpen(false)
+    setActiveExploreSection(id)
+    const target = document.getElementById(id)
+    if (id === 'explore-home') window.scrollTo({ top: 0, behavior: 'smooth' })
+    else target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    window.history.replaceState(null, '', `#${id}`)
+  }
+
   const items = [
     { to: '/explore', label: translate(language, 'explore'), icon: Compass, end: true },
     { to: '/saved', label: translate(language, 'saved'), icon: Bookmark },
@@ -209,38 +231,21 @@ export default function App() {
         </NavLink>
         {location.pathname === '/explore' && (
           <nav className="home-main-nav" aria-label="Điều hướng trang chủ">
-            <a
-              className={`home-main-nav-link${activeExploreSection === 'explore-home' ? ' active' : ''}`}
-              href="#explore-home"
-              aria-current={activeExploreSection === 'explore-home' ? 'location' : undefined}
-            >
-              <House size={14} />{language === 'vi' ? 'Trang chủ' : 'Home'}
-            </a>
-            <a
-              className={`home-main-nav-link${activeExploreSection === 'explore-featured' ? ' active' : ''}`}
-              href="#explore-featured"
-              aria-current={activeExploreSection === 'explore-featured' ? 'location' : undefined}
-            >
-              <Compass size={14} />{language === 'vi' ? 'Khám phá Quảng Trị' : 'Explore Quang Tri'}
-            </a>
-            <a
-              className={`home-main-nav-link${activeExploreSection === 'explore-map' ? ' active' : ''}`}
-              href="#explore-map"
-              aria-current={activeExploreSection === 'explore-map' ? 'location' : undefined}
-            >
-              <MapPinned size={14} />{language === 'vi' ? 'Bản đồ du lịch' : 'Travel map'}
-            </a>
-            <a
-              className={`home-main-nav-link${activeExploreSection === 'explore-info' ? ' active' : ''}`}
-              href="#explore-info"
-              aria-current={activeExploreSection === 'explore-info' ? 'location' : undefined}
-            >
-              <Map size={14} />{language === 'vi' ? 'Giới thiệu' : 'About'}
-            </a>
+            {homeNavItems.map(({ id, icon: Icon, vi, en }) => (
+              <a
+                key={id}
+                className={`home-main-nav-link${activeExploreSection === id ? ' active' : ''}`}
+                href={`#${id}`}
+                aria-current={activeExploreSection === id ? 'location' : undefined}
+                onClick={(event) => goToExploreSection(event, id)}
+              >
+                <Icon size={14} />{language === 'vi' ? vi : en}
+              </a>
+            ))}
           </nav>
         )}
         <div className="topbar-right">
-          <NavLink className="device-picker-link" to="/" title="Chọn thiết bị">
+          <NavLink className="device-picker-link" to="/device" title="Chọn thiết bị">
             <MonitorSmartphone size={15} aria-hidden="true" />
             <span>Thiết bị</span>
           </NavLink>

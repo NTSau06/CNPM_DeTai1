@@ -11,7 +11,6 @@ import { RitualGuidancePanel } from '../components/RitualGuidancePanel'
 import { ItineraryPlanner } from '../components/ItineraryPlanner'
 import { getOfflinePlacePack } from '../db'
 import { categoryKeys, categoryLabels, languages, localizedTitle, places as bundledPlaces } from '../data/places'
-import { placeVisitorDetails } from '../data/placeDetails'
 import { translate } from '../i18n'
 import { getNarrationAudioUrl, getNarrationText, speakWithAudio, speechAvailable, stopSpeaking } from '../speech'
 import { optimizeRouteOrder } from '../routeOptimization'
@@ -20,6 +19,19 @@ import type { Category } from '../types'
 import './explore-home.css'
 
 const DISCOVER_PREVIEW_COUNT = 6
+
+// Tìm kiếm không phân biệt hoa/thường và dấu tiếng Việt ("dong" khớp "Động").
+const normalizeSearch = (value: string) => value
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/đ/g, 'd')
+  .replace(/\s+/g, ' ')
+  .trim()
+
+const scrollToSection = (id: string) => {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 const MapView = lazy(() => import('../components/MapView').then((module) => ({ default: module.MapView })))
 
@@ -75,12 +87,21 @@ export function ExplorePage() {
     }
   }, [selectedPlace.id, language])
 
-  const filteredPlaces = useMemo(() => places.filter((place) => {
-    const title = localizedTitle(place, language).toLowerCase()
-    const query = search.trim().toLowerCase()
-    const matchesSearch = !query || title.includes(query) || place.copy.vi.title.toLowerCase().includes(query) || place.copy.en.title.toLowerCase().includes(query)
-    return matchesSearch && (category === 'all' || place.category === category)
-  }), [places, language, search, category])
+  const filteredPlaces = useMemo(() => {
+    const query = normalizeSearch(search)
+    return places.filter((place) => {
+      const haystack = normalizeSearch([
+        localizedTitle(place, language),
+        place.copy.vi.title,
+        place.copy.en.title,
+        place.copy[language].subtitle,
+        place.copy.vi.subtitle,
+        categoryLabels[language][place.category],
+      ].join(' '))
+      const matchesSearch = !query || query.split(' ').every((word) => haystack.includes(word))
+      return matchesSearch && (category === 'all' || place.category === category)
+    })
+  }, [places, language, search, category])
   const featuredPlaces = useMemo(() => {
     const featuredIds = ['bao-ninh-beach', 'cua-tung-beach', 'da-nhay']
     const preferred = featuredIds
@@ -109,6 +130,14 @@ export function ExplorePage() {
   }, [location, autoNarration, places, language, setSelectedPlace])
 
   useEffect(() => () => stopSpeaking(), [])
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && placeDetailsRef.current?.open) placeDetailsRef.current.open = false
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [])
 
   useEffect(() => {
     if (!autoNarration && watchId.current !== null && navigator.geolocation) {
@@ -175,13 +204,16 @@ export function ExplorePage() {
   }
 
   const showPlaceDetails = () => {
-    if (placeDetailsRef.current) placeDetailsRef.current.open = true
+    const details = placeDetailsRef.current
+    if (!details) return
+    details.open = true
+    details.scrollTop = 0
   }
 
   const selectFeaturedPlace = (placeId: string) => {
     setSelectedPlace(placeId)
     setMapFocusRequest((request) => request + 1)
-    document.getElementById('explore-map')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    scrollToSection('explore-map')
   }
 
   const focusPlaceOnMap = (placeId: string) => {
@@ -250,12 +282,12 @@ export function ExplorePage() {
             <h1>{language === 'vi' ? 'Quảng Trị' : translate(language, 'title')}</h1>
             <p>{language === 'vi' ? 'Qua thuyết minh tự động – bằng ngôn ngữ của bạn' : translate(language, 'introduction')}</p>
             <div className="hero-highlights">
-              <span><Headphones size={17} />{language === 'vi' ? <>Thuyết minh AI<br />đa ngôn ngữ</> : <>Multilingual AI<br />audio guide</>}</span>
-              <span><MapPin size={17} />{language === 'vi' ? <>Bản đồ tương tác<br />thông minh</> : <>Interactive<br />travel map</>}</span>
-              <span><Landmark size={17} />{language === 'vi' ? <>Khám phá di tích<br />và danh thắng</> : <>Discover local<br />landmarks</>}</span>
+              <button type="button" onClick={() => scrollToSection('explore-info')}><Headphones size={17} />{vi ? <>Thuyết minh AI<br />đa ngôn ngữ</> : <>Multilingual AI<br />audio guide</>}</button>
+              <button type="button" onClick={() => scrollToSection('explore-map')}><MapPin size={17} />{vi ? <>Bản đồ tương tác<br />thông minh</> : <>Interactive<br />travel map</>}</button>
+              <button type="button" onClick={() => { setCategory('landmark'); setPlacesExpanded(true); scrollToSection('explore-featured') }}><Landmark size={17} />{vi ? <>Khám phá di tích<br />và danh thắng</> : <>Discover local<br />landmarks</>}</button>
             </div>
             <div className="hero-actions">
-            <button type="button" className="hero-cta" onClick={() => document.getElementById('explore-map')?.scrollIntoView({ behavior: 'smooth' })}>
+            <button type="button" className="hero-cta" onClick={() => scrollToSection('explore-map')}>
               <Play size={14} fill="currentColor" />{language === 'vi' ? 'Bắt đầu khám phá' : 'Start exploring'}<ArrowRight size={15} />
             </button>
             <a className="hero-secondary" href="#explore-featured">{language === 'vi' ? 'Xem điểm đến' : 'View destinations'}<ChevronRight size={16} /></a>
@@ -269,7 +301,7 @@ export function ExplorePage() {
         <form className="home-search" role="search" onSubmit={(event) => {
           event.preventDefault()
           setPlacesExpanded(true)
-          document.getElementById('explore-featured')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          scrollToSection('explore-featured')
         }}>
           <span className="home-search-icon"><MapPin size={23} /></span>
           <label htmlFor="home-destination-search">
@@ -439,7 +471,7 @@ export function ExplorePage() {
                 ? 'Ứng dụng giúp bạn khám phá theo cách riêng: chọn điểm đến, nghe thuyết minh bằng ngôn ngữ của mình, lưu hành trình và dùng cả khi không có mạng.'
                 : 'This guide lets you explore your own way: pick a stop, listen in your language, save your route and keep using it offline.'}</p>
               <div className="about-actions">
-                <button type="button" className="hero-cta" onClick={() => document.getElementById('explore-map')?.scrollIntoView({ behavior: 'smooth' })}><Play size={14} fill="currentColor" />{vi ? 'Bắt đầu khám phá' : 'Start exploring'}<ArrowRight size={15} /></button>
+                <button type="button" className="hero-cta" onClick={() => scrollToSection('explore-map')}><Play size={14} fill="currentColor" />{vi ? 'Bắt đầu khám phá' : 'Start exploring'}<ArrowRight size={15} /></button>
                 <NavLink to="/saved" className="about-link">{translate(language, 'savedTitle')}<ChevronRight size={16} /></NavLink>
               </div>
             </div>
@@ -513,36 +545,18 @@ export function ExplorePage() {
                   <figcaption><span><Camera size={13} /> {selectedPlace.detailImage.caption || selectedPlace.detailImage.alt}</span></figcaption>
                 </figure>
               )}
-              <section className="place-visitor-info" lang="vi">
-                <div className="place-visitor-info-heading">
-                  <span className="eyebrow"><span className="eyebrow-line" /> THÔNG TIN HỮU ÍCH</span>
-                  <h2>Thông tin tham quan</h2>
-                  <p>Thông tin và gợi ý hữu ích để bạn chuẩn bị cho chuyến tham quan.</p>
+              <section className="place-story" lang="vi">
+                <div className="place-story-heading">
+                  <span className="eyebrow"><span className="eyebrow-line" /> KHÁM PHÁ ĐỊA ĐIỂM</span>
+                  <h2>Câu chuyện của nơi này</h2>
+                  <p>Khám phá những câu chuyện và hình ảnh đặc trưng của địa phương.</p>
                 </div>
-                <div className="place-visitor-details">
-                  {placeVisitorDetails[selectedPlace.id] && (
-                    <>
-                      <div className="place-visitor-detail"><h3>Vị trí</h3><p>{placeVisitorDetails[selectedPlace.id].location}</p></div>
-                      <div className="place-visitor-detail"><h3>Giới thiệu</h3><p>{placeVisitorDetails[selectedPlace.id].introduction}</p></div>
-                      <div className="place-visitor-detail">
-                        <h3>Hoạt động tham quan</h3>
-                        <ul>{placeVisitorDetails[selectedPlace.id].activities.map((activity) => <li key={activity}>{activity}</li>)}</ul>
-                      </div>
-                      {placeVisitorDetails[selectedPlace.id].food && (
-                        <div className="place-visitor-detail"><h3>Ẩm thực</h3><p>{placeVisitorDetails[selectedPlace.id].food}</p></div>
-                      )}
-                      {placeVisitorDetails[selectedPlace.id].historicalValue && (
-                        <div className="place-visitor-detail"><h3>Giá trị lịch sử</h3><p>{placeVisitorDetails[selectedPlace.id].historicalValue}</p></div>
-                      )}
-                      <div className="place-visitor-detail"><h3>Thời điểm thích hợp</h3><p>{placeVisitorDetails[selectedPlace.id].bestTime}</p></div>
-                      <div className="place-visitor-detail"><h3>Điểm nổi bật</h3><p>{placeVisitorDetails[selectedPlace.id].highlight}</p></div>
-                    </>
-                  )}
+                <div className="place-story-sections">
                   {selectedPlace.detailSections.map((section, index) => (
-                    <div className="place-visitor-detail" key={`${selectedPlace.id}-${index}`}>
-                      <h3>{section.heading}</h3>
-                      <p>{section.body}</p>
-                    </div>
+                    <section className="place-story-section" key={`${selectedPlace.id}-${index}`}>
+                      <span className="place-story-number">{String(index + 1).padStart(2, '0')}</span>
+                      <div><h3>{section.heading}</h3><p>{section.body}</p></div>
+                    </section>
                   ))}
                 </div>
               </section>

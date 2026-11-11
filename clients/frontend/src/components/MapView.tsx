@@ -5,7 +5,7 @@ import { GeoJSONSource, type Map as MapLibreMap, type MapLayerMouseEvent } from 
 import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { Protocol, PMTiles } from 'pmtiles'
 import { lineString, point } from '@turf/turf'
-import { ArrowRight, LoaderCircle, LocateFixed, MapPinned, Maximize2, Minimize2, Minus, Plus, Route, Search, X } from 'lucide-react'
+import { ArrowRight, ArrowUpDown, LoaderCircle, LocateFixed, MapPinned, Maximize2, Minimize2, Minus, Plus, Route, Search, X } from 'lucide-react'
 import { getOfflineMap } from '../db'
 import { translate } from '../i18n'
 import { makeOfflineStyle, makeOnlineStyle } from '../mapStyle'
@@ -26,6 +26,9 @@ interface MapViewProps {
   onSelectPlace: (id: string) => void
   onShowPlaceDetails: () => void
 }
+
+// Giá trị đặc biệt trong ô chọn điểm: vị trí GPS hiện tại của người dùng.
+const MY_LOCATION_ID = '__my-location__'
 
 export function MapView({ places, language, selectedPlaceId, focusRequest, onSelectPlace, onShowPlaceDetails }: MapViewProps) {
   const container = useRef<HTMLDivElement>(null)
@@ -54,9 +57,10 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
   const [directionsStatus, setDirectionsStatus] = useState<'locating' | 'loading' | 'offline' | 'error' | 'unsupported' | null>(null)
   const [showDirections, setShowDirections] = useState(false)
   const [placeRoutePlannerOpen, setPlaceRoutePlannerOpen] = useState(false)
-  const [fromPlaceId, setFromPlaceId] = useState(() => places.find((place) => place.id !== selectedPlaceId)?.id ?? '')
+  const [fromPlaceId, setFromPlaceId] = useState(MY_LOCATION_ID)
   const [toPlaceId, setToPlaceId] = useState(selectedPlaceId)
   const [placeRoute, setPlaceRoute] = useState<[string, string] | null>(null)
+  const [styleReadyTick, setStyleReadyTick] = useState(0)
   const mapPlaces = useMemo(() => {
     const query = mapSearch.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase()
     if (!query) return places
@@ -121,8 +125,17 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
         minZoom: 7,
         maxZoom: 19,
         attributionControl: false,
-        cooperativeGestures: true,
+        // Cho phép kéo bằng chuột / một ngón tay và lăn chuột để phóng to mà không cần giữ Ctrl.
+        cooperativeGestures: false,
+        dragPan: true,
+        scrollZoom: true,
+        touchZoomRotate: true,
+        doubleClickZoom: true,
+        keyboard: true,
+        dragRotate: false,
+        pitchWithRotate: false,
       })
+      instance.touchZoomRotate.disableRotation()
       map.current = instance
       instance.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
       instance.once('style.load', () => {
@@ -264,7 +277,13 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
 
   useEffect(() => {
     const instance = map.current
-    if (!mapReady || !instance?.isStyleLoaded()) return
+    if (!mapReady || !instance) return
+    if (!instance.isStyleLoaded()) {
+      // Bản đồ còn đang tải ô nền: đợi tải xong rồi vẽ đường, tránh bỏ lỡ yêu cầu tìm đường.
+      const retry = () => setStyleReadyTick((tick) => tick + 1)
+      instance.once('idle', retry)
+      return () => { instance.off('idle', retry) }
+    }
 
     if (!showDirections && !placeRoute) {
       syncDirectionsRoute(instance, null)
@@ -283,7 +302,9 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
       return
     }
 
-    const placeCoordinates = placeRoute?.map((id) => places.find((place) => place.id === id)?.coordinates)
+    const placeCoordinates = placeRoute?.map((id) => id === MY_LOCATION_ID
+      ? location ?? undefined
+      : places.find((place) => place.id === id)?.coordinates)
     const destination = places.find((place) => place.id === selectedPlaceId)?.coordinates
     const coordinates = placeRoute
       ? placeCoordinates?.every((coordinate): coordinate is [number, number] => coordinate !== undefined)
@@ -323,7 +344,7 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
       })
 
     return () => controller.abort()
-  }, [mapReady, showDirections, placeRoute, location, selectedPlaceId, online, expanded, places])
+  }, [mapReady, showDirections, placeRoute, location, selectedPlaceId, online, expanded, places, styleReadyTick])
 
   useEffect(() => {
     if (!expanded) return
@@ -408,7 +429,8 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
     setShowDirections(false)
     setPlaceRoute(null)
     setDirectionsStatus(null)
-    setFromPlaceId(places.find((place) => place.id !== selectedPlaceId)?.id ?? places[0]?.id ?? '')
+    // Mặc định đi từ vị trí hiện tại của người dùng tới điểm đang chọn.
+    setFromPlaceId(MY_LOCATION_ID)
     setToPlaceId(selectedPlaceId)
     setPlaceRoutePlannerOpen((open) => !open)
   }
@@ -420,9 +442,33 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
       return
     }
     setShowDirections(false)
-    setPlaceRoute([fromPlaceId, toPlaceId])
-    setPlaceRoutePlannerOpen(false)
+    const usesMyLocation = fromPlaceId === MY_LOCATION_ID || toPlaceId === MY_LOCATION_ID
+    if (!usesMyLocation || location) {
+      setPlaceRoute([fromPlaceId, toPlaceId])
+      setPlaceRoutePlannerOpen(false)
+      return
+    }
+
+    // Chưa có vị trí: xin quyền GPS rồi mới vẽ đường.
+    const route: [string, string] = [fromPlaceId, toPlaceId]
+    setDirectionsStatus('locating')
+    void getCurrentLocation()
+      .then((coordinates) => {
+        useAppStore.getState().setLocation(coordinates)
+        setPlaceRoute(route)
+        setPlaceRoutePlannerOpen(false)
+      })
+      .catch(handleLocationError)
   }
+
+  const routeEndpointOptions = (
+    <>
+      <option value={MY_LOCATION_ID}>📍 {translate(language, 'locate')}{location ? '' : language === 'vi' ? ' (bật GPS)' : ' (GPS)'}</option>
+      {places.map((place) => (
+        <option key={place.id} value={place.id}>{place.copy[language].title}</option>
+      ))}
+    </>
+  )
 
   return (
     <div className={`map-stage${expanded ? ' map-stage-expanded' : ''}`}>
@@ -511,20 +557,19 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
           <label>
             <span>{translate(language, 'routeOrigin')}</span>
             <select value={fromPlaceId} onChange={(event) => setFromPlaceId(event.target.value)} required>
-              {places.map((place) => (
-                <option key={place.id} value={place.id}>{place.copy[language].title}</option>
-              ))}
+              {routeEndpointOptions}
             </select>
           </label>
           <label>
             <span>{translate(language, 'routeDestination')}</span>
             <select value={toPlaceId} onChange={(event) => setToPlaceId(event.target.value)} required>
-              {places.map((place) => (
-                <option key={place.id} value={place.id}>{place.copy[language].title}</option>
-              ))}
+              {routeEndpointOptions}
             </select>
           </label>
-          <button type="submit" disabled={!fromPlaceId || !toPlaceId || fromPlaceId === toPlaceId}>
+          <button type="button" className="map-route-swap" onClick={() => { setFromPlaceId(toPlaceId); setToPlaceId(fromPlaceId) }}>
+            <ArrowUpDown size={13} />{language === 'vi' ? 'Đổi chiều' : 'Swap'}
+          </button>
+          <button type="submit" disabled={!fromPlaceId || !toPlaceId || fromPlaceId === toPlaceId || directionsStatus === 'locating'}>
             <Route size={14} />{translate(language, 'showRoute')}
           </button>
         </form>
