@@ -10,6 +10,7 @@ import { TicketPurchasePanel } from '../components/TicketPurchasePanel'
 import { RitualGuidancePanel } from '../components/RitualGuidancePanel'
 import { ItineraryPlanner } from '../components/ItineraryPlanner'
 import { getOfflinePlacePack } from '../db'
+import { placeVisitorDetails } from '../data/placeDetails'
 import { categoryKeys, categoryLabels, languages, localizedTitle, places as bundledPlaces } from '../data/places'
 import { translate } from '../i18n'
 import { getNarrationAudioUrl, getNarrationText, speakWithAudio, speechAvailable, stopSpeaking } from '../speech'
@@ -65,6 +66,7 @@ export function ExplorePage() {
   const watchId = useRef<number | null>(null)
   const placeDetailsRef = useRef<HTMLDetailsElement>(null)
   const selectedPlace = places.find((place) => place.id === selectedPlaceId) ?? places[0] ?? bundledPlaces[0]
+  const visitorDetails = placeVisitorDetails[selectedPlace.id]
   const selectedLanguage = languages.find((item) => item.code === language)
   const vi = language === 'vi'
 
@@ -522,7 +524,7 @@ export function ExplorePage() {
               <span><MapPin size={13} />Quảng Trị · Quảng Bình</span>
             </div>
           </div>
-          <span className="place-detail-hero-count">{String(places.findIndex((place) => place.id === selectedPlace.id) + 1).padStart(2, '0')} <i>/ {String(places.length).padStart(2, '0')}</i><span className="place-detail-hero-close"><ChevronLeft size={15} /> Quay lại bản đồ</span></span>
+          <span className="place-detail-hero-count"><span className="place-detail-hero-close"><ChevronLeft size={15} /> Quay lại bản đồ</span></span>
         </summary>
         <article className="place-detail-content">
           <div className="place-detail-layout">
@@ -545,17 +547,28 @@ export function ExplorePage() {
                   <figcaption><span><Camera size={13} /> {selectedPlace.detailImage.caption || selectedPlace.detailImage.alt}</span></figcaption>
                 </figure>
               )}
-              <section className="place-story" lang="vi">
-                <div className="place-story-heading">
-                  <span className="eyebrow"><span className="eyebrow-line" /> KHÁM PHÁ ĐỊA ĐIỂM</span>
-                  <h2>Câu chuyện của nơi này</h2>
-                  <p>Khám phá những câu chuyện và hình ảnh đặc trưng của địa phương.</p>
+              <section className="place-visitor-info" lang="vi">
+                <div className="place-visitor-info-heading">
+                  <span className="eyebrow"><span className="eyebrow-line" /> THÔNG TIN ĐIỂM ĐẾN</span>
+                  <h2>Thông tin tham quan</h2>
                 </div>
-                <div className="place-story-sections">
-                  {selectedPlace.detailSections.map((section, index) => (
-                    <section className="place-story-section" key={`${selectedPlace.id}-${index}`}>
-                      <span className="place-story-number">{String(index + 1).padStart(2, '0')}</span>
-                      <div><h3>{section.heading}</h3><p>{section.body}</p></div>
+                <div className="place-visitor-details">
+                  {visitorDetails ? (
+                    <>
+                      <section className="place-visitor-detail"><h3>Vị trí</h3><p>{visitorDetails.location}</p></section>
+                      <section className="place-visitor-detail"><h3>Giới thiệu</h3><p>{visitorDetails.introduction}</p></section>
+                      <section className="place-visitor-detail">
+                        <h3>Hoạt động tham quan</h3>
+                        <ul>{visitorDetails.activities.map((activity) => <li key={activity}>{activity}</li>)}</ul>
+                      </section>
+                      {visitorDetails.food && <section className="place-visitor-detail"><h3>Ẩm thực</h3><p>{visitorDetails.food}</p></section>}
+                      {visitorDetails.historicalValue && <section className="place-visitor-detail"><h3>Giá trị lịch sử</h3><p>{visitorDetails.historicalValue}</p></section>}
+                      <section className="place-visitor-detail"><h3>Thời điểm thích hợp</h3><p>{visitorDetails.bestTime}</p></section>
+                      <section className="place-visitor-detail"><h3>Điểm nổi bật</h3><p>{visitorDetails.highlight}</p></section>
+                    </>
+                  ) : selectedPlace.detailSections.map((section, index) => (
+                    <section className="place-visitor-detail" key={`${selectedPlace.id}-${index}`}>
+                      <h3>{section.heading}</h3><p>{section.body}</p>
                     </section>
                   ))}
                 </div>
