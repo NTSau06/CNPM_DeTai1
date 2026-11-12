@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { languages } from '../data/places'
 import { translate } from '../i18n'
 import { getOfflinePlacePack } from '../db'
-import { getNarrationAudioLanguage, getNarrationAudioUrl, getNarrationText, stopSpeaking } from '../speech'
+import { getNarrationAudioLanguage, getNarrationAudioUrl, getNarrationDurationSeconds, getNarrationText, stopSpeaking } from '../speech'
 import { useAppStore } from '../store'
 import type { Language, Place } from '../types'
 import { AudioPlayer } from './AudioPlayer'
@@ -32,10 +32,12 @@ export function NarrationCard({ place, language, distanceMeters, onStartWalk, on
   const isInRoute = routeIds.includes(place.id)
   const audioCopy = place.copy[audioLanguage] ?? place.copy.vi
   const localNarration = getNarrationText(place, audioLanguage)
-  const audioText = savedNarration && savedNarration.length > localNarration.length
-    ? savedNarration
-    : localNarration
-  const estimatedMinutes = Math.max(1, Math.ceil(audioText.length / 14 / 60))
+  const audioSrc = getNarrationAudioUrl(place, audioLanguage)
+  const durationSeconds = getNarrationDurationSeconds(place, audioLanguage)
+  const audioText = audioSrc ? localNarration : savedNarration ?? localNarration
+  const estimatedMinutes = Math.max(1, durationSeconds === undefined
+    ? Math.ceil(audioText.length / 14 / 60)
+    : Math.round(durationSeconds / 60))
 
   useEffect(() => {
     setAudioLanguage(getNarrationAudioLanguage(place, language))
@@ -93,7 +95,8 @@ export function NarrationCard({ place, language, distanceMeters, onStartWalk, on
           text={audioText}
           language={language}
           speechLanguage={audioLanguage}
-          audioSrc={getNarrationAudioUrl(place, audioLanguage)}
+          audioSrc={audioSrc}
+          estimatedDurationSeconds={durationSeconds}
           onPlayingChange={setPlaying}
         />
         <button className={`route-button${isInRoute ? ' in-route' : ''}`} onClick={changeRoute} disabled={isSavingRoute}>

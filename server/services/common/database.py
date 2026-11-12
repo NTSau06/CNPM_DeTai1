@@ -4,13 +4,12 @@ from __future__ import annotations
 import os
 import re
 import time
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from typing import Iterator
 
 import pyodbc
 
-# Mỗi lần mở kết nối mới, đóng hẳn khi xong để có thể xóa database kiểm thử.
-pyodbc.pooling = False
+# Runtime reuses ODBC connections. Tests disable pooling in their own process.
 
 DEFAULT_CONNECTION_STRING = (
     "DRIVER={ODBC Driver 18 for SQL Server};"
@@ -51,7 +50,8 @@ class Database:
             master = _DATABASE_PATTERN.sub(
                 lambda m: f"{m.group(1)}DATABASE=master", self.connection_string, count=1
             )
-            with pyodbc.connect(master, autocommit=True) as connection:
+            with closing(pyodbc.connect(master, autocommit=True, timeout=5)) as connection:
+                connection.timeout = 10
                 for attempt in range(10):
                     try:
                         connection.execute(
@@ -65,11 +65,20 @@ class Database:
                         if attempt == 9:
                             raise
                         time.sleep(0.5)
+                # SQL Express can create databases with AUTO_CLOSE enabled.
+                # Keep frequently used service databases open between requests.
+                connection.execute(
+                    f"IF EXISTS (SELECT 1 FROM sys.databases "
+                    f"WHERE name = ? AND is_auto_close_on = 1) "
+                    f"ALTER DATABASE [{name}] SET AUTO_CLOSE OFF",
+                    name,
+                )
         self._ensured = True
 
     @contextmanager
     def connect(self) -> Iterator[pyodbc.Connection]:
-        connection = pyodbc.connect(self.connection_string)
+        connection = pyodbc.connect(self.connection_string, timeout=5)
+        connection.timeout = 10
         try:
             yield connection
             connection.commit()
@@ -87,7 +96,7 @@ class Database:
         master = _DATABASE_PATTERN.sub(
             lambda m: f"{m.group(1)}DATABASE=master", self.connection_string, count=1
         )
-        with pyodbc.connect(master, autocommit=True) as connection:
+        with closing(pyodbc.connect(master, autocommit=True, timeout=5)) as connection:
             connection.execute(
                 f"IF DB_ID(N'{name}') IS NOT NULL BEGIN "
                 f"ALTER DATABASE [{name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; "

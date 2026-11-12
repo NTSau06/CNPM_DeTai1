@@ -4,7 +4,7 @@ Set-Location $PSScriptRoot
 
 $rootPattern = [regex]::Escape([IO.Path]::GetFullPath($PSScriptRoot))
 $endpoints = @(
-  [pscustomobject]@{ Name = "Frontend"; Port = 5173; Pattern = "$rootPattern\\clients\\frontend\\node_modules\\vite\\bin\\vite\.js.*--port\s+5173" },
+  [pscustomobject]@{ Name = "Frontend"; Port = 5173; Pattern = "$rootPattern\\clients\\frontend\\node_modules.*[\\/]vite[\\/]bin[\\/]vite\.js.*--port\s+5173" },
   [pscustomobject]@{ Name = "API Gateway"; Port = 8000; Pattern = "-m\s+uvicorn\s+api_gateway\.main:app.*--port\s+8000" },
   [pscustomobject]@{ Name = "Analytics Service"; Port = 8004; Pattern = "-m\s+uvicorn\s+services\.analytics_service\.main:app.*--port\s+8004" },
   [pscustomobject]@{ Name = "Narration Service"; Port = 8003; Pattern = "-m\s+uvicorn\s+services\.narration_service\.main:app.*--port\s+8003" },

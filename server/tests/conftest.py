@@ -9,8 +9,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from typing import Iterator
 
 import pytest
+import pyodbc
 
 from services.common.database import Database, _DATABASE_PATTERN
+
+# Test databases are dropped after each test; do not retain their connections.
+pyodbc.pooling = False
 
 
 @pytest.fixture

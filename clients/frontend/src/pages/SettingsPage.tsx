@@ -75,7 +75,7 @@ export function SettingsPage() {
       const textBytes = new TextEncoder().encode([
         copy.title,
         copy.subtitle,
-        copy.narration,
+          getNarrationText(place, packageLanguage),
         ...place.detailSections.flatMap((section) => [section.heading, section.body]),
       ].join('\n')).byteLength
       const size = image.size + textBytes

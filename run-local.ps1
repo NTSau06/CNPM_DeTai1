@@ -1,4 +1,5 @@
 # Chạy các backend và frontend web cục bộ, đồng thời tạo URL LAN cho mã QR.
+$ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 
 $pythonPath = Join-Path $PSScriptRoot "venvs\.venv\Scripts\python.exe"
@@ -6,6 +7,11 @@ $frontendModules = Join-Path $PSScriptRoot "clients\frontend\node_modules"
 
 if (-not (Test-Path $pythonPath)) {
   throw "Python environment not found: $pythonPath"
+}
+
+& $pythonPath -c "import fastapi, uvicorn, pyodbc"
+if ($LASTEXITCODE -ne 0) {
+  throw 'Backend Python environment is broken or incomplete. Recreate venvs\.venv with the installed Python and install server\requirements.txt. See README.md.'
 }
 
 if (-not (Test-Path $frontendModules)) {
@@ -63,6 +69,11 @@ $env:TOUR_SERVICE_URL = "http://127.0.0.1:8002"
 $env:NARRATION_SERVICE_URL = "http://127.0.0.1:8003"
 $env:ANALYTICS_SERVICE_URL = "http://127.0.0.1:8004"
 
+& $pythonPath (Join-Path $PSScriptRoot 'scripts\prepare_database.py')
+if ($LASTEXITCODE -ne 0) {
+  throw 'SQL Server preflight failed. No app services were started. Check SQL Server (SQLEXPRESS) and the error above.'
+}
+
 $defaultRoute = Get-NetRoute -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue |
   Sort-Object RouteMetric, InterfaceMetric |
   Select-Object -First 1
@@ -89,4 +100,4 @@ $python = "`"$pythonPath`" -m uvicorn"
   "$python services.narration_service.main:app --port 8003" `
   "$python services.analytics_service.main:app --port 8004" `
   "$python api_gateway.main:app --port 8000" `
-  "npm --prefix clients\frontend run dev"
+  "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-frontend.ps1"

@@ -13,6 +13,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,webp,png,woff2,mp3}'],
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
       manifest: {
         name: 'Quảng Trị — Khám phá Quảng Bình',
@@ -34,8 +35,8 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      '/api': { target: 'http://localhost:8000', changeOrigin: true },
-      '/static': { target: 'http://localhost:8000', changeOrigin: true },
+      '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/static': { target: 'http://127.0.0.1:8000', changeOrigin: true },
     },
   },
 })

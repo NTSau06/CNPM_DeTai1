@@ -7,17 +7,19 @@ import type { Language } from '../types'
 import type { CSSProperties } from 'react'
 
 const playbackRates = [0.75, 1, 1.25, 1.5]
-const estimatedCharactersPerSecond = 14
 
 interface AudioPlayerProps {
   text: string
   language: Language
   speechLanguage: Language
   audioSrc?: string
+  estimatedDurationSeconds?: number
   onPlayingChange: (playing: boolean) => void
 }
 
-export function AudioPlayer({ text, language, speechLanguage, audioSrc, onPlayingChange }: AudioPlayerProps) {
+export function AudioPlayer({ text, language, speechLanguage, audioSrc, estimatedDurationSeconds, onPlayingChange }: AudioPlayerProps) {
+  const estimatedCharactersPerSecond = estimatedDurationSeconds ? text.length / estimatedDurationSeconds : 14
+  const [mediaDuration, setMediaDuration] = useState<number | null>(null)
   const [playing, setPlaying] = useState(false)
   const [rate, setRate] = useState(1)
   const [characterIndex, setCharacterIndex] = useState(0)
@@ -232,12 +234,12 @@ export function AudioPlayer({ text, language, speechLanguage, audioSrc, onPlayin
   const progress = seekDraft ?? (useAudioFile && audio && audio.duration > 0
     ? audio.currentTime / audio.duration * 100
     : text.length ? characterIndex / text.length * 100 : 0)
-  const totalSeconds = useAudioFile && audio && Number.isFinite(audio.duration)
-    ? audio.duration
-    : text.length / estimatedCharactersPerSecond / rate
+  const totalSeconds = useAudioFile
+    ? mediaDuration ?? estimatedDurationSeconds ?? text.length / estimatedCharactersPerSecond
+    : text.length / estimatedCharactersPerSecond
   const currentSeconds = useAudioFile && audio
     ? audio.currentTime
-    : characterIndex / estimatedCharactersPerSecond / rate
+    : characterIndex / estimatedCharactersPerSecond
 
   return (
     <div className="audio-player" aria-label={translate(language, 'play')}>
@@ -246,6 +248,10 @@ export function AudioPlayer({ text, language, speechLanguage, audioSrc, onPlayin
           ref={audioRef}
           src={audioSrc}
           preload="metadata"
+          onLoadedMetadata={() => {
+            const duration = audioRef.current?.duration
+            if (duration && Number.isFinite(duration)) setMediaDuration(duration)
+          }}
           onPlay={() => {
             playingRef.current = true
             setPlaying(true)
@@ -274,7 +280,7 @@ export function AudioPlayer({ text, language, speechLanguage, audioSrc, onPlayin
         <button type="button" className="audio-stop-button" onClick={stop} disabled={!playing && characterIndex === 0} aria-label={translate(language, 'stop')}>
           <Square size={13} fill="currentColor" />
         </button>
-        <span className="audio-time">{formatTime(currentSeconds)} / ~{formatTime(totalSeconds)}</span>
+        <span className="audio-time">{formatTime(currentSeconds)} / {useAudioFile && mediaDuration ? '' : '~'}{formatTime(totalSeconds)}</span>
         <label className="audio-speed">
           <span>{translate(language, 'speechSpeed')}</span>
           <select aria-label={translate(language, 'speechSpeed')} value={rate} onChange={(event) => changeRate(Number(event.target.value))}>
@@ -297,7 +303,7 @@ export function AudioPlayer({ text, language, speechLanguage, audioSrc, onPlayin
         onKeyUp={() => { if (seekDraft !== null) seekTo(seekDraft) }}
         onBlur={() => { if (seekDraft !== null) seekTo(seekDraft) }}
       />
-      {!speechAvailable() && <p className="inline-warning">{translate(language, 'speechUnsupported')}</p>}
+      {!useAudioFile && !speechAvailable() && <p className="inline-warning">{translate(language, 'speechUnsupported')}</p>}
     </div>
   )
 }

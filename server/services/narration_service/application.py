@@ -1,9 +1,11 @@
 """Tạo nội dung thuyết minh đa ngôn ngữ từ dữ liệu của POI Service."""
 from __future__ import annotations
 
+import json
+from functools import lru_cache
+from pathlib import Path
 from typing import Protocol
 
-from services.common.errors import ServiceUnavailableError
 from services.common.schemas import Locale, Narration, Place
 
 SPEECH_LOCALES: dict[str, str] = {
@@ -15,6 +17,13 @@ SPEECH_LOCALES: dict[str, str] = {
     "ko-KR": "ko-KR",
     "es": "es-ES",
 }
+
+
+@lru_cache(maxsize=1)
+def bundled_scripts() -> dict:
+    return json.loads(
+        (Path(__file__).parent / "data" / "narrationScripts.json").read_text(encoding="utf-8")
+    )
 
 
 class PlaceReader(Protocol):
@@ -32,10 +41,14 @@ class NarrationReader:
         copy = place.localized_copy.get(locale)
         if copy is None:
             raise KeyError(f"Locale {locale} is not available for place {place_id}.")
+        entry = bundled_scripts().get(place.id, {}).get(locale)
+        text = copy.narration
+        if entry and text in (entry["originalNarration"], entry["text"]):
+            text = entry["text"]
         return Narration(
             placeId=place.id,
             locale=locale,
             title=copy.title,
-            text=copy.narration,
+            text=text,
             speechLocale=SPEECH_LOCALES[locale],
         )

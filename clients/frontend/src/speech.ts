@@ -1,24 +1,24 @@
 // Tạo, điều khiển và dừng lời đọc thuyết minh bằng Speech Synthesis.
 import { languages } from './data/places'
 import type { Language, Place } from './types'
+import bundledScripts from './data/narrationScripts.json'
+import bundledAudio from './data/narrationAudio.json'
 
 let activeAudio: HTMLAudioElement | null = null
 
-const narrationAudioLanguages: Record<string, readonly Language[]> = {
-  'bao-ninh-beach': ['vi'],
-  'cau-hien-luong': ['vi'],
-  'cua-tung-beach': ['vi'],
-  'da-nhay': ['vi'],
-  'dia-dao-vinh-moc': ['vi'],
-  'dong-hoi': ['vi'],
-  'hang-toi-song-chay': ['vi', 'en'],
-  'nhat-le-beach': ['vi'],
-  'nuoc-mooc': ['vi'],
-  'ozo-park': ['vi'],
-  'phong-nha-cave': ['vi', 'en'],
-  'thanh-co-quang-tri': ['vi'],
-  'thien-duong-cave': ['vi', 'en'],
-  'tien-son-cave': ['vi'],
+const narrationScripts: Record<string, Partial<Record<Language, { originalNarration: string; text: string }>>> = bundledScripts
+const narrationAudio: Record<string, Partial<Record<Language, { durationSeconds: number; audioSha256: string }>>> = bundledAudio
+
+function getBundledScript(place: { id: string; copy: Partial<Place['copy']> }, language: Language) {
+  const entry = narrationScripts[place.id]?.[language]
+  const text = place.copy[language]?.narration
+  // An admin-edited narration must keep its own content and audio selection.
+  return entry && (text === entry.originalNarration || text === entry.text) ? entry : undefined
+}
+
+export function getNarrationDurationSeconds(place: Place, language: Language): number | undefined {
+  if (place.copy[language]?.audioUrl != null || !getBundledScript(place, language)) return undefined
+  return narrationAudio[place.id]?.[language]?.durationSeconds
 }
 
 export const speechAvailable = () =>
@@ -28,25 +28,18 @@ export function getNarrationAudioUrl(place: { id: string; copy: Partial<Place['c
   const customUrl = place.copy[language]?.audioUrl
   if (customUrl != null) return customUrl || undefined
   const placeId = place.id
-  if (!narrationAudioLanguages[placeId]?.includes(language)) return undefined
-  return `${import.meta.env.BASE_URL}audio/${placeId}/${language}.mp3`
+  const metadata = narrationAudio[placeId]?.[language]
+  if (!metadata || !getBundledScript(place, language)) return undefined
+  return `${import.meta.env.BASE_URL}audio/${placeId}/${language}.mp3?v=${metadata.audioSha256.slice(0, 12)}`
 }
 
 export function getNarrationAudioLanguage(place: Place, preferredLanguage: Language): Language {
-  if (place.copy[preferredLanguage]?.audioUrl != null || getNarrationAudioUrl(place, preferredLanguage)) return preferredLanguage
-  return languages.find(({ code }) => getNarrationAudioUrl(place, code))?.code ?? preferredLanguage
+  return place.copy[preferredLanguage] ? preferredLanguage : 'vi'
 }
 
 export function getNarrationText(place: Place, language: Language) {
   const copy = place.copy[language] ?? place.copy.vi
-  if (language !== 'vi') return copy.narration
-
-  return [
-    copy.title,
-    copy.subtitle,
-    copy.narration,
-    ...place.detailSections.flatMap((section) => [section.heading, section.body]),
-  ].join('. ')
+  return getBundledScript(place, language)?.text ?? copy.narration
 }
 
 export interface SpeechPlaybackCallbacks {

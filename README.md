@@ -12,6 +12,7 @@ Trước khi chạy dự án, máy tính cần cài đặt sẵn:
 4. **ODBC Driver 18 for SQL Server** (thư viện kết nối SQL Server cho Python `pyodbc`).
 
 > **Lưu ý:** Nếu SQL Server trên máy của bạn không dùng tên instance `localhost\SQLEXPRESS`, hãy đặt biến môi trường `SQLSERVER_CONNECTION_STRING` trong PowerShell trước khi chạy backend, ví dụ:
+>
 > ```powershell
 > $env:SQLSERVER_CONNECTION_STRING = "DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost;DATABASE=QuangTriDB;Trusted_Connection=yes;TrustServerCertificate=yes;"
 > ```
@@ -28,10 +29,28 @@ npm ci --prefix clients\frontend
 
 # Bước 2: Tạo môi trường ảo Python tại thư mục venvs\.venv
 py -3.12 -m venv venvs\.venv
+
 # (Nếu máy không nhận lệnh "py -3.12", hãy dùng: python -m venv venvs\.venv)
 
 # Bước 3: Cài đặt thư viện cho Backend vào môi trường ảo
 .\venvs\.venv\Scripts\python.exe -m pip install -r server\requirements.txt
+```
+
+Nếu gặp `No Python at ...Python312\python.exe`, môi trường ảo cũ đang trỏ đến Python đã bị gỡ hoặc chuyển thư mục. Dừng ứng dụng, mở PowerShell mới tại thư mục dự án rồi tạo lại môi trường (giữ bản sao cũ):
+
+```powershell
+python --version
+Rename-Item -LiteralPath .\venvs\.venv -NewName ('.venv-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+python -m venv venvs\.venv
+.\venvs\.venv\Scripts\python.exe -m pip install -r server\requirements.txt
+```
+
+Môi trường `.audio-venv` chỉ dùng tạo audio. Lệnh `npm run dev` luôn dùng `venvs\.venv`, không cần kích hoạt `.audio-venv` trước khi chạy ứng dụng.
+
+Sau khi ứng dụng đã chạy, có thể kiểm tra nhanh các backend, proxy API, dữ liệu và audio bằng:
+
+```powershell
+.\venvs\.venv\Scripts\python.exe scripts/check_local_app.py
 ```
 
 ---
@@ -48,9 +67,11 @@ py -3.12 -m venv venvs\.venv
 npm run dev
 ```
 
-* Lệnh này tự động khởi chạy đủ 5 service Backend (`8000`–`8004`) và Frontend (`http://localhost:5173`).
-* Để quét mã QR từ điện thoại khi chạy bản cục bộ, chỉ cần kết nối máy tính và điện thoại vào cùng mạng Wi-Fi; ứng dụng sẽ tự tạo mã QR trỏ tới địa chỉ IP LAN của máy tính.
-* Để dừng toàn bộ frontend và các backend cục bộ, chạy từ thư mục gốc:
+- Lệnh này tự động khởi chạy đủ 5 service Backend (`8000`–`8004`) và Frontend (`http://localhost:5173`).
+- Frontend chờ cả 5 backend sẵn sàng rồi mới mở cổng `5173`, tránh lỗi `ECONNREFUSED` khi SQL Server còn đang khởi tạo. Có thể chờ tối đa 120 giây; nếu quá thời gian, kiểm tra log backend và dịch vụ `SQL Server (SQLEXPRESS)`.
+- Lệnh chạy kiểm tra SQL trước khi mở các service. Database dự án được đặt `AUTO_CLOSE OFF` và backend tái sử dụng kết nối ODBC, tránh đóng/mở database giữa các lần gọi API. Xem [khuyến nghị AUTO_CLOSE của Microsoft](https://learn.microsoft.com/en-us/sql/relational-databases/policy-based-management/set-the-auto-close-database-option-to-off?view=sql-server-ver17).
+- Để quét mã QR từ điện thoại khi chạy bản cục bộ, chỉ cần kết nối máy tính và điện thoại vào cùng mạng Wi-Fi; ứng dụng sẽ tự tạo mã QR trỏ tới địa chỉ IP LAN của máy tính.
+- Để dừng toàn bộ frontend và các backend cục bộ, chạy từ thư mục gốc:
   ```powershell
   npm run stop:local
   ```
@@ -86,7 +107,7 @@ Cần Docker Desktop và Docker Compose:
 docker compose -f server/compose.yml up --build
 ```
 
-*(Nếu có file `.env` tùy chỉnh cấu hình, dùng `docker compose --env-file .env -f server/compose.yml up --build`).*
+_(Nếu có file `.env` tùy chỉnh cấu hình, dùng `docker compose --env-file .env -f server/compose.yml up --build`)._
 
 ---
 
@@ -103,8 +124,8 @@ Admin có thể đặt giá vé VND theo địa điểm; để trống giá rồ
 
 Có 2 cách cấp quyền tài khoản Admin:
 
-* **Cách A (Biến môi trường):** Trước khi khởi động backend, cấu hình `ADMIN_EMAIL` và `ADMIN_PASSWORD` qua biến môi trường hoặc file `.env` cục bộ không đưa vào Git. Gateway sẽ tự tạo/cập nhật tài khoản quản trị theo cấu hình này khi khởi động.
-* **Cách B (Cập nhật trực tiếp trong SQL Server):** Đăng ký tài khoản trên web trước, sau đó kiểm tra `id` trong bảng `users` (database `QuangTriDB`):
+- **Cách A (Biến môi trường):** Trước khi khởi động backend, cấu hình `ADMIN_EMAIL` và `ADMIN_PASSWORD` qua biến môi trường hoặc file `.env` cục bộ không đưa vào Git. Gateway sẽ tự tạo/cập nhật tài khoản quản trị theo cấu hình này khi khởi động.
+- **Cách B (Cập nhật trực tiếp trong SQL Server):** Đăng ký tài khoản trên web trước, sau đó kiểm tra `id` trong bảng `users` (database `QuangTriDB`):
   ```powershell
   sqlcmd -S .\SQLEXPRESS -E -d QuangTriDB -Q "SELECT id, email, is_admin FROM users"
   ```
@@ -125,6 +146,27 @@ Thêm ít nhất hai điểm vào hành trình để hiện nút **Tối ưu l�
 - Trên web, mở **Ngoại tuyến** để tải gói cho từng địa điểm/ngôn ngữ. Gói gồm lời thuyết minh, nội dung câu chuyện và ảnh chi tiết trong bộ nhớ IndexedDB; có thể gỡ từng gói. Audio player phát MP3 đã có cho địa điểm/ngôn ngữ tương ứng; nếu chưa có bản thu, ứng dụng dùng TTS của trình duyệt. Các MP3 trong ứng dụng web được cache để phát khi ngoại tuyến.
 - Trên mobile, có thể lưu lời thuyết minh của địa điểm/ngôn ngữ đang chọn vào thiết bị để phát bằng Expo Speech khi mất mạng.
 - Tại Thành cổ Quảng Trị, ứng dụng hiển thị gợi ý ứng xử theo buổi sáng/chiều/tối theo giờ Việt Nam. Đây không phải lịch nghi lễ hay thông báo sự kiện; hãy xác nhận giờ mở cửa và hoạt động với đơn vị quản lý.
+
+### Bộ audio thuyết minh 3–5 phút
+
+14 địa điểm có đủ 7 ngôn ngữ: Việt, Anh, Trung giản thể, Hàn, Pháp, Nhật và Tây Ban Nha (98 MP3). Thời lượng 3–5 phút tính ở tốc độ phát **1x**. Bản lời dài được dùng chung cho giọng đọc dự phòng trên web và API thuyết minh cho mobile; các nội dung admin đã sửa được giữ nguyên. Mobile vẫn đọc bằng Expo Speech nên thời lượng phụ thuộc giọng cài trên thiết bị.
+
+- MP3: `clients/frontend/public/audio/<place-id>/<locale>.mp3`.
+- Lời đọc: `clients/frontend/src/data/narrationScripts.json`, đồng bộ sang `server/services/narration_service/data/narrationScripts.json`.
+- Thời lượng đo, mã kiểm tra nội dung và MP3: `clients/frontend/src/data/narrationAudio.json`.
+- Bản dịch tự động sử dụng Google; giọng đọc tổng hợp dùng Google TTS hoặc Microsoft Edge TTS. Cần rà soát ngôn ngữ bản địa trước khi dùng làm thuyết minh chính thức.
+
+Tạo lại audio bằng môi trường Python riêng (chỉ cần khi sửa nội dung):
+
+```powershell
+python -m venv .audio-venv
+.\.audio-venv\Scripts\python.exe -m pip install -r scripts/narration-requirements.txt
+.\.audio-venv\Scripts\python.exe scripts/build_narrations.py
+.\.audio-venv\Scripts\python.exe scripts/build_narrations.py --verify
+node scripts/check_narration_frontend.cjs
+```
+
+Lệnh tạo gửi lời thuyết minh công khai đến Google để dịch và tạo giọng đọc. Có thể tiếp tục các bản còn thiếu bằng Microsoft với `--audio-only --provider edge --workers 2`. Công cụ tái sử dụng kết quả đã tạo, đo từng MP3, chỉ điều chỉnh nhịp đọc trong khoảng 0,85–1,15 và dừng báo lỗi nếu nội dung chưa đạt 3–5 phút. Không lặp audio hoặc chèn im lặng để tăng thời lượng. Dùng `--verify` để kiểm tra ngoại tuyến.
 
 ---
 

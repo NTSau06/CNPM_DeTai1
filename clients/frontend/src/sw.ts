@@ -11,7 +11,9 @@ declare let self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Array<PrecacheEntr
 self.skipWaiting()
 clientsClaim()
 cleanupOutdatedCaches()
-precacheAndRoute(self.__WB_MANIFEST)
+precacheAndRoute(self.__WB_MANIFEST, {
+  ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^v$/],
+})
 
 registerRoute(
   ({ url }) => url.origin === 'https://tile.openstreetmap.de',

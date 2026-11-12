@@ -1,0 +1,745 @@
+{
+  "phong-nha-cave": {
+    "vi": {
+      "durationSeconds": 240.048,
+      "textSha256": "0bc4a4a0598a96388942cc9654171568696ef8c03f05487688c2ec619d5eeffd",
+      "audioSha256": "a012c8e2808061a33342383a2d719749758dfea2de28d95a1aae02ca0de621f7",
+      "bytes": 1920620,
+      "tempo": 0.9909
+    },
+    "fr": {
+      "durationSeconds": 240.072,
+      "textSha256": "1a6daae733f1241cbabe39adb68f584be92e87417acfac0a8d3c37fed6d6a200",
+      "audioSha256": "0537f0d8c6a9d37a9318e11f456978e0b0d5bdc02a84536474f1618d000b9d0e",
+      "bytes": 1920812,
+      "tempo": 1.0841
+    },
+    "en": {
+      "durationSeconds": 240.048,
+      "textSha256": "70c5ecc1f3507cb3b382a631e35da2173a51c23bb8a6aba1f1e6ee2a15e1a950",
+      "audioSha256": "e0676356a80f603f5611675e7774255f879a86885a94b47292f965cd3cc7572b",
+      "bytes": 1920620,
+      "tempo": 0.9942
+    },
+    "ko-KR": {
+      "durationSeconds": 240.048,
+      "textSha256": "27f0e90e1b58ae8fe36948afa7cebb207db34fde9e39c1c981da9cc8d18aab7a",
+      "audioSha256": "f90c3c0946f8a830477057e3be47a41cc653d8bbc3fe98ab751a4d1867721c2d",
+      "bytes": 1920620,
+      "tempo": 1.0863
+    },
+    "zh-CN": {
+      "durationSeconds": 240.072,
+      "textSha256": "d6df4f575f82b6cd936c38d119322e7399fd17673e919fdf406233a9b6d303a1",
+      "audioSha256": "bbc0e66575b4bc0773d54c9f7d67931f6aabfb5fcb2ef521a44b7d81ecf22a5e",
+      "bytes": 1920812,
+      "tempo": 1.1434
+    },
+    "es": {
+      "durationSeconds": 253.56,
+      "textSha256": "f6f4ec26d372f5432ab001daa818665dd74a848e01dbbf9a33bdf3ea5b932e6d",
+      "audioSha256": "122cc9c7edb073ebc223d36587c07d67a1144b65c01fde60da8fda132708a5a5",
+      "bytes": 2028716,
+      "tempo": 1.15
+    },
+    "ja": {
+      "durationSeconds": 257.904,
+      "textSha256": "2848149bd40d72ec28f40e4388ac7a1f2234617583580dae6cb50f5c61f0b94e",
+      "audioSha256": "7a2448eb765f1fba4c7935aae86f912ce5b115e6100345463086370d880b905b",
+      "bytes": 2063468,
+      "tempo": 1.15
+    }
+  },
+  "thien-duong-cave": {
+    "vi": {
+      "durationSeconds": 240.048,
+      "textSha256": "364dcf4a4f14f626c029365728c56caa3355e0d07a071ce1b9fa67caf1d2da08",
+      "audioSha256": "4b2fb2d51e2db07399f1f69aa219fa107124924685914b1a8892205c1d5e4386",
+      "bytes": 1920620,
+      "tempo": 0.9477
+    },
+    "en": {
+      "durationSeconds": 240.048,
+      "textSha256": "b310fa42cdbcd191169fa9ada976e398ef494f04408b5c88d623d3b68bc56dd3",
+      "audioSha256": "54264b55f9b3b2ee773783c4ee31438b9451d86b132904611df3dce2acb95f3f",
+      "bytes": 1920620,
+      "tempo": 0.9543
+    },
+    "zh-CN": {
+      "durationSeconds": 240.072,
+      "textSha256": "45be351159f53110033d263b446353df605afbc53a32e71f0110db79cc06bf55",
+      "audioSha256": "682faf511053b3cbcd081dd2822ef99c9eb18b2a06f8aea1565b53970c2c384e",
+      "bytes": 1920812,
+      "tempo": 1.1292
+    },
+    "fr": {
+      "durationSeconds": 240.072,
+      "textSha256": "faee8fa65d255f6756051333fd7b5eda7c042eea8fd55a5353d529869f03d0b6",
+      "audioSha256": "51433b9571e8e360902d086dbc153b3d2dd2128f3698b1c22affed3ac0af3833",
+      "bytes": 1920812,
+      "tempo": 1.0377
+    },
+    "ja": {
+      "durationSeconds": 253.08,
+      "textSha256": "e1df09a3962a9bf53f0f1265314bc1eefb946e3428d893993ec9e226f3164139",
+      "audioSha256": "81ae36badbf6f705ce9f8e17387bf34e086eebeb80c95b325748f233a3b10a5e",
+      "bytes": 2024876,
+      "tempo": 1.15
+    },
+    "ko-KR": {
+      "durationSeconds": 240.048,
+      "textSha256": "70588e11ce638196d0415e8f35bd3413d1ed9fd6158d464618f3dccf3fb1d518",
+      "audioSha256": "5379c142f6bbd44042d2398a419604f56bb607dafcf8faba962f02931692c231",
+      "bytes": 1920620,
+      "tempo": 1.0715
+    },
+    "es": {
+      "durationSeconds": 244.224,
+      "textSha256": "82dbf35d61cf5e1907f5038e232efa30edb1fc78329c1d6dcf5628daaae2e061",
+      "audioSha256": "2a1cb5d0c76e3d5ee044bddb579b8ab51308e7f4b1ef97779bbc55fd2e072ebd",
+      "bytes": 1954028,
+      "tempo": 1.15
+    }
+  },
+  "dark-cave": {
+    "vi": {
+      "durationSeconds": 240.048,
+      "textSha256": "eed3aafb84c089e704e4a6c9835b335c24cf177af9c46243d014cdbc306349b7",
+      "audioSha256": "6f408d827cc11bba854650e31eb487475802635504a2def90957dfd388163ec5",
+      "bytes": 1920620,
+      "tempo": 0.9625
+    },
+    "en": {
+      "durationSeconds": 240.048,
+      "textSha256": "b06be27036e6471c6162b5dbacc3000724a0d1c487ff62d39019b9094a3de337",
+      "audioSha256": "d6dc70ce83053f1734b552e0615d5beb2649ba01e07628fda537f3fb18496500",
+      "bytes": 1920620,
+      "tempo": 0.9988
+    },
+    "ja": {
+      "durationSeconds": 261.696,
+      "textSha256": "aaf54e57c9eed4aa87feaba58bff9dea858f33ef41c92f5e9d384a39192c4a84",
+      "audioSha256": "b76df12ab0bccc588f4eb5aa108f1a16228956ef7d4b1e0449a92ac82c72ecb6",
+      "bytes": 2093804,
+      "tempo": 1.15
+    },
+    "fr": {
+      "durationSeconds": 240.072,
+      "textSha256": "d747173e9215aa7e4645041b1afd7e68c2cd3f91c81bb8f1943f88f4cc75722f",
+      "audioSha256": "65fb1cb87ff3070908be500794eb40c71e480af8c76a67eb1a41a32cb5080e60",
+      "bytes": 1920812,
+      "tempo": 1.1146
+    },
+    "ko-KR": {
+      "durationSeconds": 240.072,
+      "textSha256": "1c4c78960a4aa2dc4717f43b84ac82d8788fad8d6a121b341a0d48ad2e788e0b",
+      "audioSha256": "927dbe6f32fdb5cdff881a956e9aa1d19884c5e05bba1cc2d7e47d54a49e4716",
+      "bytes": 1920812,
+      "tempo": 1.0895
+    },
+    "es": {
+      "durationSeconds": 260.04,
+      "textSha256": "5e7af23b4ef04e906a848011db7f12ae853f5c2379372ced12eb080884254050",
+      "audioSha256": "04aae8d68e42b7d688dd6b1dc92c218d5439d536f0f5da36e90e6f319325ec7d",
+      "bytes": 2080556,
+      "tempo": 1.15
+    },
+    "zh-CN": {
+      "durationSeconds": 240.072,
+      "textSha256": "c3b3031e15aafee587c00c28339d46c29d2587033f8e5d01a7e7e5f9fd13ecff",
+      "audioSha256": "9cfe0cc816a3332d31e0d8df650d3a74c47d317f2b830b2526c4b0bea012ed0b",
+      "bytes": 1920812,
+      "tempo": 1.1446
+    }
+  },
+  "tien-son-cave": {
+    "vi": {
+      "durationSeconds": 240.048,
+      "textSha256": "52598d0ff8879251fb865173e0b27aa532bcfe3be0b1961db3f38fe9e089cac5",
+      "audioSha256": "aa2213f426d8069e0dd28c47fb703bbc1dec5c4f3d365a93bf5fa7c3db061db9",
+      "bytes": 1920620,
+      "tempo": 0.9091
+    },
+    "zh-CN": {
+      "durationSeconds": 240.072,
+      "textSha256": "422a15ec4fa44ad21576f3bf96c9dc991aea01befa13dd2b8ba6517fbaadec42",
+      "audioSha256": "ea17716b361fac0b37ad204e9b0efdff4731935a33248e3bdfe563050a5be354",
+      "bytes": 1920812,
+      "tempo": 1.1357
+    },
+    "ja": {
+      "durationSeconds": 247.128,
+      "textSha256": "8f6150f4ad27e46c5ac80c5b624a3ffe12ba0a62236579214e4fdde06a56910f",
+      "audioSha256": "c6195ac31d47b897d62e978d25bf783cf0f1bff1993a5ad0a7520162942dd817",
+      "bytes": 1977260,
+      "tempo": 1.15
+    },
+    "fr": {
+      "durationSeconds": 240.072,
+      "textSha256": "309b029e4fcb361cf3bc658a49715bcfdfc38dbc159327e8a7d3871fa128ab1f",
+      "audioSha256": "153caae25bdffbeb9c32ba88253bde97599f0879db337dd9aab045a496cd07f5",
+      "bytes": 1920812,
+      "tempo": 1.0127
+    },
+    "ko-KR": {
+      "durationSeconds": 240.072,
+      "textSha256": "6d5a10606762c9029be5d60b119d44e2b02a0123cef9393139fb216ee5877f7c",
+      "audioSha256": "1ce07acf4fd53f47eaeb35bddd9a38f95fc83ded35c3296ab33cdc5f2b0b5638",
+      "bytes": 1920812,
+      "tempo": 1.0237
+    },
+    "es": {
+      "durationSeconds": 241.008,
+      "textSha256": "7fd065c2df4d3e7ad67aebe0f4cb594033709727c315e397d2eea26a6b8c028b",
+      "audioSha256": "8e235046ce40b6fb3ada1ab52635f4a19bf49ebd5021af2c06b673f57ab3dc29",
+      "bytes": 1928300,
+      "tempo": 1.15
+    },
+    "en": {
+      "durationSeconds": 240.048,
+      "textSha256": "7b7e1f2ec797ef757ace610b26eef3dc531ee900517f25d7eb216c5cb6fa8352",
+      "audioSha256": "adfac9afd0a0cc76a6452420864b304c8a323fa8204c43b01e8bcd28e53a9f29",
+      "bytes": 1920620,
+      "tempo": 0.9355
+    }
+  },
+  "ozo-park": {
+    "vi": {
+      "durationSeconds": 240.048,
+      "textSha256": "b7726cd5786ce2044c8f8f9dc4006ca292a77dc5eed6af22d1fb09b770b52e99",
+      "audioSha256": "5c8d450666ca97163e234417398e8022992ecc5e9e18e076eedf2dc586a25466",
+      "bytes": 1920620,
+      "tempo": 0.9192
+    },
+    "en": {
+      "durationSeconds": 240.048,
+      "textSha256": "5164e656d1c1589f50453abb05b055256d254d784ad14ceecba1a625ae82a41d",
+      "audioSha256": "1cc2bb318ac02d99cd754ac535af99db50ecbb37b34017be7ea90118c003282b",
+      "bytes": 1920620,
+      "tempo": 0.9732
+    },
+    "zh-CN": {
+      "durationSeconds": 240.072,
+      "textSha256": "ba4f4648fd9582f659ff4b260bf83031ae0e002cb23b263f6a86550791e894bf",
+      "audioSha256": "1d3ded7de792a6dc01fdd6f426bf2fcde5b4c20a3ea5c23eb20d1c7912b336ba",
+      "bytes": 1920812,
+      "tempo": 1.0727
+    },
+    "ja": {
+      "durationSeconds": 265.08,
+      "textSha256": "0ae65cbe3d9d6bd88c8a0f898ceb9071ed64d43eaa02c164ed4d5d3fb7c455e8",
+      "audioSha256": "1a774c3baf684349a2ef388ec3f75593e290a40eb2bb07c0ecaa38b062c406a4",
+      "bytes": 2120876,
+      "tempo": 1.15
+    },
+    "fr": {
+      "durationSeconds": 240.048,
+      "textSha256": "9d3f6de1753c9f588d8dfa4bd7928876138d9d0ebda421e7322019ecfd8974aa",
+      "audioSha256": "4506b267ed2d6c2b8c26447c87fc828ff398875c33515f5f1dca6e5989b4666f",
+      "bytes": 1920620,
+      "tempo": 1.0518
+    },
+    "es": {
+      "durationSeconds": 246.144,
+      "textSha256": "ae6712e81e54685e1f40ceb844f32d67710705792c454bb9cad5fec1f01143dd",
+      "audioSha256": "be3fba1809ff34db893679bfc9b1ba56b2bdca1c802fe468324448b3d8087da3",
+      "bytes": 1969388,
+      "tempo": 1.15
+    },
+    "ko-KR": {
+      "durationSeconds": 240.072,
+      "textSha256": "4aa2c5fe5c2481951c95a1ea3ecb7ac259456331dbc3422ed93efa1d4c79e92c",
+      "audioSha256": "110c82ae38a1513b4c457a04cd558cbc776e30e14e3299f2428dd046b623ef3b",
+      "bytes": 1920812,
+      "tempo": 1.0545
+    }
+  },
+  "nhat-le-beach": {
+    "vi": {
+      "durationSeconds": 240.048,
+      "textSha256": "7b600b96f1ed0c94f8e36eb1922061dce9ec0b61ebf634442b76f373df73df2a",
+      "audioSha256": "7685da1e2e1ec5887e175bba9971c6217192d8f7d995e4a39ff94f894c5f2bed",
+      "bytes": 1920620,
+      "tempo": 0.912
+    },
+    "zh-CN": {
+      "durationSeconds": 240.072,
+      "textSha256": "1eef65caa49505f7bc779840ac3e430ec6d9e270433e40d3c6c1ead74e156536",
+      "audioSha256": "c2cd2d81a2cfe7acf1457ca1ccf259c2327343d63454bf55e8b3b4e64d3f2c7d",
+      "bytes": 1920812,
+      "tempo": 1.0618
+    },
+    "fr": {
+      "durationSeconds": 240.048,
+      "textSha256": "30367fe6c447ee856752ff200ad5d23c2d180de9bc263cdf449487fd42888922",
+      "audioSha256": "34543392ca02cc31db873ee99e429203cc4e03ed3decefb4ea58f49b556b706d",
+      "bytes": 1920620,
+      "tempo": 1.005
+    },
+    "en": {
+      "durationSeconds": 240.048,
+      "textSha256": "1d44785ef96663017c1bc291158a72b4fdefa23b0299f0830f162212a8c1d101",
+      "audioSha256": "ea4f0b6b848295715ef98d17ea87f021bcede121adaf0bd1006012ad2751fbe9",
+      "bytes": 1920620,
+      "tempo": 0.9327
+    },
+    "ko-KR": {
+      "durationSeconds": 240.072,
+      "textSha256": "d75ee1459b07cb321c52b5327a499181f507f156cb5314e205660bfdc1829d0c",
+      "audioSha256": "2a4956e2a667e5f8b906aa02695b525b15585eae753b95bc53bbb55a512c3dd9",
+      "bytes": 1920812,
+      "tempo": 1.0799
+    },
+    "es": {
+      "durationSeconds": 240.072,
+      "textSha256": "e735cce81bcb1257c8d28d8ab73910f7d6520f6278c84edc32253488b4e1f470",
+      "audioSha256": "dabd1421c5ad30fda184d48d106de986243dcb916faba49f65b05aed6cc6bb0b",
+      "bytes": 1920812,
+      "tempo": 1.1494
+    },
+    "ja": {
+      "durationSeconds": 247.272,
+      "textSha256": "b3a8e02157362c34fb31ff9fb28e63df9193bd6c7ab3cc72c1680aa4d7e4c36e",
+      "audioSha256": "9515440f902094f3ac7b57a19fa98259a550b63cb515505f1e0871c122092eca",
+      "bytes": 1978412,
+      "tempo": 1.15
+    }
+  },
+  "dong-hoi-market": {
+    "vi": {
+      "durationSeconds": 240.048,
+      "textSha256": "65753079dd1570e9b3b078ab40972c582a724dcf0a7e1b76d667100237580739",
+      "audioSha256": "db0daf7d8c4544aae1b5291b5c15ba075ee22dcf52746732e8247bc747ad1a85",
+      "bytes": 1920620,
+      "tempo": 0.9294
+    },
+    "en": {
+      "durationSeconds": 240.048,
+      "textSha256": "9544fb2f52fcf15c121675b6d4f0868653de3dfc27ae7e38421b5a1155fd14d6",
+      "audioSha256": "25e24ff06b704dd60e444828cf0e1f95327e3afbefba9156dea416919efed327",
+      "bytes": 1920620,
+      "tempo": 0.93
+    },
+    "zh-CN": {
+      "durationSeconds": 240.072,
+      "textSha256": "a9d50c15da32388bd8b0200e05ef97eb9be868a484480bb430fa01394679dd23",
+      "audioSha256": "807f37e9aee69cc3e140093b26e6ffd2f9ef6dee93387dee6526e94a31b75847",
+      "bytes": 1920812,
+      "tempo": 1.0744
+    },
+    "fr": {
+      "durationSeconds": 240.072,
+      "textSha256": "7d6c6b79aa9ebfade457c6732618a2741d4e7c938bb5b8f04d6981617d29b587",
+      "audioSha256": "63405c0b45360563a51a9c78e231761bf7c1c3bd52ab7409b44ce2166d7bbc56",
+      "bytes": 1920812,
+      "tempo": 1.0219
+    },
+    "ja": {
+      "durationSeconds": 262.968,
+      "textSha256": "2b40bec8d52e5b5da81a7ad8bb44a66641e2f4dcab153658fbde3a7ad4d65bba",
+      "audioSha256": "6b9b01b5a0567bc00b1b4c60752064c38f6acb886fbae218d07e7aa6f522f60c",
+      "bytes": 2103980,
+      "tempo": 1.15
+    },
+    "ko-KR": {
+      "durationSeconds": 240.072,
+      "textSha256": "ac7dea47c9ef68a43d20513ee485d570507b9318a5483c6340cf792814d88c54",
+      "audioSha256": "3fdd0418e5d23e062c5790a1200f2ed0c3411c22729675e6cd3c25b57f9f38a0",
+      "bytes": 1920812,
+      "tempo": 1.0668
+    },
+    "es": {
+      "durationSeconds": 247.056,
+      "textSha256": "4f7eeca11d955e18e68d837ad29f91417234541c61243826502416480dcd0ac3",
+      "audioSha256": "2b14a2bd51b32519213dd4867a6d58f6f6d26e5a81f43ca0c3cf79b129c087a7",
+      "bytes": 1976684,
+      "tempo": 1.15
+    }
+  },
+  "bao-ninh-village": {
+    "vi": {
+      "durationSeconds": 240.048,
+      "textSha256": "d51dae1b51b049acf6de515f0b2a94527e8f8b6e9b4192e62f484b8f2d6e8b56",
+      "audioSha256": "9ec6027851918f22f05dbe1e0312968a077e061ff131ca136eca84e84630f83c",
+      "bytes": 1920620,
+      "tempo": 0.9003
+    },
+    "en": {
+      "durationSeconds": 240.048,
+      "textSha256": "2ba8dedf2e7a9666308b2b6037096ffc65a875fe20cc697a4b900ce9fb629f95",
+      "audioSha256": "5909b8ff3e640c9db6356ab54f8bebdf3b4670236522773dd507651eb99155df",
+      "bytes": 1920620,
+      "tempo": 0.8694
+    },
+    "ja": {
+      "durationSeconds": 240.072,
+      "textSha256": "8754a02166f06cfcf4d824688598728bad99a91e790e7d96eaa80d28eef18bff",
+      "audioSha256": "7811471ab08bf78614a147d3e1d622106a1774e2bba818c4510ca4c0ff32e080",
+      "bytes": 1920812,
+      "tempo": 1.1429
+    },
+    "ko-KR": {
+      "durationSeconds": 240.048,
+      "textSha256": "525035130543a5ea221a3bd8d0555df79089bfeed4b9160dc25439f318540026",
+      "audioSha256": "925c9ced8897495808e28c1faa3f710cd826a912ae55bfcf323f180114cd0b3c",
+      "bytes": 1920620,
+      "tempo": 0.9818
+    },
+    "zh-CN": {
+      "durationSeconds": 240.048,
+      "textSha256": "e0628ecec7f279e8c45a46715271851de6b719234e9a975ee804392f9f1e1295",
+      "audioSha256": "7ac3e4f62221dcc25af2036809089e134006181f67cdbdcd3121677047d0bb08",
+      "bytes": 1920620,
+      "tempo": 0.9984
+    },
+    "fr": {
+      "durationSeconds": 240.048,
+      "textSha256": "3e8a61fde5868c726f62451ad850f7cdd0719369178bb77d649dc6518d4954a3",
+      "audioSha256": "6623ef4eec310e27a0d515c07ac88e53850205e14bca1563115b81412136f037",
+      "bytes": 1920620,
+      "tempo": 0.9362
+    },
+    "es": {
+      "durationSeconds": 240.072,
+      "textSha256": "33c9058d087fc181ff413257401411b8ad1c2737c71f513523a8eb449ba02c1a",
+      "audioSha256": "496226167ab8527caaa4408637c6e1ef1c31694fdc00ee6de997d4cbbc97d4d6",
+      "bytes": 1920812,
+      "tempo": 1.0779
+    }
+  },
+  "vinh-moc-tunnels": {
+    "vi": {
+      "durationSeconds": 240.048,
+      "textSha256": "25424a5ac173b59fada3ec1ca34b896123b8abffa4aaf13cb6ed2e7dd6d20121",
+      "audioSha256": "b5621567bef6fa7acf547dd64a8030cf79f6e8392d4093502fa868542001b0f5",
+      "bytes": 1920620,
+      "tempo": 0.9367
+    },
+    "en": {
+      "durationSeconds": 240.048,
+      "textSha256": "b8f2186e7df2267f7e0beb8639543c7762938097f784d24af73908c114b88bd2",
+      "audioSha256": "4c6db107c5895c96c2d95179ff705d0fa2297fcfa0c62877bfbebb5ee9875430",
+      "bytes": 1920620,
+      "tempo": 0.9401
+    },
+    "zh-CN": {
+      "durationSeconds": 240.072,
+      "textSha256": "d0c63d12b30b9fef76d2a6cd7d43c45af36467bc5c72981d1d0bf6049ea68f7e",
+      "audioSha256": "ddcaac35b79eb3a73b77ba888b1965e9da43024fa98a2797972f8be53da32c23",
+      "bytes": 1920812,
+      "tempo": 1.0419
+    },
+    "fr": {
+      "durationSeconds": 240.072,
+      "textSha256": "ff9bd1a4d743da4ef661af84ddf3f3b6f08cee83f04e8e7178d2f1e427fb8254",
+      "audioSha256": "c2e3ce432cb9ec97db81b00553f053f7187024eec5a44b265f4e7eb4aa1233cb",
+      "bytes": 1920812,
+      "tempo": 1.0068
+    },
+    "ko-KR": {
+      "durationSeconds": 240.072,
+      "textSha256": "5a76b04d2a0cc2dfe99a1e2287c04babb5383a17b963a1374eb3345155626afe",
+      "audioSha256": "1895d55e85068bca38b11b6f3385b1641cbb4046f1f69bfccd1302de21927efb",
+      "bytes": 1920812,
+      "tempo": 1.017
+    },
+    "ja": {
+      "durationSeconds": 251.592,
+      "textSha256": "68be5cccdeba7ae4a994790c6cff80f703cffe16888c0529b98d93149c4f3f81",
+      "audioSha256": "fd56694bfa2439e27687df86e25adb8aff99247c2b0ca2d93cd318abae4f3959",
+      "bytes": 2012972,
+      "tempo": 1.15
+    },
+    "es": {
+      "durationSeconds": 242.856,
+      "textSha256": "798fadfd47a3d172f62ea1a189182e9ca572667e88a76a726e0a24fcf33fccb9",
+      "audioSha256": "928aac2241e44e0528386332ab64b3524e11cbf4416484f5747987493e233a8a",
+      "bytes": 1943084,
+      "tempo": 1.15
+    }
+  },
+  "hien-luong-bridge": {
+    "vi": {
+      "durationSeconds": 240.048,
+      "textSha256": "9e2434dfc73e9eb79efa00dc439ac507b57045b46b365ca838be1cfd226a6616",
+      "audioSha256": "f9eadb19b213074b24e7b02ada7d3bd0bc72ec8905919d3b137b63ce9d5a60e3",
+      "bytes": 1920620,
+      "tempo": 0.9628
+    },
+    "en": {
+      "durationSeconds": 240.048,
+      "textSha256": "3539cbc65812517d5e4014788b8ea2e680eed60ec9ce7e0b69cf4f09eda301fb",
+      "audioSha256": "6d77f1c61e6fcbacaad30a7627fbe2736117124c33c7716eade3df37d71bff16",
+      "bytes": 1920620,
+      "tempo": 0.9784
+    },
+    "zh-CN": {
+      "durationSeconds": 240.072,
+      "textSha256": "d042316239392c29842d37c251f45de51b21bfca44e3468e0c0f6a6b409abaa9",
+      "audioSha256": "fca9ef997f3ce7229de9c7591226bff32adf990b60d12c20530a98c733b2e98c",
+      "bytes": 1920812,
+      "tempo": 1.0575
+    },
+    "fr": {
+      "durationSeconds": 240.048,
+      "textSha256": "0140d1888def820a5f88a0c6d9c3582a445b976316ab0b16f2b906f9b437aad6",
+      "audioSha256": "262e55c23c7b71142ea306c74bd24e782018e1dc87065d9eeff3b8c1802e2acd",
+      "bytes": 1920620,
+      "tempo": 1.004
+    },
+    "ja": {
+      "durationSeconds": 251.544,
+      "textSha256": "a6ba2d72116424a004dd761809b53b294faaf6f9fd75902f6b666273254f6ce7",
+      "audioSha256": "53f7117e4da1c20b0592bf64a914f42bbcc7d400de4616b33861644b08c17f54",
+      "bytes": 2012588,
+      "tempo": 1.15
+    },
+    "ko-KR": {
+      "durationSeconds": 240.048,
+      "textSha256": "32a6ef8afc927f5d60f112a8017f950f8c41a7ba47dfde1fe0141ab346182592",
+      "audioSha256": "1e5d6be7a4ce91513ee9733ec4a309d942633e8271bbc5412c1b8e4221773e45",
+      "bytes": 1920620,
+      "tempo": 0.994
+    },
+    "es": {
+      "durationSeconds": 240.048,
+      "textSha256": "a69f7bdb5686afe085546306465f04e1d616d6518ddc34f4aaf53dddf2938040",
+      "audioSha256": "4c80f47705d74faed3baf3558f7688746505c0da15cc59541404229d030a0c8b",
+      "bytes": 1920620,
+      "tempo": 0.9862,
+      "provider": "edge"
+    }
+  },
+  "quang-tri-citadel": {
+    "en": {
+      "durationSeconds": 240.048,
+      "textSha256": "49d0c98f42826ce676e6bef76a08a33810bf5ea15c4f6b2f39252cd82114adb0",
+      "audioSha256": "0028aeac055156ab521363eb2468389fb456b4277fd6a89be39f6ed7773a01c2",
+      "bytes": 1920620,
+      "tempo": 0.9889,
+      "provider": "edge"
+    },
+    "ja": {
+      "durationSeconds": 243.528,
+      "textSha256": "94a482cdc42ac8f3b3b5d56b3365d6859f37d86cb19c25f5578ef0bffd7ed259",
+      "audioSha256": "5cc05a8df42d45817f9c8f0f70d613d3292c1a256499a3a2543542cda395b987",
+      "bytes": 1948460,
+      "tempo": 1.15,
+      "provider": "edge"
+    },
+    "zh-CN": {
+      "durationSeconds": 240.024,
+      "textSha256": "11dfa76bb8e38d76207d6b554fa00766b092d1ea0ee6f9b9e9cf91d4d921f8e5",
+      "audioSha256": "5ae2220a3083eb26b60e9bab2c174cce0dad0001b191eed4f54005bc40ab7a36",
+      "bytes": 1920428,
+      "tempo": 0.8849,
+      "provider": "edge"
+    },
+    "fr": {
+      "durationSeconds": 240.048,
+      "textSha256": "b810c8df16030afe6068301d477428f1cb0cade64173ce7715ab6032590188ab",
+      "audioSha256": "b50d371bd4bd1549e9d381b9f0fee5101051c7dc43531a47458fec9594c3ff5c",
+      "bytes": 1920620,
+      "tempo": 1.033,
+      "provider": "edge"
+    },
+    "ko-KR": {
+      "durationSeconds": 240.048,
+      "textSha256": "2f27a69ebec8a5d6e4bd135743ac3ae0f5a8cd36b688babb0b5a3d88cced1156",
+      "audioSha256": "a22aa6e82a774cc4ce104f8d06ed800be792d9695ef08fd62addb7eafc3cdd0b",
+      "bytes": 1920620,
+      "tempo": 1.0101,
+      "provider": "edge"
+    },
+    "es": {
+      "durationSeconds": 240.048,
+      "textSha256": "4a542e17b75fabe412431d4d8086bb41d609584a15e3711ba2b64a27253054c7",
+      "audioSha256": "79973d3e5d56d7b754a9afa6613f5ea23429f2c378c1872902c178e2be07cb87",
+      "bytes": 1920620,
+      "tempo": 1.0361,
+      "provider": "edge"
+    },
+    "vi": {
+      "durationSeconds": 240.048,
+      "textSha256": "e7ddf28fe904fa34bb9751fc8371cdbf9b6c218e428936646eaf99b40287a193",
+      "audioSha256": "65855f90829f7d42d6abc26687cde8e517a3c27c4ab93b597ad69765b0ec6b7d",
+      "bytes": 1920620,
+      "tempo": 0.9669,
+      "provider": "google"
+    }
+  },
+  "cua-tung-beach": {
+    "en": {
+      "durationSeconds": 240.024,
+      "textSha256": "744ecb3baa270d31c0986b0c051416b0d1612498ba1512f4afc166549ba249d7",
+      "audioSha256": "9fc7a9cc8dcc896e9fc0d09d7f52542c2834f0d7e0072fd40ac7abf28bd6795e",
+      "bytes": 1920428,
+      "tempo": 0.9104,
+      "provider": "edge"
+    },
+    "zh-CN": {
+      "durationSeconds": 240.024,
+      "textSha256": "ae4a231bfe44d0727217c0f981c828e8ecb1b2f696ee4de498ecb70255df9734",
+      "audioSha256": "2113e5a37ba6cf493e6fa3270db77f29cb62ddfc8cd86b3b13edf15ee1697db3",
+      "bytes": 1920428,
+      "tempo": 0.8648,
+      "provider": "edge"
+    },
+    "fr": {
+      "durationSeconds": 240.048,
+      "textSha256": "b29e7ebc17543d09878f6b8d3ee4947a6ce8d3cee89355b8c29f9ebf58502051",
+      "audioSha256": "9821e74447db78cdf63b18a70b9233f8ef3076b156ce5b7e2244d8986fa2b679",
+      "bytes": 1920620,
+      "tempo": 0.9488,
+      "provider": "edge"
+    },
+    "ja": {
+      "durationSeconds": 240.048,
+      "textSha256": "6c63b7f234bb473e981c4b22eb88365c2e4886175611604f7653f9a7547df3ae",
+      "audioSha256": "dacbe15374764c3742c1cf269941e40b394b7ebaa76b022221f4d05f4ff3b896",
+      "bytes": 1920620,
+      "tempo": 1.1394,
+      "provider": "edge"
+    },
+    "ko-KR": {
+      "durationSeconds": 240.048,
+      "textSha256": "38e97c3f1ebc7a0d380386b5057eb3a42da557511362c7aff30ac3ae71e343bb",
+      "audioSha256": "dd67566b106658c48f36e03478b7e427198bbef79e9cea0d32f9ba2b35bafd7b",
+      "bytes": 1920620,
+      "tempo": 1.0044,
+      "provider": "edge"
+    },
+    "es": {
+      "durationSeconds": 240.048,
+      "textSha256": "201053e0a50f820b2bac20d3801083d6371a119b21232b91e54fcc44155c6a3e",
+      "audioSha256": "5c5fc661b2dbc83b3320468a2d46b154ea18d360896dd3b747dddd5f596d0f28",
+      "bytes": 1920620,
+      "tempo": 0.9571,
+      "provider": "edge"
+    },
+    "vi": {
+      "durationSeconds": 240.048,
+      "textSha256": "c4edccff72ce3bc53534727dfd2ded20de5b993f3331ae9b24386930ee827b50",
+      "audioSha256": "8d181a905cd42f2137a9564b24db95cd3cd4a50f2e26a55c11dcdf54512efde9",
+      "bytes": 1920620,
+      "tempo": 0.8877,
+      "provider": "google"
+    }
+  },
+  "nuoc-mooc-spring": {
+    "en": {
+      "durationSeconds": 240.048,
+      "textSha256": "de73a709bd3abec848a7d8e84378048627b358ab89722a2139a6e6128c6a13c5",
+      "audioSha256": "1ebc21ef8b04edbe8e6267ba1699c41cdc2d653ca50f2b996fda82a5f995abf3",
+      "bytes": 1920620,
+      "tempo": 0.95,
+      "provider": "edge"
+    },
+    "fr": {
+      "durationSeconds": 240.048,
+      "textSha256": "908dd8074fc935ad514d89abfb082f62256881c70978c9740b29b243ac216b2d",
+      "audioSha256": "3e40d2166ea6ef39ec94dc6b6ea089f2fb5c0b34295ba5b40331fa66ff9ca7a5",
+      "bytes": 1920620,
+      "tempo": 1.0198,
+      "provider": "edge"
+    },
+    "ko-KR": {
+      "durationSeconds": 240.048,
+      "textSha256": "0b37f82f38eea1f776d40548fadae23a8b279716d292d055299b775d65133279",
+      "audioSha256": "2f0a6a945b8a0d40f96b337d28c14230234061f33ff0359631e1c1c74e100868",
+      "bytes": 1920620,
+      "tempo": 1.0407,
+      "provider": "edge"
+    },
+    "zh-CN": {
+      "durationSeconds": 240.024,
+      "textSha256": "2a8504eebfbb9ef79d2f154afd2df584a07f14bfc1dca87cd831e218f30d9475",
+      "audioSha256": "410b06cfbb4730a0d6a7317baeb938ff4ab2152a7fa7f339910c66e76380a172",
+      "bytes": 1920428,
+      "tempo": 0.8818,
+      "provider": "edge"
+    },
+    "ja": {
+      "durationSeconds": 247.224,
+      "textSha256": "ab383706cbf9956cde456e77a917c3899ce3c6e5bb214bcf6f70864cfb9bd246",
+      "audioSha256": "cc1d027c8c1cd3340d31211406e5c2ab0d89aed2644b3e6e823f6cedc39aa4d4",
+      "bytes": 1978028,
+      "tempo": 1.15,
+      "provider": "edge"
+    },
+    "es": {
+      "durationSeconds": 240.048,
+      "textSha256": "2ffa13dc4da2df1df384bf2b5e1b342239b5b3ddd2ad07aba449ddb89879ba8f",
+      "audioSha256": "b37e8ab0aed647fb2c15c9e38ccccaf90689edc79158f4a55948025926939fde",
+      "bytes": 1920620,
+      "tempo": 1.0123,
+      "provider": "edge"
+    },
+    "vi": {
+      "durationSeconds": 240.048,
+      "textSha256": "88c38c5f746b985b6bc9d5f16adc520d2cb3d79fe803734a59b61fbea79f5b65",
+      "audioSha256": "e796ceaea6591f1761a06063c63135b5deea22336b4ad76c32e23167245241c3",
+      "bytes": 1920620,
+      "tempo": 0.9188,
+      "provider": "google"
+    }
+  },
+  "da-nhay-beach": {
+    "en": {
+      "durationSeconds": 240.024,
+      "textSha256": "a19fc93b07bab270a50511f5712ad4fc4ce2f9f1516f5798a50f2197c918309c",
+      "audioSha256": "cef8833034309b1acc7210c349752c0f6de9a8b612099dd77ee5f1fde6ffc795",
+      "bytes": 1920428,
+      "tempo": 0.9238,
+      "provider": "edge"
+    },
+    "ja": {
+      "durationSeconds": 240.048,
+      "textSha256": "185e591cbe18f326031ba2b5e51c277343da8796e531f3378439b4c20d02eb9a",
+      "audioSha256": "8d8e30ac07c47146724d143cb88b6a5de1496e0e6fad1d95680528d1c9390b50",
+      "bytes": 1920620,
+      "tempo": 1.1434,
+      "provider": "edge"
+    },
+    "fr": {
+      "durationSeconds": 240.048,
+      "textSha256": "5785e349465967cff2d0fb3ff3dfdf91fc400eb39c80fdc314b44c96508ceed5",
+      "audioSha256": "c7d0d6c274e44857b86cedec5e9f804233ad03c088c7d3492757fee0773bab84",
+      "bytes": 1920620,
+      "tempo": 0.9751,
+      "provider": "edge"
+    },
+    "zh-CN": {
+      "durationSeconds": 240.024,
+      "textSha256": "5c92b1728d9aacd146af1924f9a1150427cc80590312d3a49366becaf18e3e99",
+      "audioSha256": "683acd7450aac765b7bca86cca125f387c9066928bb7f330207f907cf6246599",
+      "bytes": 1920428,
+      "tempo": 0.893,
+      "provider": "edge"
+    },
+    "es": {
+      "durationSeconds": 240.048,
+      "textSha256": "8a0b676eb0f4f158130327bdd3e766c724fc02932de2d46906c5d901b8854991",
+      "audioSha256": "39dd69eedf5f21baddac81bc4f9418906e8158e2d129d166d3c75b037168574b",
+      "bytes": 1920620,
+      "tempo": 0.9862,
+      "provider": "edge"
+    },
+    "ko-KR": {
+      "durationSeconds": 240.048,
+      "textSha256": "90e354feffa52fc61cc42b0df4dad68b2d3e5444df5956e708ab3564562cebf9",
+      "audioSha256": "09fbf99f412509a767a1a00944801932eb938828ae57e914851cfa4255e36312",
+      "bytes": 1920620,
+      "tempo": 1.0102,
+      "provider": "edge"
+    },
+    "vi": {
+      "durationSeconds": 240.048,
+      "textSha256": "de181b7981c2dd8f06aed9f55579d3bf3d42d7d717e38442fc031f14c41d343c",
+      "audioSha256": "7e996df10439e81b85a43a307aabb0b4c41d17064e2d62a02efff9e1c451f178",
+      "bytes": 1920620,
+      "tempo": 0.8936,
+      "provider": "google"
+    }
+  }
+}

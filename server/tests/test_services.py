@@ -23,6 +23,16 @@ from services.tour_service.repository import TourRepository
 SEED = Path(__file__).parents[1] / "services" / "poi_service" / "data" / "places.json"
 
 
+def test_database_stays_open_between_connections(database: Database) -> None:
+    with database.connect() as connection:
+        row = connection.execute(
+            "SELECT is_auto_close_on FROM sys.databases WHERE name = DB_NAME()"
+        ).fetchone()
+        assert row[0] == 0
+    with database.connect() as connection:
+        assert connection.execute("SELECT 1").fetchone()[0] == 1
+
+
 def test_auth_repository_migrates_existing_accounts_for_admin_role(
     database: Database,
 ) -> None:
