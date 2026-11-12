@@ -24,15 +24,17 @@ const narrationAudioLanguages: Record<string, readonly Language[]> = {
 export const speechAvailable = () =>
   typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window
 
-export function getNarrationAudioUrl(placeId: string, language: Language): string | undefined {
+export function getNarrationAudioUrl(place: { id: string; copy: Partial<Place['copy']> }, language: Language): string | undefined {
+  const customUrl = place.copy[language]?.audioUrl
+  if (customUrl != null) return customUrl || undefined
+  const placeId = place.id
   if (!narrationAudioLanguages[placeId]?.includes(language)) return undefined
   return `${import.meta.env.BASE_URL}audio/${placeId}/${language}.mp3`
 }
 
-export function getNarrationAudioLanguage(placeId: string, preferredLanguage: Language): Language {
-  const availableLanguages = narrationAudioLanguages[placeId]
-  if (!availableLanguages || availableLanguages.includes(preferredLanguage)) return preferredLanguage
-  return availableLanguages[0]
+export function getNarrationAudioLanguage(place: Place, preferredLanguage: Language): Language {
+  if (place.copy[preferredLanguage]?.audioUrl != null || getNarrationAudioUrl(place, preferredLanguage)) return preferredLanguage
+  return languages.find(({ code }) => getNarrationAudioUrl(place, code))?.code ?? preferredLanguage
 }
 
 export function getNarrationText(place: Place, language: Language) {

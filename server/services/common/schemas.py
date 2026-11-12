@@ -14,6 +14,17 @@ class LocalizedCopy(BaseModel):
     title: str
     subtitle: str
     narration: str
+    audio_url: str | None = Field(default=None, alias="audioUrl", max_length=2048)
+
+    @field_validator("audio_url")
+    @classmethod
+    def validate_audio_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if value and not (value.startswith(("https://", "http://")) or (value.startswith("/") and not value.startswith("//"))):
+            raise ValueError("Audio must use an HTTP(S) URL or a local absolute path")
+        return value
 
 
 class PlaceDetailSection(BaseModel):

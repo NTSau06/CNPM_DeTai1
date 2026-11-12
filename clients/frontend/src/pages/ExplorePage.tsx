@@ -128,7 +128,7 @@ export function ExplorePage() {
     if (!nearby || spokenPlaces.current.has(nearby.id)) return
     spokenPlaces.current.add(nearby.id)
     setSelectedPlace(nearby.id)
-    if (speechAvailable()) speakWithAudio(getNarrationText(nearby, language), language, getNarrationAudioUrl(nearby.id, language))
+    if (speechAvailable()) speakWithAudio(getNarrationText(nearby, language), language, getNarrationAudioUrl(nearby, language))
   }, [location, autoNarration, places, language, setSelectedPlace])
 
   useEffect(() => () => stopSpeaking(), [])
@@ -164,7 +164,7 @@ export function ExplorePage() {
     spokenPlaces.current.clear()
     spokenPlaces.current.add(selectedPlace.id)
     setAutoNarration(true)
-    if (speechAvailable()) speakWithAudio(getNarrationText(selectedPlace, language), language, getNarrationAudioUrl(selectedPlace.id, language))
+    if (speechAvailable()) speakWithAudio(getNarrationText(selectedPlace, language), language, getNarrationAudioUrl(selectedPlace, language))
     watchId.current = navigator.geolocation.watchPosition(
       (position) => {
         const coordinates: [number, number] = [position.coords.longitude, position.coords.latitude]

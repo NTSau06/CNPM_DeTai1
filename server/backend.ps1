@@ -3,7 +3,9 @@ param(
   [Parameter(Mandatory = $true, Position = 0)]
   [ValidateSet("start", "stop")]
   [string]$Action,
-  [int[]]$ProcessId
+  [int[]]$ProcessId,
+  [ValidateSet("127.0.0.1", "0.0.0.0")]
+  [string]$GatewayHost = "127.0.0.1"
 )
 
 $ErrorActionPreference = "Stop"
@@ -73,6 +75,9 @@ if ($Action -eq "start") {
       $pidPath = Join-Path $runtimeDirectory "$($service.Name).pid"
       $existing = Get-ManagedProcess -PidPath $pidPath -Module $service.Module
       if ($null -ne $existing) {
+        if ($service.Name -eq "gateway" -and $GatewayHost -eq "0.0.0.0" -and $existing.CommandLine -notmatch '--host\s+0\.0\.0\.0(?:\s|$)') {
+          throw "Gateway is running without LAN access. Stop the existing backend (npm run backend:stop), then run npm run mobile:dev again."
+        }
         Write-Host "$($service.Name) is already running (PID $($existing.ProcessId))."
         continue
       }
@@ -82,8 +87,9 @@ if ($Action -eq "start") {
 
       $logPath = Join-Path $logDirectory "$($service.Name).log"
       $errorPath = Join-Path $logDirectory "$($service.Name).error.log"
+      $bindAddress = if ($service.Name -eq "gateway") { $GatewayHost } else { "127.0.0.1" }
       $process = Start-Process -FilePath $pythonPath `
-        -ArgumentList @("-m", "uvicorn", "$($service.Module):app", "--host", "127.0.0.1", "--port", "$($service.Port)") `
+        -ArgumentList @("-m", "uvicorn", "$($service.Module):app", "--host", $bindAddress, "--port", "$($service.Port)") `
         -WorkingDirectory $root `
         -RedirectStandardOutput $logPath `
         -RedirectStandardError $errorPath `

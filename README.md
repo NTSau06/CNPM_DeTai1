@@ -142,7 +142,11 @@ Chạy backend và Expo cùng lúc bằng một lệnh từ thư mục gốc:
 npm run mobile:dev
 ```
 
-Khi Expo hiện menu, nhấn `a` để mở ứng dụng trên Android Emulator. Lệnh này mặc định cấu hình API là `http://10.0.2.2:8000/api/v1` cho Android Emulator; nhấn `Ctrl+C` để dừng Expo và các backend. Nếu biến `EXPO_PUBLIC_API_URL` đã được đặt, script sẽ giữ nguyên giá trị đó. Cấu hình EAS bằng biến repository `EAS_PROJECT_ID` và secret `EXPO_TOKEN` để bật native build trong GitHub Actions.
+Lệnh mặc định dùng IP LAN của máy tính và mở API Gateway cho điện thoại thật. Kết nối điện thoại và máy tính cùng Wi-Fi, rồi quét mã QR bằng Expo Go. Mở địa chỉ `http://<IP-LAN>:8000/docs` trên điện thoại để kiểm tra kết nối API. Nếu Windows Firewall chặn, cho phép Node.js và Python trên mạng riêng đang dùng.
+
+Nếu máy có nhiều card mạng, chạy `.\run-mobile.ps1 -LanAddress <IP-Wi-Fi>`. Để dùng Android Emulator, chạy `.\run-mobile.ps1 -Emulator` (API `http://10.0.2.2:8000/api/v1`) rồi nhấn `a`. Nếu backend đã chạy ở chế độ localhost, dừng bằng `npm run backend:stop` trước khi chạy mobile.
+
+Nhấn `Ctrl+C` để dừng Expo và các backend do lệnh khởi tạo. Nếu biến `EXPO_PUBLIC_API_URL` đã được đặt, script giữ nguyên giá trị đó; bỏ biến cũ bằng `Remove-Item Env:EXPO_PUBLIC_API_URL -ErrorAction SilentlyContinue` nếu muốn tự chọn IP LAN. Cấu hình EAS bằng biến repository `EAS_PROJECT_ID` và secret `EXPO_TOKEN` để bật native build trong GitHub Actions.
 
 ---
 

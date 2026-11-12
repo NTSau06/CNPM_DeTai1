@@ -5,7 +5,7 @@ import { GeoJSONSource, type Map as MapLibreMap, type MapLayerMouseEvent } from 
 import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { Protocol, PMTiles } from 'pmtiles'
 import { lineString, point } from '@turf/turf'
-import { ArrowRight, ArrowUpDown, LoaderCircle, LocateFixed, MapPinned, Maximize2, Minimize2, Minus, Plus, Route, Search, X } from 'lucide-react'
+import { ArrowRight, ArrowUpDown, Compass, LoaderCircle, LocateFixed, MapPinned, Maximize2, Minimize2, Minus, Plus, RotateCw, Route, Search, X } from 'lucide-react'
 import { getOfflineMap } from '../db'
 import { translate } from '../i18n'
 import { makeOfflineStyle, makeOnlineStyle } from '../mapStyle'
@@ -61,6 +61,8 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
   const [toPlaceId, setToPlaceId] = useState(selectedPlaceId)
   const [placeRoute, setPlaceRoute] = useState<[string, string] | null>(null)
   const [styleReadyTick, setStyleReadyTick] = useState(0)
+  const [bearing, setBearing] = useState(0)
+  const [pitch, setPitch] = useState(0)
   const mapPlaces = useMemo(() => {
     const query = mapSearch.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase()
     if (!query) return places
@@ -73,9 +75,19 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
   }, [places, language, mapSearch])
   const selectedMapPlace = places.find((place) => place.id === selectedPlaceId) ?? places[0]
   const currentProps = useRef({ places: mapPlaces, language, location })
-  const selectPlace = (id: string) => {
+  const previewVisibleRef = useRef(previewVisible)
+  previewVisibleRef.current = previewVisible
+  const showPlace = (id: string) => {
     onSelectPlace(id)
     setPreviewVisible(true)
+  }
+  // Nhấp vào một địa điểm trên bản đồ: lần 1 mở ô xem chi tiết, nhấp lại đúng điểm đó thì đóng.
+  const selectPlace = (id: string) => {
+    if (id === selectedId.current && previewVisibleRef.current) {
+      setPreviewVisible(false)
+      return
+    }
+    showPlace(id)
   }
 
   selectedId.current = selectedPlaceId
@@ -132,10 +144,15 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
         touchZoomRotate: true,
         doubleClickZoom: true,
         keyboard: true,
-        dragRotate: false,
-        pitchWithRotate: false,
+        // Xoay 360° và nghiêng lên/xuống: kéo chuột phải (hoặc Ctrl + kéo) — kéo ngang để xoay,
+        // kéo dọc để nghiêng; trên điện thoại xoay hai ngón, vuốt hai ngón lên/xuống để nghiêng.
+        dragRotate: true,
+        pitchWithRotate: true,
+        touchPitch: true,
+        maxPitch: 70,
       })
-      instance.touchZoomRotate.disableRotation()
+      instance.on('rotate', () => setBearing(instance.getBearing()))
+      instance.on('pitch', () => setPitch(instance.getPitch()))
       map.current = instance
       instance.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
       instance.once('style.load', () => {
@@ -175,6 +192,12 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
         instance.on('click', 'place-halos', (event: MapLayerMouseEvent) => {
           const id = event.features?.[0]?.properties?.id
           if (typeof id === 'string') onSelect.current(id)
+        })
+        // Nhấp vào vùng trống của bản đồ cũng đóng ô xem chi tiết.
+        instance.on('click', (event) => {
+          if (!instance.getLayer('place-halos')) return
+          const hits = instance.queryRenderedFeatures(event.point, { layers: ['place-halos'] })
+          if (hits.length === 0) setPreviewVisible(false)
         })
         instance.on('mouseenter', 'place-halos', () => { instance.getCanvas().style.cursor = 'pointer' })
         instance.on('mouseleave', 'place-halos', () => { instance.getCanvas().style.cursor = '' })
@@ -499,7 +522,7 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
                   key={place.id}
                   type="button"
                   onClick={() => {
-                    onSelect.current(place.id)
+                    showPlace(place.id)
                     setMapSearch('')
                   }}
                 >
@@ -511,7 +534,7 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
           )}
         </>
       )}
-      {(expanded || previewVisible) && (
+      {previewVisible && (
         <button
           type="button"
           className="map-place-preview"
@@ -580,6 +603,21 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
         </button>
         <button onClick={() => map.current?.zoomIn()} aria-label="Zoom in"><Plus size={18} /></button>
         <button onClick={() => map.current?.zoomOut()} aria-label="Zoom out"><Minus size={18} /></button>
+        <button
+          onClick={() => map.current?.rotateTo(map.current.getBearing() - 45, { duration: 300 })}
+          aria-label={language === 'vi' ? 'Xoay bản đồ' : 'Rotate map'}
+          title={language === 'vi' ? 'Xoay 45° (giữ chuột phải và kéo để xoay tự do)' : 'Rotate 45° (right-drag to rotate freely)'}
+        >
+          <RotateCw size={16} />
+        </button>
+        <button
+          className={`map-compass${Math.abs(bearing) > 0.5 || pitch > 0.5 ? ' is-rotated' : ''}`}
+          onClick={() => map.current?.easeTo({ bearing: 0, pitch: 0, duration: 400 })}
+          aria-label={language === 'vi' ? 'Quay về hướng Bắc' : 'Reset to north'}
+          title={language === 'vi' ? `Hướng Bắc (đang xoay ${Math.round(((bearing % 360) + 360) % 360)}°)` : 'Reset to north'}
+        >
+          <Compass size={17} style={{ transform: `rotate(${-bearing - 45}deg)` }} />
+        </button>
         <span className="map-control-divider" />
         <button onClick={centerOnLocation} aria-label={translate(language, 'locate')} title={translate(language, 'locate')}><LocateFixed size={17} /></button>
         <button onClick={openPlaceRoutePlanner} aria-label={translate(language, 'placeDirections')} title={translate(language, 'placeDirections')} aria-expanded={placeRoutePlannerOpen}><Route size={17} /></button>

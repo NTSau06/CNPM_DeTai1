@@ -54,10 +54,9 @@ const locales: Language[] = ['vi', 'en', 'ja', 'fr', 'zh-CN', 'ko-KR', 'es']
 const languages: { code: Language; label: string }[] = [
   { code: 'vi', label: 'VI' },
   { code: 'en', label: 'EN' },
-  { code: 'ja', label: '日本語' },
-  { code: 'fr', label: 'FR' },
   { code: 'zh-CN', label: '中文' },
-  { code: 'ko-KR', label: '한국어' },
+  { code: 'fr', label: 'FR' },
+  { code: 'ja', label: '日本語' },
   { code: 'es', label: 'ES' },
 ]
 const speechLocales: Record<Language, string> = {

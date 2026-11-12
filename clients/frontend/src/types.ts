@@ -6,6 +6,7 @@ export interface LocalizedCopy {
   title: string
   subtitle: string
   narration: string
+  audioUrl?: string | null
 }
 
 export interface PlaceDetailSection {

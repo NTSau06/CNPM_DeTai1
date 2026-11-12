@@ -9,7 +9,6 @@ import {
   fetchCurrentUser,
   fetchPlaces,
   fetchTicketPrices,
-  getAdminOnlineVisitorCount,
   getAdminOverview,
   getAdminUsers,
   getStoredAdminAuthToken,
@@ -22,6 +21,7 @@ import {
 import type { AdminOverview, AdminUser, ApiPlace } from '../api'
 import { languages, categoryLabels } from '../data/places'
 import { useAppStore } from '../store'
+import { getNarrationAudioUrl } from '../speech'
 import type { Language, Place, PlaceDetailSection, UserProfile } from '../types'
 
 type AdminTab = 'overview' | 'tickets' | 'users' | 'places'
@@ -80,7 +80,6 @@ function toApiPlace(form: PlaceForm): ApiPlace {
 
 export function OnlineDashboardPage() {
   const navigate = useNavigate()
-  const online = useAppStore((state) => state.online)
   const setPlaces = useAppStore((state) => state.setPlaces)
   const [adminUser, setAdminUser] = useState<UserProfile | null>(null)
   const [authToken, setAuthToken] = useState<string | null>(() => getStoredAdminAuthToken())
@@ -131,26 +130,7 @@ export function OnlineDashboardPage() {
 
   useEffect(() => {
     void refresh()
-    const interval = window.setInterval(() => { void refresh() }, 30_000)
-    return () => window.clearInterval(interval)
   }, [refresh])
-
-  // Làm mới riêng số thiết bị online mỗi 5 giây để thấy thay đổi gần như tức thì.
-  useEffect(() => {
-    if (!authToken) return
-    let active = true
-    const interval = window.setInterval(() => {
-      getAdminOnlineVisitorCount(authToken)
-        .then(({ onlineVisitors }) => {
-          if (active) setOverview((current) => (current ? { ...current, onlineVisitors } : current))
-        })
-        .catch(() => undefined)
-    }, 5_000)
-    return () => {
-      active = false
-      window.clearInterval(interval)
-    }
-  }, [authToken])
 
   useEffect(() => {
     let active = true
@@ -349,13 +329,6 @@ export function OnlineDashboardPage() {
           <span className="admin-breadcrumb">Quảng Trị <span>·</span> Quản trị</span>
         </div>
         <div className="topbar-right admin-dashboard-topbar-right">
-          <span className={`connection-pill ${online ? 'is-online' : 'is-offline'}`}>
-            <span className="status-dot" />
-            {online ? 'Đang kết nối' : 'Ngoại tuyến'}
-          </span>
-          <span className="admin-online-count" title="Số thiết bị người dùng đang mở trang">
-            <Users size={14} aria-hidden="true" /><strong>{overview ? overview.onlineVisitors.toLocaleString('vi-VN') : '—'}</strong><span>đang online</span>
-          </span>
           <span className="admin-account-chip" title={adminUser.email}>
             <span className="admin-account-avatar">{adminUser.fullName.slice(0, 2).toUpperCase()}</span>
             <span>{adminUser.fullName}</span>
@@ -372,7 +345,7 @@ export function OnlineDashboardPage() {
             <p>Quản lý và phát triển nền tảng thuyết minh du lịch Quảng Trị</p>
           </div>
           <div className="admin-welcome-actions">
-            <span><Clock3 size={15} /> Báo cáo cập nhật tự động</span>
+            <span><Clock3 size={15} /> Cập nhật khi làm mới dữ liệu</span>
             <button className="admin-refresh" disabled={loading || busy} onClick={() => void refresh()} type="button">
               {loading ? 'Đang tải…' : 'Làm mới dữ liệu'}
             </button>
@@ -585,11 +558,18 @@ function LocalizedFields({
     setForm({ ...form, copy: { ...form.copy, [language]: { ...value, [field]: next } } })
   }
   const label = languages.find((item) => item.code === language)?.label ?? language
+  const bundledAudio = getNarrationAudioUrl({ id: form.id, copy: {} }, language)
+  const audioUrl = value.audioUrl ?? bundledAudio ?? ''
   return (
     <div className="admin-form-grid">
       <label>{label} · Tiêu đề<input required={required} maxLength={160} value={value.title} onChange={(event) => update('title', event.target.value)} /></label>
       <label>{label} · Phụ đề<input maxLength={240} value={value.subtitle} onChange={(event) => update('subtitle', event.target.value)} /></label>
       <label className="admin-form-wide">{label} · Thuyết minh<textarea required={required} rows={3} value={value.narration} onChange={(event) => update('narration', event.target.value)} /></label>
+      <label className="admin-form-wide">{label} · Audio thuyết minh
+        <input value={audioUrl} maxLength={2048} placeholder="https://example.com/audio.mp3 hoặc /audio/diem-den/vi.mp3" pattern="https?://.+|/[^/].*" onChange={(event) => update('audioUrl', event.target.value.trim())} />
+        <small>Nhập đường dẫn trực tiếp tới file âm thanh. Xóa đường dẫn để dùng giọng đọc tự động. Bấm Lưu địa điểm để áp dụng.</small>
+      </label>
+      {audioUrl && <div className="admin-form-wide"><audio key={audioUrl} controls preload="none" src={audioUrl} aria-label={`Nghe thử audio ${label}`} style={{ width: '100%' }} /></div>}
     </div>
   )
 }

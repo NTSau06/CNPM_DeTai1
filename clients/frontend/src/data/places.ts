@@ -5,10 +5,9 @@ import { placeDetails } from './placeDetails'
 export const languages: { code: Language; label: string; native: string; speech: string; flag: string }[] = [
   { code: 'vi', label: 'Tiếng Việt', native: 'VI', speech: 'vi-VN', flag: '🇻🇳' },
   { code: 'en', label: 'English', native: 'EN', speech: 'en-US', flag: '🇬🇧' },
-  { code: 'ja', label: '日本語', native: '日本', speech: 'ja-JP', flag: '🇯🇵' },
-  { code: 'fr', label: 'Français', native: 'FR', speech: 'fr-FR', flag: '🇫🇷' },
   { code: 'zh-CN', label: '中文（简体）', native: '中文', speech: 'zh-CN', flag: '🇨🇳' },
-  { code: 'ko-KR', label: '한국어', native: '한국', speech: 'ko-KR', flag: '🇰🇷' },
+  { code: 'fr', label: 'Français', native: 'FR', speech: 'fr-FR', flag: '🇫🇷' },
+  { code: 'ja', label: '日本語', native: '日本', speech: 'ja-JP', flag: '🇯🇵' },
   { code: 'es', label: 'Español', native: 'ES', speech: 'es-ES', flag: '🇪🇸' },
 ]
 
