@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LoaderCircle, Ticket } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
@@ -8,11 +8,16 @@ import {
 } from '../api'
 import type { TicketOrder, TicketPrice } from '../api'
 import { useAppStore } from '../store'
+import type { Language } from '../types'
+import { localeOf, ui } from '../uiText'
 
-const formatVnd = (value: number) => `${value.toLocaleString('vi-VN')} ₫`
+const formatVnd = (value: number, language: Language) => `${value.toLocaleString(localeOf(language))} ₫`
 
 export function TicketPurchasePanel({ placeId }: { placeId: string }) {
   const authToken = useAppStore((state) => state.authToken)
+  const language = useAppStore((state) => state.language)
+  const languageRef = useRef(language)
+  languageRef.current = language
   const [price, setPrice] = useState<TicketPrice | null>(null)
   const [orders, setOrders] = useState<TicketOrder[]>([])
   const [quantity, setQuantity] = useState(1)
@@ -34,7 +39,7 @@ export function TicketPurchasePanel({ placeId }: { placeId: string }) {
         setPrice(prices.find((item) => item.placeId === placeId) ?? { placeId, priceVnd: null })
         setOrders(myOrders)
       } catch (requestError) {
-        if (active) setError(requestError instanceof Error ? requestError.message : 'Không tải được thông tin vé.')
+        if (active) setError(requestError instanceof Error ? requestError.message : ui(languageRef.current, 'tkLoadError'))
       } finally {
         if (active) setLoading(false)
       }
@@ -60,30 +65,30 @@ export function TicketPurchasePanel({ placeId }: { placeId: string }) {
     try {
       const order = await createTicketOrder(placeId, quantity, authToken)
       setOrders((current) => [order, ...current])
-      setMessage(`Đặt thành công ${quantity} vé, tổng ${formatVnd(order.totalPriceVnd)}.`)
+      setMessage(ui(language, 'tkSuccess', { n: quantity, total: formatVnd(order.totalPriceVnd, language) }))
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Không thể đặt vé.')
+      setError(requestError instanceof Error ? requestError.message : ui(language, 'tkOrderError'))
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <section className="ticket-purchase-panel" aria-label="Đặt vé tham quan">
+    <section className="ticket-purchase-panel" aria-label={ui(language, 'tkPanel')}>
       <div className="ticket-purchase-heading">
         <span className="ticket-purchase-icon"><Ticket size={18} /></span>
         <div>
-          <h2>Vé tham quan</h2>
-          <p>{loading ? 'Đang tải thông tin vé…' : availablePrice !== null ? `Giá ${formatVnd(availablePrice)}/vé` : 'Địa điểm hiện chưa mở bán vé.'}</p>
+          <h2>{ui(language, 'tkTitle')}</h2>
+          <p>{loading ? ui(language, 'tkLoading') : availablePrice !== null ? ui(language, 'tkPrice', { price: formatVnd(availablePrice, language) }) : ui(language, 'tkNotOnSale')}</p>
         </div>
       </div>
-      {ownedTickets > 0 && <p className="ticket-owned-count">Bạn đã đặt {ownedTickets} vé tại địa điểm này.</p>}
+      {ownedTickets > 0 && <p className="ticket-owned-count">{ui(language, 'tkOwned', { n: ownedTickets })}</p>}
       {availablePrice !== null && (
         <div className="ticket-order-controls">
           {authToken ? (
             <>
               <label>
-                Số lượng
+                {ui(language, 'tkQuantity')}
                 <select
                   value={quantity}
                   onChange={(event) => setQuantity(Number(event.target.value))}
@@ -96,15 +101,15 @@ export function TicketPurchasePanel({ placeId }: { placeId: string }) {
               </label>
               <button type="button" onClick={() => void orderTickets()} disabled={busy || loading}>
                 {busy && <LoaderCircle className="loading-spinner" size={14} />}
-                {busy ? 'Đang đặt…' : `Đặt vé · ${formatVnd(availablePrice * quantity)}`}
+                {busy ? ui(language, 'tkBooking') : ui(language, 'tkBook', { total: formatVnd(availablePrice * quantity, language) })}
               </button>
             </>
           ) : (
-            <Link to="/login">Đăng nhập để đặt vé</Link>
+            <Link to="/login">{ui(language, 'tkSignIn')}</Link>
           )}
         </div>
       )}
-      <small className="ticket-purchase-note">Giá vé minh họa để thử nghiệm, chưa xác nhận là giá chính thức. Đơn đặt vé chưa thu tiền trực tuyến.</small>
+      <small className="ticket-purchase-note">{ui(language, 'tkNote')}</small>
       {error && <p className="ticket-purchase-feedback error" role="alert">{error}</p>}
       {message && <p className="ticket-purchase-feedback" role="status">{message}</p>}
     </section>

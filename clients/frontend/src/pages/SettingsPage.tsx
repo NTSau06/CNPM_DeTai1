@@ -5,6 +5,7 @@ import { PMTiles } from 'pmtiles'
 import { languages } from '../data/places'
 import { deleteOfflinePlacePack, getOfflinePlacePacks, saveOfflinePlacePack } from '../db'
 import { translate } from '../i18n'
+import { localeOf, ui } from '../uiText'
 import { getNarrationText } from '../speech'
 import { useAppStore } from '../store'
 import type { Language, OfflineMapPack, OfflinePlacePack } from '../types'
@@ -23,13 +24,9 @@ export function SettingsPage() {
   const [offlinePacks, setOfflinePacks] = useState<OfflinePlacePack[]>([])
   const [packagePlaceId, setPackagePlaceId] = useState(places[0]?.id ?? '')
   const [packageLanguage, setPackageLanguage] = useState<Language>(language)
-  const isVietnamese = language === 'vi'
-
   useEffect(() => {
-    void getOfflinePlacePacks().then(setOfflinePacks).catch(() => setMessage(isVietnamese
-      ? 'Không thể đọc các gói ngoại tuyến đã lưu.'
-      : 'Could not read saved offline packages.'))
-  }, [isVietnamese])
+    void getOfflinePlacePacks().then(setOfflinePacks).catch(() => setMessage(ui(language, 'stReadPacksError')))
+  }, [language])
 
   const importMap = async (file?: File) => {
     if (!file) return
@@ -61,11 +58,11 @@ export function SettingsPage() {
   const downloadPlacePackage = async () => {
     const place = places.find((item) => item.id === packagePlaceId)
     if (!place) {
-      setMessage(isVietnamese ? 'Không tìm thấy địa điểm cần tải.' : 'The selected place could not be found.')
+      setMessage(ui(language, 'stPlaceNotFound'))
       return
     }
     setBusy(true)
-    setMessage(isVietnamese ? 'Đang tải ảnh và chuẩn bị nội dung…' : 'Downloading the image and preparing content…')
+    setMessage(ui(language, 'stPreparing'))
     try {
       const response = await fetch(place.detailImage.src)
       if (!response.ok) throw new Error(`Image request failed (${response.status}).`)
@@ -81,7 +78,7 @@ export function SettingsPage() {
       const size = image.size + textBytes
       const estimate = await navigator.storage?.estimate()
       if (estimate?.quota && estimate.usage !== undefined && estimate.usage + size > estimate.quota * 0.95) {
-        throw new Error(isVietnamese ? 'Thiết bị không còn đủ dung lượng lưu gói.' : 'There is not enough device storage for this package.')
+        throw new Error(ui(language, 'stNoStorage'))
       }
       const pack: OfflinePlacePack = {
         id: `${place.id}:${packageLanguage}`,
@@ -98,11 +95,11 @@ export function SettingsPage() {
       }
       await saveOfflinePlacePack(pack)
       setOfflinePacks(await getOfflinePlacePacks())
-      setMessage(isVietnamese ? 'Gói địa điểm đã sẵn sàng khi ngoại tuyến.' : 'The place package is ready for offline use.')
+      setMessage(ui(language, 'stPackReady'))
     } catch (error) {
       setMessage(error instanceof Error
-        ? `${isVietnamese ? 'Không tải được gói ngoại tuyến' : 'Could not download the offline package'}: ${error.message}`
-        : isVietnamese ? 'Không tải được gói ngoại tuyến.' : 'Could not download the offline package.')
+        ? `${ui(language, 'stPackError')}: ${error.message}`
+        : `${ui(language, 'stPackError')}.`)
     } finally {
       setBusy(false)
     }
@@ -112,7 +109,7 @@ export function SettingsPage() {
     try {
       await deleteOfflinePlacePack(id)
       setOfflinePacks(await getOfflinePlacePacks())
-      setMessage(isVietnamese ? 'Đã gỡ gói ngoại tuyến.' : 'Offline package removed.')
+      setMessage(ui(language, 'stPackRemoved'))
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not remove the offline package.')
     }
@@ -122,20 +119,20 @@ export function SettingsPage() {
   return (
     <div className="subpage settings-page">
       <div className="subpage-heading">
-        <div className="eyebrow"><span className="eyebrow-line" /> {mapPage ? 'PACK LIGHT, WANDER FAR' : 'A FEW THINGS BEFORE YOU GO'}</div>
+        <div className="eyebrow"><span className="eyebrow-line" /> {ui(language, mapPage ? 'stEyebrowMap' : 'stEyebrowSettings')}</div>
         <h1>{translate(language, mapPage ? 'offlineTitle' : 'settingsTitle')}</h1>
         <p>{mapPage ? translate(language, 'offlineDescription') : translate(language, 'introduction')}</p>
       </div>
 
       <div className="settings-grid">
         <section className="setting-card offline-card">
-          <div className="setting-card-heading"><div className="setting-icon"><MapPinned size={20} /></div><span className="setting-tag"><WifiOff size={12} /> OFFLINE READY</span></div>
+          <div className="setting-card-heading"><div className="setting-icon"><MapPinned size={20} /></div><span className="setting-tag"><WifiOff size={12} /> {ui(language, 'stOfflineReady')}</span></div>
           <h2>{translate(language, 'offlineTitle')}</h2>
           <p>{translate(language, 'offlineDescription')}</p>
           {offlineMap ? (
             <div className="installed-map">
               <span className="installed-check"><Check size={16} /></span>
-              <span><strong>{offlineMap.filename}</strong><small>{formatBytes(offlineMap.size)} · {new Date(offlineMap.installedAt).toLocaleDateString()}</small></span>
+              <span><strong>{offlineMap.filename}</strong><small>{formatBytes(offlineMap.size)} · {new Date(offlineMap.installedAt).toLocaleDateString(localeOf(language))}</small></span>
               <button onClick={() => { void removeOfflineMap(); setMessage('') }} aria-label={translate(language, 'removeOfflineMap')}><Trash2 size={15} /></button>
             </div>
           ) : <div className="install-helper"><Info size={15} />{translate(language, 'installHelp')}</div>}
@@ -148,38 +145,34 @@ export function SettingsPage() {
         </section>
 
         <section className="setting-card setting-card-wide place-package-card">
-          <div className="setting-card-heading"><div className="setting-icon"><ArrowDownToLine size={20} /></div><span className="setting-tag">{isVietnamese ? 'LƯU TRÊN THIẾT BỊ' : 'SAVED ON THIS DEVICE'}</span></div>
-          <h2>{isVietnamese ? 'Gói địa điểm ngoại tuyến' : 'Offline place packages'}</h2>
-          <p>{isVietnamese
-            ? 'Tải nội dung thuyết minh, câu chuyện và ảnh của một điểm đến theo ngôn ngữ đã chọn. Khi mất mạng, dùng giọng đọc TTS có sẵn trên thiết bị.'
-            : 'Download a place narration, story, and image for a selected language. Offline speech uses a voice already available on your device.'}</p>
+          <div className="setting-card-heading"><div className="setting-icon"><ArrowDownToLine size={20} /></div><span className="setting-tag">{ui(language, 'stSavedOnDevice')}</span></div>
+          <h2>{ui(language, 'stPacksTitle')}</h2>
+          <p>{ui(language, 'stPacksText')}</p>
           <div className="place-package-form">
             <label>
-              <span>{isVietnamese ? 'Địa điểm' : 'Place'}</span>
+              <span>{ui(language, 'stPlace')}</span>
               <select value={packagePlaceId} onChange={(event) => setPackagePlaceId(event.target.value)}>
                 {places.map((place) => <option key={place.id} value={place.id}>{place.copy[language].title}</option>)}
               </select>
             </label>
             <label>
-              <span>{isVietnamese ? 'Ngôn ngữ' : 'Language'}</span>
+              <span>{ui(language, 'stLanguage')}</span>
               <select value={packageLanguage} onChange={(event) => setPackageLanguage(event.target.value as Language)}>
                 {languages.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
               </select>
             </label>
             <button className="setting-primary-button" type="button" onClick={() => void downloadPlacePackage()} disabled={busy || !packagePlaceId}>
-              <ArrowDownToLine size={16} /> {busy ? (isVietnamese ? 'Đang tải…' : 'Downloading…') : (isVietnamese ? 'Tải gói ngoại tuyến' : 'Download package')}
+              <ArrowDownToLine size={16} /> {ui(language, busy ? 'stDownloading' : 'stDownload')}
             </button>
           </div>
-          <p className="experience-note">{isVietnamese
-            ? 'Giọng đọc là TTS của trình duyệt/thiết bị, không phải tệp MP3. Hãy kiểm tra trước rằng giọng và ngôn ngữ mong muốn đã có sẵn để dùng khi ngoại tuyến.'
-            : 'Speech is generated by your browser/device, not stored as an MP3. Check that the required voice is installed for offline use.'}</p>
+          <p className="experience-note">{ui(language, 'stVoiceNote')}</p>
           {offlinePacks.length > 0 && (
             <div className="offline-package-list">
               {offlinePacks.map((pack) => (
                 <div className="installed-map" key={pack.id}>
                   <span className="installed-check"><Check size={16} /></span>
-                  <span><strong>{pack.title}</strong><small>{pack.language} · {formatBytes(pack.size)} · {new Date(pack.savedAt).toLocaleDateString()}</small></span>
-                  <button type="button" onClick={() => void removePlacePackage(pack.id)} aria-label={isVietnamese ? `Gỡ gói ${pack.title}` : `Remove ${pack.title} package`}><Trash2 size={15} /></button>
+                  <span><strong>{pack.title}</strong><small>{pack.language} · {formatBytes(pack.size)} · {new Date(pack.savedAt).toLocaleDateString(localeOf(language))}</small></span>
+                  <button type="button" onClick={() => void removePlacePackage(pack.id)} aria-label={ui(language, 'stRemovePack', { name: pack.title })}><Trash2 size={15} /></button>
                 </div>
               ))}
             </div>
@@ -188,7 +181,7 @@ export function SettingsPage() {
         </section>
 
         <section className="setting-card">
-          <div className="setting-card-heading"><div className="setting-icon"><Languages size={20} /></div><span className="setting-tag">{languages.length} LANGUAGES</span></div>
+          <div className="setting-card-heading"><div className="setting-icon"><Languages size={20} /></div><span className="setting-tag">{ui(language, 'stLanguagesTag', { n: languages.length })}</span></div>
           <h2>{translate(language, 'language')}</h2>
           <p>{translate(language, 'speechDescription')}</p>
           <div className="language-cards">
@@ -201,19 +194,19 @@ export function SettingsPage() {
         </section>
 
         <section className="setting-card setting-card-wide">
-          <div className="setting-card-heading"><div className="setting-icon"><HardDrive size={20} /></div><span className="setting-tag">SAVED ON DEVICE</span></div>
+          <div className="setting-card-heading"><div className="setting-icon"><HardDrive size={20} /></div><span className="setting-tag">{ui(language, 'stSavedOnDevice')}</span></div>
           <h2>{translate(language, 'cacheTitle')}</h2>
           <p>{translate(language, 'cacheDescription')}</p>
           <div className="offline-data-items">
-            <div><span className="data-item-icon"><MapPinned size={16} /></span><span><strong>Quang Tri &amp; Quang Binh</strong><small>Stories in {languages.length} languages</small></span><span className="data-ready">READY</span></div>
-            <div><span className="data-item-icon"><ArrowDownToLine size={16} /></span><span><strong>Saved walks</strong><small>Stored privately on this device</small></span><span className="data-ready">READY</span></div>
-            <div><span className="data-item-icon"><Radio size={16} /></span><span><strong>Voice narration</strong><small>{translate(language, 'speechDescription')}</small></span><span className="data-optional">DEVICE VOICE</span></div>
+            <div><span className="data-item-icon"><MapPinned size={16} /></span><span><strong>{ui(language, 'regionName')}</strong><small>{ui(language, 'stStoriesIn', { n: languages.length })}</small></span><span className="data-ready">{ui(language, 'stReady')}</span></div>
+            <div><span className="data-item-icon"><ArrowDownToLine size={16} /></span><span><strong>{translate(language, 'saved')}</strong><small>{ui(language, 'stStoredPrivately')}</small></span><span className="data-ready">{ui(language, 'stReady')}</span></div>
+            <div><span className="data-item-icon"><Radio size={16} /></span><span><strong>{ui(language, 'stVoiceNarration')}</strong><small>{translate(language, 'speechDescription')}</small></span><span className="data-optional">{ui(language, 'stDeviceVoice')}</span></div>
           </div>
         </section>
 
         <section className="setting-card device-note">
           <Globe2 size={20} />
-          <div><strong>Đi nhẹ, ở lâu.</strong><p>Xin phép trước khi chụp ảnh, hỏi giá trước khi mua và mang rác theo mình.</p></div>
+          <div><strong>{ui(language, 'stTipTitle')}</strong><p>{ui(language, 'stTipText')}</p></div>
         </section>
       </div>
     </div>

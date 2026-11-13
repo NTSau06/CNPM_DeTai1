@@ -1,6 +1,6 @@
 // Trang khám phá: tìm/lọc địa điểm, xem bản đồ, GPS, hành trình và thuyết minh.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, BookmarkPlus, Camera, ChevronDown, ChevronLeft, ChevronRight, Clock3, Compass, Globe2, Headphones, Heart, Home, Landmark, Leaf, LocateFixed, LoaderCircle, MapPin, Play, Search, Sparkles, Volume2 } from 'lucide-react'
+import { ArrowRight, BookmarkPlus, CalendarDays, Camera, ChefHat, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Clock3, Compass, Globe2, Headphones, Heart, Home, Landmark, Leaf, Lightbulb, LoaderCircle, LocateFixed, MapPin, Play, Search, Sparkles, Volume2 } from 'lucide-react'
 import { distance, point } from '@turf/turf'
 import { NavLink } from 'react-router-dom'
 import { getVisitorId, recordVisit } from '../api'
@@ -10,14 +10,16 @@ import { TicketPurchasePanel } from '../components/TicketPurchasePanel'
 import { RitualGuidancePanel } from '../components/RitualGuidancePanel'
 import { ItineraryPlanner } from '../components/ItineraryPlanner'
 import { getOfflinePlacePack } from '../db'
-import { placeVisitorDetails } from '../data/placeDetails'
+import { getVisitorDetails } from '../data/visitorDetails'
 import { categoryKeys, categoryLabels, languages, localizedTitle, places as bundledPlaces } from '../data/places'
 import { translate } from '../i18n'
+import { ui } from '../uiText'
 import { getNarrationAudioUrl, getNarrationText, speakWithAudio, speechAvailable, stopSpeaking } from '../speech'
 import { optimizeRouteOrder } from '../routeOptimization'
 import { useAppStore } from '../store'
 import type { Category } from '../types'
 import './explore-home.css'
+import './place-detail.css'
 
 const DISCOVER_PREVIEW_COUNT = 6
 
@@ -66,9 +68,7 @@ export function ExplorePage() {
   const watchId = useRef<number | null>(null)
   const placeDetailsRef = useRef<HTMLDetailsElement>(null)
   const selectedPlace = places.find((place) => place.id === selectedPlaceId) ?? places[0] ?? bundledPlaces[0]
-  const visitorDetails = placeVisitorDetails[selectedPlace.id]
-  const selectedLanguage = languages.find((item) => item.code === language)
-  const vi = language === 'vi'
+  const visitorDetails = getVisitorDetails(selectedPlace.id, language)
 
   useEffect(() => {
     let active = true
@@ -154,7 +154,7 @@ export function ExplorePage() {
   }, [])
 
   const startWalk = () => {
-    if (!window.confirm('Khi bật hướng dẫn GPS, ứng dụng sẽ gửi vị trí gần điểm dừng để ghi nhận tối đa một lượt ghé ẩn danh cho mỗi thiết bị/điểm/ngày. Tiếp tục?')) return
+    if (!window.confirm(ui(language, 'gpsConsent'))) return
     if (!navigator.geolocation) {
       setGpsMessage(translate(language, 'gpsUnsupported'))
       return
@@ -177,7 +177,7 @@ export function ExplorePage() {
           try {
             if (localStorage.getItem(`quang-tri:visit:${visitKey}`)) continue
           } catch {
-            setGpsMessage('Không thể đọc trạng thái lượt ghé trên thiết bị.')
+            setGpsMessage(ui(language, 'visitStateError'))
             continue
           }
           submittedVisits.current.add(visitKey)
@@ -191,7 +191,7 @@ export function ExplorePage() {
             })
             .catch(() => {
               submittedVisits.current.delete(visitKey)
-              setGpsMessage('Không ghi nhận được lượt ghé. Kiểm tra kết nối rồi thử lại gần địa điểm.')
+              setGpsMessage(ui(language, 'visitRecordError'))
             })
         }
       },
@@ -231,6 +231,21 @@ export function ExplorePage() {
   const closePlaceDetails = () => {
     if (placeDetailsRef.current) placeDetailsRef.current.open = false
   }
+
+  const scrollToPlaceAudio = () => {
+    document.getElementById('place-detail-audio')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const viewSelectedPlaceOnMap = () => {
+    closePlaceDetails()
+    selectFeaturedPlace(selectedPlace.id)
+  }
+
+  // Gợi ý: ưu tiên điểm cùng loại hình, sau đó tới các điểm khác.
+  const relatedPlaces = places
+    .filter((place) => place.id !== selectedPlace.id)
+    .sort((first, second) => Number(second.category === selectedPlace.category) - Number(first.category === selectedPlace.category))
+    .slice(0, 4)
 
   const routePlaces = routeIds.map((id) => places.find((place) => place.id === id)).filter((place) => place !== undefined)
   const routeDistance = routePlaces.length > 1 ? routePlaces.reduce((total, place, index) => {
@@ -279,23 +294,23 @@ export function ExplorePage() {
       <section className="explore-hero" id="explore-home">
         <div className="explore-hero-inner">
           <div className="hero-copy">
-            <span className="hero-kicker"><Compass size={15} />{language === 'vi' ? 'Mỗi điểm đến, một câu chuyện' : 'Every destination tells a story'}</span>
-            <span className="hero-script">{language === 'vi' ? 'Khám phá' : 'Discover'}</span>
+            <span className="hero-kicker"><Compass size={15} />{ui(language, 'heroKicker')}</span>
+            <span className="hero-script">{ui(language, 'heroScript')}</span>
             <h1>{language === 'vi' ? 'Quảng Trị' : translate(language, 'title')}</h1>
             <p>{language === 'vi' ? 'Qua thuyết minh tự động – bằng ngôn ngữ của bạn' : translate(language, 'introduction')}</p>
             <div className="hero-highlights">
-              <button type="button" onClick={() => scrollToSection('explore-info')}><Headphones size={17} />{vi ? <>Thuyết minh AI<br />đa ngôn ngữ</> : <>Multilingual AI<br />audio guide</>}</button>
-              <button type="button" onClick={() => scrollToSection('explore-map')}><MapPin size={17} />{vi ? <>Bản đồ tương tác<br />thông minh</> : <>Interactive<br />travel map</>}</button>
-              <button type="button" onClick={() => { setCategory('landmark'); setPlacesExpanded(true); scrollToSection('explore-featured') }}><Landmark size={17} />{vi ? <>Khám phá di tích<br />và danh thắng</> : <>Discover local<br />landmarks</>}</button>
+              <button type="button" onClick={() => scrollToSection('explore-info')}><Headphones size={17} />{ui(language, 'heroAudio1')}<br />{ui(language, 'heroAudio2')}</button>
+              <button type="button" onClick={() => scrollToSection('explore-map')}><MapPin size={17} />{ui(language, 'heroMap1')}<br />{ui(language, 'heroMap2')}</button>
+              <button type="button" onClick={() => { setCategory('landmark'); setPlacesExpanded(true); scrollToSection('explore-featured') }}><Landmark size={17} />{ui(language, 'heroLandmarks1')}<br />{ui(language, 'heroLandmarks2')}</button>
             </div>
             <div className="hero-actions">
             <button type="button" className="hero-cta" onClick={() => scrollToSection('explore-map')}>
-              <Play size={14} fill="currentColor" />{language === 'vi' ? 'Bắt đầu khám phá' : 'Start exploring'}<ArrowRight size={15} />
+              <Play size={14} fill="currentColor" />{ui(language, 'startExploring')}<ArrowRight size={15} />
             </button>
-            <a className="hero-secondary" href="#explore-featured">{language === 'vi' ? 'Xem điểm đến' : 'View destinations'}<ChevronRight size={16} /></a>
+            <a className="hero-secondary" href="#explore-featured">{ui(language, 'viewDestinations')}<ChevronRight size={16} /></a>
             </div>
           </div>
-          <p className="hero-quote">{language === 'vi' ? <>“Quảng Trị – vùng đất của lịch sử<br />và khát vọng hòa bình”</> : <>“Quang Tri – a land of history<br />and the hope for peace”</>}</p>
+          <p className="hero-quote">{ui(language, 'heroQuote1')}<br />{ui(language, 'heroQuote2')}</p>
         </div>
       </section>
 
@@ -307,20 +322,20 @@ export function ExplorePage() {
         }}>
           <span className="home-search-icon"><MapPin size={23} /></span>
           <label htmlFor="home-destination-search">
-            <span>{language === 'vi' ? 'Bạn muốn khám phá nơi nào?' : 'Where would you like to explore?'}</span>
+            <span>{ui(language, 'searchPrompt')}</span>
             <input id="home-destination-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={translate(language, 'search')} />
           </label>
-          <button type="submit"><Search size={18} /><span>{language === 'vi' ? 'Tìm điểm đến' : 'Find destinations'}</span></button>
+          <button type="submit"><Search size={18} /><span>{ui(language, 'findDestinations')}</span></button>
         </form>
         <section className="home-section discover-section" id="explore-featured" aria-labelledby="discover-title">
           <div className="home-section-heading">
             <div>
-              <span className="home-section-kicker"><span className="kicker-index">01</span>{vi ? 'KHÁM PHÁ QUẢNG TRỊ' : 'EXPLORE QUANG TRI'}</span>
-              <h2 id="discover-title">{vi ? 'Những điểm đến không thể bỏ lỡ' : 'Destinations you should not miss'}</h2>
+              <span className="home-section-kicker"><span className="kicker-index">01</span>{ui(language, 'navExplore').toLocaleUpperCase(language)}</span>
+              <h2 id="discover-title">{ui(language, 'discoverTitle')}</h2>
             </div>
-            <p>{vi ? 'Di tích lịch sử, hang động, biển xanh và ẩm thực địa phương – mỗi nơi đều có bài thuyết minh riêng.' : 'Historic sites, caves, beaches and local food – each stop comes with its own audio story.'}</p>
+            <p>{ui(language, 'discoverText')}</p>
           </div>
-          <div className="discover-tabs" role="group" aria-label={vi ? 'Lọc theo loại điểm đến' : 'Filter by type'}>
+          <div className="discover-tabs" role="group" aria-label={ui(language, 'filterByType')}>
             <button type="button" aria-pressed={category === 'all'} className={`discover-tab${category === 'all' ? ' selected' : ''}`} onClick={() => setCategory('all')}>
               {translate(language, 'all')}<span>{places.length}</span>
             </button>
@@ -334,17 +349,17 @@ export function ExplorePage() {
             <div className="discover-grid">
               {discoverPlaces.map((place, index) => (
                 <article key={place.id} className={`dest-card${selectedPlace.id === place.id ? ' active' : ''}`}>
-                  <button type="button" className={`dest-card-media illustration-${place.image}`} onClick={() => openPlace(place.id)} aria-label={`${vi ? 'Xem chi tiết' : 'View details'}: ${localizedTitle(place, language)}`}>
+                  <button type="button" className={`dest-card-media illustration-${place.image}`} onClick={() => openPlace(place.id)} aria-label={`${ui(language, 'viewDetails')}: ${localizedTitle(place, language)}`}>
                     <span className="dest-card-badge">{categoryLabels[language][place.category]}</span>
                     <span className="dest-card-index">{String(index + 1).padStart(2, '0')}</span>
                   </button>
                   <div className="dest-card-body">
                     <h3>{localizedTitle(place, language)}</h3>
                     <p>{place.copy[language].subtitle}</p>
-                    <span className="dest-card-meta"><Clock3 size={13} /> {place.duration} {translate(language, 'minute')}<i /><Headphones size={13} /> {vi ? 'Có thuyết minh' : 'Audio guide'}</span>
+                    <span className="dest-card-meta"><Clock3 size={13} /> {place.duration} {translate(language, 'minute')}<i /><Headphones size={13} /> {ui(language, 'hasAudioGuide')}</span>
                     <div className="dest-card-actions">
-                      <button type="button" className="dest-card-primary" onClick={() => openPlace(place.id)}><Play size={12} fill="currentColor" />{vi ? 'Nghe thuyết minh' : 'Listen'}</button>
-                      <button type="button" className="dest-card-secondary" onClick={() => selectFeaturedPlace(place.id)}><MapPin size={14} />{vi ? 'Xem trên bản đồ' : 'On the map'}</button>
+                      <button type="button" className="dest-card-primary" onClick={() => openPlace(place.id)}><Play size={12} fill="currentColor" />{ui(language, 'listen')}</button>
+                      <button type="button" className="dest-card-secondary" onClick={() => selectFeaturedPlace(place.id)}><MapPin size={14} />{ui(language, 'onTheMap')}</button>
                     </div>
                   </div>
                 </article>
@@ -356,8 +371,8 @@ export function ExplorePage() {
           {filteredPlaces.length > DISCOVER_PREVIEW_COUNT && (
             <button type="button" className="discover-more" aria-expanded={placesExpanded} onClick={() => setPlacesExpanded((expanded) => !expanded)}>
               {placesExpanded
-                ? vi ? 'Thu gọn' : 'Show less'
-                : vi ? `Xem tất cả ${filteredPlaces.length} điểm đến` : `View all ${filteredPlaces.length} destinations`}
+                ? ui(language, 'showLess')
+                : ui(language, 'viewAll', { n: filteredPlaces.length })}
               <ChevronDown className={`places-disclosure${placesExpanded ? ' expanded' : ''}`} size={16} />
             </button>
           )}
@@ -366,10 +381,10 @@ export function ExplorePage() {
         <section className="home-section map-section" id="explore-map" aria-labelledby="map-title">
           <div className="home-section-heading">
             <div>
-              <span className="home-section-kicker"><span className="kicker-index">02</span>{vi ? 'BẢN ĐỒ DU LỊCH' : 'TRAVEL MAP'}</span>
-              <h2 id="map-title">{vi ? 'Chạm vào bản đồ, mở ra câu chuyện' : 'Explore the map. Discover a story.'}</h2>
+              <span className="home-section-kicker"><span className="kicker-index">02</span>{ui(language, 'navMap').toLocaleUpperCase(language)}</span>
+              <h2 id="map-title">{ui(language, 'mapTitle')}</h2>
             </div>
-            <p>{vi ? 'Chọn một điểm trên bản đồ hoặc trong danh sách, bật GPS để nghe thuyết minh tự động khi bạn đến gần.' : 'Pick a stop on the map or in the list, and turn on GPS to hear narration automatically as you arrive.'}</p>
+            <p>{ui(language, 'mapText')}</p>
           </div>
           <div className="explore-grid">
             <div className="map-column">
@@ -401,7 +416,7 @@ export function ExplorePage() {
 
             <aside className="places-column map-places" aria-labelledby="map-places-title">
               <div className="places-head">
-                <div><div className="eyebrow small"><span className="eyebrow-line" /> QUẢNG TRỊ · QUẢNG BÌNH</div><h2 id="map-places-title"><span className="featured-heading-icon"><MapPin size={15} /></span>{vi ? 'Điểm trên bản đồ' : 'Stops on the map'}</h2></div>
+                <div><div className="eyebrow small"><span className="eyebrow-line" /> {ui(language, 'regionName').toLocaleUpperCase(language)}</div><h2 id="map-places-title"><span className="featured-heading-icon"><MapPin size={15} /></span>{ui(language, 'stopsOnMap')}</h2></div>
                 <span className="count-badge">{filteredPlaces.length}</span>
               </div>
               <div className="place-list map-place-list">
@@ -421,7 +436,7 @@ export function ExplorePage() {
                 {filteredPlaces.length === 0 && <div className="empty-search">{translate(language, 'noResults')}</div>}
               </div>
               <button type="button" className="featured-see-all" onClick={showPlaceDetails}>
-                {vi ? 'Mở thuyết minh điểm đang chọn' : 'Open selected stop'}<ArrowRight size={14} />
+                {ui(language, 'openSelectedStop')}<ArrowRight size={14} />
               </button>
               <NavLink to="/saved" className="all-stops-link">{translate(language, 'savedTitle')} <ArrowRight size={14} /></NavLink>
             </aside>
@@ -444,7 +459,7 @@ export function ExplorePage() {
                   {translate(language, optimizingRoute ? 'optimizingRoute' : 'optimizeRoute')}
                 </button>
               )}
-              <NavLink to="/saved" className="save-route-button">{language === 'vi' ? 'Đã tự lưu' : 'Saved'} <BookmarkPlus size={15} /></NavLink>
+              <NavLink to="/saved" className="save-route-button">{ui(language, 'autoSaved')} <BookmarkPlus size={15} /></NavLink>
               {visibleOptimizationResult && (
                 <p
                   className={`route-optimization-status${visibleOptimizationResult === 'error' ? ' is-error' : ''}`}
@@ -464,16 +479,12 @@ export function ExplorePage() {
         <section className="home-section about-section" id="explore-info" aria-labelledby="about-title">
           <div className="about-intro">
             <div className="about-copy">
-              <span className="home-section-kicker"><span className="kicker-index">03</span>{vi ? 'GIỚI THIỆU' : 'ABOUT'}</span>
-              <h2 id="about-title">{vi ? 'Quảng Trị – nơi lịch sử kể chuyện bằng chính giọng của bạn' : 'Quang Tri – where history speaks your language'}</h2>
-              <p>{vi
-                ? 'Từ Thành cổ, cầu Hiền Lương, địa đạo Vịnh Mốc đến biển Cửa Tùng và hệ thống hang động Phong Nha, mảnh đất miền Trung này lưu giữ những câu chuyện về chiến tranh, hòa bình và thiên nhiên hùng vĩ.'
-                : 'From the Citadel, Hien Luong Bridge and the Vinh Moc tunnels to Cua Tung beach and the Phong Nha caves, this central region holds stories of war, peace and remarkable nature.'}</p>
-              <p>{vi
-                ? 'Ứng dụng giúp bạn khám phá theo cách riêng: chọn điểm đến, nghe thuyết minh bằng ngôn ngữ của mình, lưu hành trình và dùng cả khi không có mạng.'
-                : 'This guide lets you explore your own way: pick a stop, listen in your language, save your route and keep using it offline.'}</p>
+              <span className="home-section-kicker"><span className="kicker-index">03</span>{ui(language, 'navAbout').toLocaleUpperCase(language)}</span>
+              <h2 id="about-title">{ui(language, 'aboutTitle')}</h2>
+              <p>{ui(language, 'aboutText1')}</p>
+              <p>{ui(language, 'aboutText2')}</p>
               <div className="about-actions">
-                <button type="button" className="hero-cta" onClick={() => scrollToSection('explore-map')}><Play size={14} fill="currentColor" />{vi ? 'Bắt đầu khám phá' : 'Start exploring'}<ArrowRight size={15} /></button>
+                <button type="button" className="hero-cta" onClick={() => scrollToSection('explore-map')}><Play size={14} fill="currentColor" />{ui(language, 'startExploring')}<ArrowRight size={15} /></button>
                 <NavLink to="/saved" className="about-link">{translate(language, 'savedTitle')}<ChevronRight size={16} /></NavLink>
               </div>
             </div>
@@ -485,114 +496,166 @@ export function ExplorePage() {
           </div>
 
           <dl className="about-stats">
-            <div><dt>{vi ? 'Điểm đến' : 'Destinations'}</dt><dd>{places.length}</dd></div>
-            <div><dt>{vi ? 'Ngôn ngữ thuyết minh' : 'Narration languages'}</dt><dd>{languages.length}</dd></div>
-            <div><dt>{vi ? 'Nhóm trải nghiệm' : 'Experience types'}</dt><dd>{categoryKeys.length}</dd></div>
-            <div><dt>{vi ? 'Dùng ngoại tuyến' : 'Works offline'}</dt><dd>24/7</dd></div>
+            <div><dt>{ui(language, 'statDestinations')}</dt><dd>{places.length}</dd></div>
+            <div><dt>{ui(language, 'statLanguages')}</dt><dd>{languages.length}</dd></div>
+            <div><dt>{ui(language, 'statTypes')}</dt><dd>{categoryKeys.length}</dd></div>
+            <div><dt>{ui(language, 'statOffline')}</dt><dd>24/7</dd></div>
           </dl>
 
           <div className="about-steps">
-            <h3>{vi ? 'Bắt đầu chỉ với 3 bước' : 'Get started in 3 steps'}</h3>
+            <h3>{ui(language, 'stepsTitle')}</h3>
             <ol>
-              <li><span className="about-step-icon"><MapPin size={20} /></span><strong>{vi ? 'Chọn điểm đến' : 'Pick a destination'}</strong><small>{vi ? 'Tìm kiếm hoặc chạm vào điểm trên bản đồ du lịch.' : 'Search or tap a stop on the travel map.'}</small></li>
-              <li><span className="about-step-icon"><Headphones size={20} /></span><strong>{vi ? 'Nghe thuyết minh' : 'Listen to the story'}</strong><small>{vi ? 'Chọn ngôn ngữ ở góc trên và nghe câu chuyện của nơi đó.' : 'Choose a language at the top and hear the story of the place.'}</small></li>
-              <li><span className="about-step-icon"><LocateFixed size={20} /></span><strong>{vi ? 'Bật GPS tản bộ' : 'Walk with GPS'}</strong><small>{vi ? 'Thuyết minh tự phát khi bạn đến gần mỗi điểm dừng.' : 'Narration plays automatically as you approach each stop.'}</small></li>
+              <li><span className="about-step-icon"><MapPin size={20} /></span><strong>{ui(language, 'step1Title')}</strong><small>{ui(language, 'step1Text')}</small></li>
+              <li><span className="about-step-icon"><Headphones size={20} /></span><strong>{ui(language, 'step2Title')}</strong><small>{ui(language, 'step2Text')}</small></li>
+              <li><span className="about-step-icon"><LocateFixed size={20} /></span><strong>{ui(language, 'step3Title')}</strong><small>{ui(language, 'step3Text')}</small></li>
             </ol>
           </div>
 
           <div className="home-benefits about-benefits">
-            <div><Leaf size={24} /><span><strong>{vi ? 'Trải nghiệm hiện đại' : 'A modern experience'}</strong><small>{vi ? 'với công nghệ AI' : 'powered by AI'}</small></span></div>
-            <div><Globe2 size={24} /><span><strong>{vi ? 'Hỗ trợ đa ngôn ngữ' : 'Multiple languages'}</strong><small>{languages.map((item) => item.native).join(' · ')}</small></span></div>
-            <div><Landmark size={24} /><span><strong>{vi ? 'Khám phá dễ dàng' : 'Explore with ease'}</strong><small>{vi ? 'mọi lúc, mọi nơi' : 'anytime, anywhere'}</small></span></div>
-            <div><Heart size={24} /><span><strong>{vi ? 'Góp phần quảng bá' : 'Celebrate local heritage'}</strong><small>{vi ? 'văn hóa – du lịch Quảng Trị' : 'culture and tourism in Quang Tri'}</small></span></div>
+            <div><Leaf size={24} /><span><strong>{ui(language, 'benefitModern')}</strong><small>{ui(language, 'benefitModernSub')}</small></span></div>
+            <div><Globe2 size={24} /><span><strong>{ui(language, 'benefitLanguages')}</strong><small>{languages.map((item) => item.native).join(' · ')}</small></span></div>
+            <div><Landmark size={24} /><span><strong>{ui(language, 'benefitEasy')}</strong><small>{ui(language, 'benefitEasySub')}</small></span></div>
+            <div><Heart size={24} /><span><strong>{ui(language, 'benefitHeritage')}</strong><small>{ui(language, 'benefitHeritageSub')}</small></span></div>
           </div>
         </section>
       </div>
 
-      <details className="place-detail-page" ref={placeDetailsRef}>
-        <summary
-          className="selected-place-panel place-detail-hero"
-          style={{ backgroundImage: `linear-gradient(90deg, #073e31f2 0%, #0c5844c9 34%, #123d3440 67%, #102d2730 100%), url("${offlineImageUrl ?? selectedPlace.detailImage.src}")` }}
-        >
-          <div className="place-detail-hero-copy">
-            <span className="place-detail-location-chip"><MapPin size={13} /> Quảng Trị</span>
-            <h2>{localizedTitle(selectedPlace, language)}</h2>
-            <p>{selectedPlace.copy[language].subtitle}</p>
-            <div className="place-detail-hero-tags">
-              <span><Sparkles size={13} />{categoryLabels[language][selectedPlace.category]}</span>
-              <span><Clock3 size={13} />{selectedPlace.duration} {translate(language, 'minute')}</span>
-              <span><MapPin size={13} />Quảng Trị · Quảng Bình</span>
-            </div>
-          </div>
-          <span className="place-detail-hero-count"><span className="place-detail-hero-close"><ChevronLeft size={15} /> Quay lại bản đồ</span></span>
+      <details className="place-detail-page pd-page" ref={placeDetailsRef}>
+        <summary className="pd-backbar">
+          <span className="pd-backbar-button"><ChevronLeft size={16} />{ui(language, 'backToExplore')}</span>
+          <span className="pd-backbar-hint">Esc</span>
         </summary>
-        <article className="place-detail-content">
-          <div className="place-detail-layout">
-            <div className="place-detail-main-column">
-              <nav className="place-detail-breadcrumbs" aria-label="Đường dẫn">
-                <button type="button" onClick={closePlaceDetails}><Home size={14} /> Trang chủ</button>
-                <ChevronRight size={13} />
-                <span>Du lịch Quảng Trị</span>
-                <ChevronRight size={13} />
-                <span aria-current="page">{localizedTitle(selectedPlace, language)}</span>
-              </nav>
-              <div className="place-detail-heading" lang={language}>
-                <span className="eyebrow"><span className="eyebrow-line" /> {categoryLabels[language][selectedPlace.category]}</span>
-                <h1>{localizedTitle(selectedPlace, language)}</h1>
-                <p>{selectedPlace.copy[language].narration}</p>
+        <article className="place-detail-content" lang={language}>
+          <header
+            className="pd-hero"
+            style={{ backgroundImage: `linear-gradient(90deg, #062f25f0 0%, #0b4a39c4 38%, #0d3a2f52 72%, #0d2e2633 100%), url("${offlineImageUrl ?? selectedPlace.detailImage.src}")` }}
+          >
+            <nav className="pd-breadcrumbs" aria-label={ui(language, 'breadcrumb')}>
+              <button type="button" onClick={closePlaceDetails}><Home size={13} />{ui(language, 'navHome')}</button>
+              <ChevronRight size={12} />
+              <button type="button" onClick={() => { closePlaceDetails(); scrollToSection('explore-featured') }}>{ui(language, 'navExplore')}</button>
+              <ChevronRight size={12} />
+              <span aria-current="page">{localizedTitle(selectedPlace, language)}</span>
+            </nav>
+            <div className="pd-hero-copy">
+              <span className="pd-hero-category"><Sparkles size={13} />{categoryLabels[language][selectedPlace.category]}</span>
+              <h1>{localizedTitle(selectedPlace, language)}</h1>
+              <p>{selectedPlace.copy[language].subtitle}</p>
+              <ul className="pd-hero-meta">
+                <li><Clock3 size={14} />{selectedPlace.duration} {translate(language, 'minute')}</li>
+                <li><Headphones size={14} />{ui(language, 'narrationLanguagesCount', { n: languages.length })}</li>
+                <li><MapPin size={14} />{ui(language, 'regionName')}</li>
+              </ul>
+              <div className="pd-hero-actions">
+                <button type="button" className="pd-btn pd-btn-primary" onClick={scrollToPlaceAudio}><Play size={13} fill="currentColor" />{ui(language, 'listenNow')}</button>
+                <button type="button" className="pd-btn pd-btn-ghost" onClick={viewSelectedPlaceOnMap}><MapPin size={15} />{ui(language, 'viewOnMap')}</button>
               </div>
-              {selectedPlace.detailImage.src && (
-                <figure className="place-detail-feature-image">
-                  <img src={offlineImageUrl ?? selectedPlace.detailImage.src} alt={selectedPlace.detailImage.alt} loading="lazy" />
-                  <figcaption><span><Camera size={13} /> {selectedPlace.detailImage.caption || selectedPlace.detailImage.alt}</span></figcaption>
-                </figure>
-              )}
-              <section className="place-visitor-info" lang="vi">
-                <div className="place-visitor-info-heading">
-                  <span className="eyebrow"><span className="eyebrow-line" /> THÔNG TIN ĐIỂM ĐẾN</span>
-                  <h2>Thông tin tham quan</h2>
-                </div>
-                <div className="place-visitor-details">
-                  {visitorDetails ? (
-                    <>
-                      <section className="place-visitor-detail"><h3>Vị trí</h3><p>{visitorDetails.location}</p></section>
-                      <section className="place-visitor-detail"><h3>Giới thiệu</h3><p>{visitorDetails.introduction}</p></section>
-                      <section className="place-visitor-detail">
-                        <h3>Hoạt động tham quan</h3>
-                        <ul>{visitorDetails.activities.map((activity) => <li key={activity}>{activity}</li>)}</ul>
-                      </section>
-                      {visitorDetails.food && <section className="place-visitor-detail"><h3>Ẩm thực</h3><p>{visitorDetails.food}</p></section>}
-                      {visitorDetails.historicalValue && <section className="place-visitor-detail"><h3>Giá trị lịch sử</h3><p>{visitorDetails.historicalValue}</p></section>}
-                      <section className="place-visitor-detail"><h3>Thời điểm thích hợp</h3><p>{visitorDetails.bestTime}</p></section>
-                      <section className="place-visitor-detail"><h3>Điểm nổi bật</h3><p>{visitorDetails.highlight}</p></section>
-                    </>
-                  ) : selectedPlace.detailSections.map((section, index) => (
-                    <section className="place-visitor-detail" key={`${selectedPlace.id}-${index}`}>
-                      <h3>{section.heading}</h3><p>{section.body}</p>
-                    </section>
-                  ))}
-                </div>
-              </section>
             </div>
-            <aside className="place-detail-sidebar">
-              <section className="place-detail-side-card">
-                <h2><span className="place-detail-side-icon"><Play size={12} fill="currentColor" /></span> Nghe bài viết</h2>
+            <span className="pd-hero-index" aria-hidden="true">
+              {String(places.findIndex((place) => place.id === selectedPlace.id) + 1).padStart(2, '0')}<small>/ {String(places.length).padStart(2, '0')}</small>
+            </span>
+          </header>
+
+          <div className="place-detail-layout pd-layout">
+            <div className="pd-main">
+              {visitorDetails && (
+                <dl className="pd-facts" lang={visitorDetails.language}>
+                  <div><dt><MapPin size={15} />{ui(language, 'factLocation')}</dt><dd>{visitorDetails.location}</dd></div>
+                  <div><dt><CalendarDays size={15} />{ui(language, 'factBestTime')}</dt><dd>{visitorDetails.bestTime}</dd></div>
+                  <div><dt><Clock3 size={15} />{ui(language, 'factDuration')}</dt><dd>{ui(language, 'minutes', { n: selectedPlace.duration })}</dd></div>
+                  <div><dt><Sparkles size={15} />{ui(language, 'factType')}</dt><dd>{categoryLabels[language][selectedPlace.category]}</dd></div>
+                </dl>
+              )}
+
+              <section className="pd-card pd-intro" lang={visitorDetails?.language ?? language}>
+                <span className="pd-kicker">{ui(language, 'overview')}</span>
+                <h2>{ui(language, 'aboutPlace', { name: localizedTitle(selectedPlace, language) })}</h2>
+                <p className="pd-lead">{visitorDetails?.introduction ?? selectedPlace.copy[language].narration}</p>
+                {selectedPlace.detailImage.src && (
+                  <figure className="pd-figure">
+                    <img src={offlineImageUrl ?? selectedPlace.detailImage.src} alt={language === 'vi' ? selectedPlace.detailImage.alt : localizedTitle(selectedPlace, language)} loading="lazy" />
+                    <figcaption><Camera size={13} />{language === 'vi' ? selectedPlace.detailImage.caption || selectedPlace.detailImage.alt : localizedTitle(selectedPlace, language)}</figcaption>
+                  </figure>
+                )}
+                {visitorDetails?.highlight && (
+                  <aside className="pd-highlight">
+                    <span className="pd-highlight-icon"><Lightbulb size={18} /></span>
+                    <div><strong>{ui(language, 'highlight')}</strong><p>{visitorDetails.highlight}</p></div>
+                  </aside>
+                )}
+              </section>
+
+              {visitorDetails ? (
+                <>
+                  <section className="pd-card" lang={visitorDetails.language}>
+                    <span className="pd-kicker">{ui(language, 'experience')}</span>
+                    <h2>{ui(language, 'activities')}</h2>
+                    <ul className="pd-checklist">
+                      {visitorDetails.activities.map((activity) => <li key={activity}><CircleCheck size={17} />{activity}</li>)}
+                    </ul>
+                  </section>
+                  {(visitorDetails.food || visitorDetails.historicalValue) && (
+                    <div className="pd-pair" lang={visitorDetails.language}>
+                      {visitorDetails.historicalValue && (
+                        <section className="pd-card pd-mini">
+                          <span className="pd-mini-icon"><Landmark size={18} /></span>
+                          <h3>{ui(language, 'historicalValue')}</h3>
+                          <p>{visitorDetails.historicalValue}</p>
+                        </section>
+                      )}
+                      {visitorDetails.food && (
+                        <section className="pd-card pd-mini">
+                          <span className="pd-mini-icon"><ChefHat size={18} /></span>
+                          <h3>{ui(language, 'foodToTry')}</h3>
+                          <p>{visitorDetails.food}</p>
+                        </section>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : selectedPlace.detailSections.length > 0 && (
+                <section className="pd-card">
+                  {selectedPlace.detailSections.map((section, index) => (
+                    <div className="pd-text-block" key={`${selectedPlace.id}-${index}`}>
+                      <h3>{section.heading}</h3><p>{section.body}</p>
+                    </div>
+                  ))}
+                </section>
+              )}
+            </div>
+
+            <aside className="place-detail-sidebar pd-side">
+              <section className="place-detail-side-card pd-audio" id="place-detail-audio">
+                <h2><span className="place-detail-side-icon"><Headphones size={12} /></span>{ui(language, 'audioGuide')}</h2>
                 <NarrationCard place={selectedPlace} language={language} distanceMeters={distanceMeters} onStartWalk={startWalk} onStopWalk={stopWalk} />
               </section>
-              <PlaceRatingPanel placeId={selectedPlace.id} />
-              <section className="place-detail-related">
-                <h2><MapPin size={16} /> Thông tin liên quan</h2>
-                <div>
-                  <span>Du lịch Quảng Trị</span>
-                  <span>{categoryLabels[language][selectedPlace.category]}</span>
-                  <span>Địa điểm nổi bật</span>
-                  <span>{selectedLanguage?.label ?? language}</span>
-                </div>
-              </section>
               <TicketPurchasePanel placeId={selectedPlace.id} />
+              <PlaceRatingPanel placeId={selectedPlace.id} />
               <RitualGuidancePanel place={selectedPlace} language={language} />
             </aside>
           </div>
+
+          {relatedPlaces.length > 0 && (
+            <section className="pd-related" aria-labelledby="pd-related-title">
+              <div className="pd-related-head">
+                <span className="pd-kicker">{ui(language, 'youMayLike')}</span>
+                <h2 id="pd-related-title">{ui(language, 'morePlaces')}</h2>
+              </div>
+              <div className="pd-related-grid">
+                {relatedPlaces.map((place) => (
+                  <button key={place.id} type="button" className="pd-related-card" onClick={() => openPlace(place.id)}>
+                    <span className={`pd-related-media illustration-${place.image}`} aria-hidden="true" />
+                    <span className="pd-related-body">
+                      <small>{categoryLabels[language][place.category]} · {place.duration} {translate(language, 'minute')}</small>
+                      <strong>{localizedTitle(place, language)}</strong>
+                      <span className="pd-related-link">{ui(language, 'viewDetails')} <ArrowRight size={13} /></span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section className="place-detail-itinerary">
             <ItineraryPlanner places={places} />
           </section>

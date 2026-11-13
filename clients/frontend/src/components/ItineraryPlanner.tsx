@@ -4,6 +4,7 @@ import { fetchTicketPrices } from '../api'
 import { categoryKeys, categoryLabels } from '../data/places'
 import { optimizeRouteOrder } from '../routeOptimization'
 import { useAppStore } from '../store'
+import { localeOf, ui } from '../uiText'
 import type { Category, Place } from '../types'
 import { distance, point } from '@turf/turf'
 
@@ -57,21 +58,21 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
     event.preventDefault()
     const budgetVnd = Number(budget)
     if (!Number.isInteger(days) || days < 1 || days > 7) {
-      setError('Số ngày cần nằm trong khoảng 1–7.')
+      setError(ui(language, 'itDaysRange'))
       return
     }
     if (!Number.isFinite(budgetVnd) || budgetVnd < 0) {
-      setError('Vui lòng nhập ngân sách hợp lệ bằng VND.')
+      setError(ui(language, 'itBudgetInvalid'))
       return
     }
     if (interests.length === 0) {
-      setError('Hãy chọn ít nhất một sở thích.')
+      setError(ui(language, 'itNoInterest'))
       return
     }
 
     const candidates = places.filter((place) => interests.includes(place.category))
     if (candidates.length === 0) {
-      setError('Không tìm thấy địa điểm phù hợp với sở thích đã chọn.')
+      setError(ui(language, 'itNoMatch'))
       return
     }
 
@@ -95,7 +96,7 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
       }
 
       if (selected.length === 0) {
-        setError('Ngân sách hiện tại không đủ cho địa điểm có giá vé đã công bố.')
+        setError(ui(language, 'itBudgetTooLow'))
         return
       }
 
@@ -123,7 +124,7 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
         unpricedCount,
       })
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Không thể tạo lịch trình. Vui lòng thử lại.')
+      setError(reason instanceof Error ? reason.message : ui(language, 'itFailed'))
     } finally {
       setLoading(false)
     }
@@ -134,21 +135,21 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
       <div className="itinerary-heading">
         <span className="itinerary-icon"><Sparkles size={17} /></span>
         <div>
-          <h2>Gợi ý lịch trình tự động</h2>
-          <p>Chọn số ngày, sở thích và ngân sách vé để tạo tuyến cùng gợi ý khu vực nghỉ.</p>
+          <h2>{ui(language, 'itTitle')}</h2>
+          <p>{ui(language, 'itIntro')}</p>
         </div>
       </div>
       <form className="itinerary-form" onSubmit={(event) => void createPlan(event)}>
         <label className="itinerary-number-field">
-          Số ngày
+          {ui(language, 'itDays')}
           <input type="number" min="1" max="7" step="1" value={days} onChange={(event) => setDays(Number(event.target.value))} />
         </label>
         <label className="itinerary-number-field">
-          Ngân sách vé (VND)
+          {ui(language, 'itBudget')}
           <input type="number" min="0" step="10000" value={budget} onChange={(event) => setBudget(event.target.value)} />
         </label>
         <fieldset className="itinerary-interests">
-          <legend>Sở thích</legend>
+          <legend>{ui(language, 'itInterests')}</legend>
           {categoryKeys.map((interest) => (
             <label key={interest}>
               <input type="checkbox" checked={interests.includes(interest)} onChange={() => toggleInterest(interest)} />
@@ -158,7 +159,7 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
         </fieldset>
         <button className="itinerary-submit" type="submit" disabled={loading}>
           {loading ? <LoaderCircle className="loading-spinner" size={15} /> : <MapPinned size={15} />}
-          {loading ? 'Đang tạo...' : 'Tạo lịch trình'}
+          {ui(language, loading ? 'itCreating' : 'itCreate')}
         </button>
       </form>
 
@@ -166,40 +167,40 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
       {plan && (
         <div className="itinerary-result" aria-live="polite">
           <p className="itinerary-budget">
-            Tổng vé đã biết: <strong>{plan.ticketTotal.toLocaleString('vi-VN')} VND</strong>
-            {plan.unpricedCount > 0 && ` · ${plan.unpricedCount} điểm chưa có giá vé`}
+            {ui(language, 'itTicketTotal')} <strong>{plan.ticketTotal.toLocaleString(localeOf(language))} VND</strong>
+            {plan.unpricedCount > 0 && ` · ${ui(language, 'itUnpriced', { n: plan.unpricedCount })}`}
           </p>
-          <p className="itinerary-note">Ngân sách chưa bao gồm ăn uống, di chuyển và lưu trú. Tuyến các điểm đã được hiển thị trên bản đồ.</p>
+          <p className="itinerary-note">{ui(language, 'itBudgetNote')}</p>
           <div className="itinerary-days">
             {plan.days.map((day, index) => (
               <section className="itinerary-day" key={`day-${index + 1}`}>
-                <h3>Ngày {index + 1}</h3>
+                <h3>{ui(language, 'itDay', { n: index + 1 })}</h3>
                 <ol>
                   {day.places.map((place) => (
                     <li key={place.id}>
                       <button type="button" onClick={() => setSelectedPlace(place.id)}>
                         {place.copy[language].title}
                       </button>
-                      <small>{place.duration} phút</small>
+                      <small>{ui(language, 'minutes', { n: place.duration })}</small>
                     </li>
                   ))}
                 </ol>
                 {day.lodging && (
                   <div className="itinerary-lodging">
-                    <strong>Gợi ý nghỉ đêm: {day.lodging.name}</strong>
+                    <strong>{ui(language, 'itLodging', { name: day.lodging.name })}</strong>
                     <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`khách sạn nhà nghỉ ${day.lodging.name}`)}`}
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${ui(language, 'itHotelQuery')} ${day.lodging.name}`)}`}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Tìm khách sạn/nhà nghỉ trên bản đồ
+                      {ui(language, 'itFindHotels')}
                     </a>
                   </div>
                 )}
               </section>
             ))}
           </div>
-          <p className="itinerary-note">Gợi ý khu vực, không phải danh sách cơ sở đã xác minh. Hãy hỏi trực tiếp nơi lưu trú về phòng trống, giá và thanh toán.</p>
+          <p className="itinerary-note">{ui(language, 'itAreaNote')}</p>
         </div>
       )}
     </section>

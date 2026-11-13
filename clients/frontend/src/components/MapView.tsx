@@ -8,6 +8,7 @@ import { lineString, point } from '@turf/turf'
 import { ArrowRight, ArrowUpDown, Compass, LoaderCircle, LocateFixed, MapPinned, Maximize2, Minimize2, Minus, Plus, RotateCw, Route, Search, X } from 'lucide-react'
 import { getOfflineMap } from '../db'
 import { translate } from '../i18n'
+import { ui } from '../uiText'
 import { makeOfflineStyle, makeOnlineStyle } from '../mapStyle'
 import { useAppStore } from '../store'
 import { categoryLabels } from '../data/places'
@@ -486,7 +487,7 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
 
   const routeEndpointOptions = (
     <>
-      <option value={MY_LOCATION_ID}>📍 {translate(language, 'locate')}{location ? '' : language === 'vi' ? ' (bật GPS)' : ' (GPS)'}</option>
+      <option value={MY_LOCATION_ID}>📍 {translate(language, 'locate')}{location ? '' : ui(language, 'gpsHint')}</option>
       {places.map((place) => (
         <option key={place.id} value={place.id}>{place.copy[language].title}</option>
       ))}
@@ -540,6 +541,7 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
           className="map-place-preview"
           aria-label={`${translate(language, 'openDetails')}: ${selectedMapPlace.copy[language].title}`}
           onClick={() => {
+            setExpanded(false)
             onShowPlaceDetails()
           }}
         >
@@ -590,7 +592,7 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
             </select>
           </label>
           <button type="button" className="map-route-swap" onClick={() => { setFromPlaceId(toPlaceId); setToPlaceId(fromPlaceId) }}>
-            <ArrowUpDown size={13} />{language === 'vi' ? 'Đổi chiều' : 'Swap'}
+            <ArrowUpDown size={13} />{ui(language, 'swap')}
           </button>
           <button type="submit" disabled={!fromPlaceId || !toPlaceId || fromPlaceId === toPlaceId || directionsStatus === 'locating'}>
             <Route size={14} />{translate(language, 'showRoute')}
@@ -605,16 +607,16 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
         <button onClick={() => map.current?.zoomOut()} aria-label="Zoom out"><Minus size={18} /></button>
         <button
           onClick={() => map.current?.rotateTo(map.current.getBearing() - 45, { duration: 300 })}
-          aria-label={language === 'vi' ? 'Xoay bản đồ' : 'Rotate map'}
-          title={language === 'vi' ? 'Xoay 45° (giữ chuột phải và kéo để xoay tự do)' : 'Rotate 45° (right-drag to rotate freely)'}
+          aria-label={ui(language, 'rotateMap')}
+          title={ui(language, 'rotateHint')}
         >
           <RotateCw size={16} />
         </button>
         <button
           className={`map-compass${Math.abs(bearing) > 0.5 || pitch > 0.5 ? ' is-rotated' : ''}`}
           onClick={() => map.current?.easeTo({ bearing: 0, pitch: 0, duration: 400 })}
-          aria-label={language === 'vi' ? 'Quay về hướng Bắc' : 'Reset to north'}
-          title={language === 'vi' ? `Hướng Bắc (đang xoay ${Math.round(((bearing % 360) + 360) % 360)}°)` : 'Reset to north'}
+          aria-label={ui(language, 'resetNorth')}
+          title={ui(language, 'northWithBearing', { n: Math.round(((bearing % 360) + 360) % 360) })}
         >
           <Compass size={17} style={{ transform: `rotate(${-bearing - 45}deg)` }} />
         </button>
@@ -623,7 +625,7 @@ export function MapView({ places, language, selectedPlaceId, focusRequest, onSel
         <button onClick={openPlaceRoutePlanner} aria-label={translate(language, 'placeDirections')} title={translate(language, 'placeDirections')} aria-expanded={placeRoutePlannerOpen}><Route size={17} /></button>
         <button onClick={toggleDirections} aria-label={translate(language, showDirections ? 'hideDirections' : 'directions')} title={translate(language, showDirections ? 'hideDirections' : 'directions')}><MapPinned size={17} /></button>
       </div>
-      <div className="map-caption"><span className="map-caption-dot" /> QUANG TRI · QUANG BINH</div>
+      <div className="map-caption"><span className="map-caption-dot" /> {ui(language, 'regionName').toLocaleUpperCase(language)}</div>
     </div>
   )
 }

@@ -1,10 +1,15 @@
 // Hiển thị số liệu địa điểm và biểu mẫu gửi/xem đánh giá từ backend.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LoaderCircle, Star } from 'lucide-react'
 import { getPlaceAnalytics, getPlaceRatings, getVisitorId, submitPlaceRating } from '../api'
 import type { PlaceAnalytics, PlaceRatingSummary } from '../api'
+import { useAppStore } from '../store'
+import { localeOf, ui } from '../uiText'
 
 export function PlaceRatingPanel({ placeId }: { placeId: string }) {
+  const language = useAppStore((state) => state.language)
+  const languageRef = useRef(language)
+  languageRef.current = language
   const [summary, setSummary] = useState<PlaceRatingSummary | null>(null)
   const [analytics, setAnalytics] = useState<PlaceAnalytics | null>(null)
   const [rating, setRating] = useState(5)
@@ -20,7 +25,7 @@ export function PlaceRatingPanel({ placeId }: { placeId: string }) {
       setAnalyticsLoading(true)
       void getPlaceAnalytics(placeId)
         .then((result) => { if (active) setAnalytics(result) })
-        .catch(() => { if (active) setMessage('Chưa tải được số liệu địa điểm. Kiểm tra kết nối máy chủ rồi thử lại.') })
+        .catch(() => { if (active) setMessage(ui(languageRef.current, 'rtStatsError')) })
         .finally(() => { if (active) setAnalyticsLoading(false) })
     }
     const refreshAfterVisit = (event: Event) => {
@@ -33,7 +38,7 @@ export function PlaceRatingPanel({ placeId }: { placeId: string }) {
     setRatingsLoading(true)
     void getPlaceRatings(placeId)
       .then((result) => { if (active) setSummary(result) })
-      .catch(() => { if (active) setMessage('Chưa tải được đánh giá. Kiểm tra kết nối máy chủ rồi thử lại.') })
+      .catch(() => { if (active) setMessage(ui(languageRef.current, 'rtLoadError')) })
       .finally(() => { if (active) setRatingsLoading(false) })
     loadAnalytics()
     window.addEventListener('place-visit-recorded', refreshAfterVisit)
@@ -50,48 +55,48 @@ export function PlaceRatingPanel({ placeId }: { placeId: string }) {
       const visitorId = await getVisitorId()
       setSummary(await submitPlaceRating(placeId, visitorId, rating, review))
       setReview('')
-      setMessage('Cảm ơn bạn đã đánh giá địa điểm.')
+      setMessage(ui(language, 'rtThanks'))
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Không gửi được đánh giá.')
+      setMessage(error instanceof Error ? error.message : ui(language, 'rtSendError'))
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <section className="rating-panel" aria-label="Đánh giá địa điểm">
+    <section className="rating-panel" aria-label={ui(language, 'rtPanel')}>
       <div className="rating-panel-heading">
-        <span className="eyebrow"><span className="eyebrow-line" /> Ý KIẾN DU KHÁCH</span>
-        <h2>Đánh giá điểm dừng</h2>
+        <span className="eyebrow"><span className="eyebrow-line" /> {ui(language, 'rtKicker')}</span>
+        <h2>{ui(language, 'rtTitle')}</h2>
         {analyticsLoading
-          ? <span className="skeleton rating-skeleton-line" aria-label="Đang tải lượt ghé" />
-          : <p>{analytics ? `${analytics.visits.toLocaleString('vi-VN')} lượt ghé được app ghi nhận trong 30 ngày gần nhất` : 'Chưa có dữ liệu lượt ghé.'}</p>}
+          ? <span className="skeleton rating-skeleton-line" aria-label={ui(language, 'rtLoadingVisits')} />
+          : <p>{analytics ? ui(language, 'rtVisits', { n: analytics.visits.toLocaleString(localeOf(language)) }) : ui(language, 'rtNoVisits')}</p>}
         {ratingsLoading
-          ? <span className="skeleton rating-skeleton-line short" aria-label="Đang tải đánh giá" />
+          ? <span className="skeleton rating-skeleton-line short" aria-label={ui(language, 'rtLoadingRatings')} />
           : <p>
           {summary?.averageRating === null || !summary
-            ? 'Chưa có đánh giá'
+            ? ui(language, 'rtNoRatings')
             : `${summary.averageRating.toFixed(1)} / 5`}
-          {summary ? ` · ${summary.totalRatings} lượt đánh giá` : ''}
+          {summary ? ` · ${ui(language, 'rtCount', { n: summary.totalRatings })}` : ''}
           </p>}
       </div>
       <div className="rating-review-list">
         {ratingsLoading
-          ? <div className="rating-review-skeleton" aria-label="Đang tải nhận xét"><span className="skeleton" /><span className="skeleton" /></div>
+          ? <div className="rating-review-skeleton" aria-label={ui(language, 'rtLoadingReviews')}><span className="skeleton" /><span className="skeleton" /></div>
           : summary?.reviews.map((item) => (
           <article className="rating-review" key={`${item.createdAt}-${item.review}`}>
             <span>{'★'.repeat(item.rating)}{'☆'.repeat(5 - item.rating)}</span>
             <p>{item.review}</p>
-            <small>{new Date(item.createdAt).toLocaleDateString('vi-VN')}</small>
+            <small>{new Date(item.createdAt).toLocaleDateString(localeOf(language))}</small>
           </article>
           ))}
       </div>
       <div className="rating-form">
-        <label htmlFor="place-rating">Chấm điểm</label>
+        <label htmlFor="place-rating">{ui(language, 'rtScore')}</label>
         <div className="rating-stars" id="place-rating">
           {[1, 2, 3, 4, 5].map((value) => (
             <button
-              aria-label={`${value} sao`}
+              aria-label={ui(language, 'rtStars', { n: value })}
               aria-pressed={rating === value}
               key={value}
               onClick={() => setRating(value)}
@@ -101,19 +106,19 @@ export function PlaceRatingPanel({ placeId }: { placeId: string }) {
             </button>
           ))}
         </div>
-        <label className="sr-only" htmlFor="place-review">Nhận xét (không bắt buộc)</label>
+        <label className="sr-only" htmlFor="place-review">{ui(language, 'rtReviewLabel')}</label>
         <textarea
           id="place-review"
           maxLength={500}
           onChange={(event) => setReview(event.target.value)}
-          placeholder="Chia sẻ cảm nhận của bạn (không bắt buộc)"
+          placeholder={ui(language, 'rtPlaceholder')}
           value={review}
         />
         <button className="rating-submit" disabled={busy} onClick={() => void submit()}>
           {busy && <LoaderCircle className="loading-spinner" size={14} aria-hidden="true" />}
-          {busy ? 'Đang gửi…' : 'Gửi đánh giá'}
+          {ui(language, busy ? 'rtSending' : 'rtSubmit')}
         </button>
-        <small className="rating-privacy">Mỗi mã thiết bị có thể cập nhật một đánh giá/địa điểm; đánh giá chưa xác minh danh tính và có thể bị giả mạo.</small>
+        <small className="rating-privacy">{ui(language, 'rtPrivacy')}</small>
         {message && <p className="rating-feedback" role="status">{message}</p>}
       </div>
     </section>

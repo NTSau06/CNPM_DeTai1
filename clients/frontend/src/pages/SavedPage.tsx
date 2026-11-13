@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Bookmark, Clock3, MapPin, Route, Trash2 } from '
 import { Link } from 'react-router-dom'
 import { localizedTitle } from '../data/places'
 import { translate } from '../i18n'
+import { localeOf, ui } from '../uiText'
 import { useAppStore } from '../store'
 
 export function SavedPage() {
@@ -16,16 +17,16 @@ export function SavedPage() {
     <div className="subpage">
       <div className="subpage-back"><Link to="/explore"><ArrowLeft size={15} /> {translate(language, 'explore')}</Link></div>
       <div className="subpage-heading">
-        <div className="eyebrow"><span className="eyebrow-line" /> MADE FOR ANOTHER DAY</div>
+        <div className="eyebrow"><span className="eyebrow-line" /> {ui(language, 'svEyebrow')}</div>
         <h1>{translate(language, 'savedTitle')}</h1>
         <p>{translate(language, 'noSavedText')}</p>
       </div>
       {!currentUser ? (
         <section className="empty-state">
           <div className="empty-icon"><Bookmark size={25} /></div>
-          <h2>Đăng nhập để xem hành trình</h2>
-          <p>Hành trình đã lưu được gắn với tài khoản của bạn.</p>
-          <Link className="primary-link" to="/login">Đăng nhập <ArrowRight size={15} /></Link>
+          <h2>{ui(language, 'svSignInTitle')}</h2>
+          <p>{ui(language, 'svSignInText')}</p>
+          <Link className="primary-link" to="/login">{ui(language, 'signIn')} <ArrowRight size={15} /></Link>
         </section>
       ) : tours.length === 0 ? (
         <section className="empty-state">
@@ -42,11 +43,11 @@ export function SavedPage() {
             return (
               <article className="saved-tour-card" key={tour.id}>
                 <div className={`tour-cover illustration-${first?.image ?? 'river'}`}>
-                  <span>WALK NO. {String(tours.length - index).padStart(2, '0')}</span>
+                  <span>{ui(language, 'walkNumber', { n: String(tours.length - index).padStart(2, '0') })}</span>
                   <div>{first ? localizedTitle(first, language) : translate(language, 'route')}</div>
                 </div>
                 <div className="tour-card-copy">
-                  <span className="eyebrow small">QUẢNG TRỊ · {new Date(tour.createdAt).toLocaleDateString(language === 'vi' ? 'vi-VN' : language)}</span>
+                  <span className="eyebrow small">{ui(language, 'regionName').split(' · ')[0].toLocaleUpperCase(language)} · {new Date(tour.createdAt).toLocaleDateString(localeOf(language))}</span>
                   <h2>{savedPlaces.length ? savedPlaces.map((place) => localizedTitle(place, language)).join('  →  ') : translate(language, 'route')}</h2>
                   <div className="tour-meta"><span><MapPin size={14} />{tour.placeIds.length} {translate(language, 'stopCount')}</span><span><Route size={14} />{tour.distanceKm.toFixed(1)} {translate(language, 'distanceUnit')}</span><span><Clock3 size={14} />{tour.durationMinutes} {translate(language, 'minute')}</span></div>
                   <div className="tour-card-actions">

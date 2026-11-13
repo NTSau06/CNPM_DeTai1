@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AlertCircle, Bookmark, ChevronDown, Compass, House, Info, Map, MapPinned, Menu, MonitorSmartphone, Settings2, X } from 'lucide-react'
 import { translate } from './i18n'
+import { ui, type UiKey } from './uiText'
 import { languages } from './data/places'
 import { useAppStore } from './store'
 import { getVisitorId, leaveOnlinePresence, updateOnlinePresence } from './api'
@@ -22,11 +23,11 @@ const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage').then((module)
 const PRESENCE_INTERVAL_MS = 5_000
 const exploreSections = ['explore-home', 'explore-featured', 'explore-map', 'explore-info'] as const
 type ExploreSection = (typeof exploreSections)[number]
-const homeNavItems: { id: ExploreSection; icon: typeof House; vi: string; en: string }[] = [
-  { id: 'explore-home', icon: House, vi: 'Trang chủ', en: 'Home' },
-  { id: 'explore-featured', icon: Compass, vi: 'Khám phá Quảng Trị', en: 'Explore Quang Tri' },
-  { id: 'explore-map', icon: MapPinned, vi: 'Bản đồ du lịch', en: 'Travel map' },
-  { id: 'explore-info', icon: Info, vi: 'Giới thiệu', en: 'About' },
+const homeNavItems: { id: ExploreSection; icon: typeof House; label: UiKey }[] = [
+  { id: 'explore-home', icon: House, label: 'navHome' },
+  { id: 'explore-featured', icon: Compass, label: 'navExplore' },
+  { id: 'explore-map', icon: MapPinned, label: 'navMap' },
+  { id: 'explore-info', icon: Info, label: 'navAbout' },
 ]
 
 export default function App() {
@@ -226,12 +227,12 @@ export default function App() {
           <span className="brand-mark"><Map size={19} strokeWidth={1.8} /></span>
           <span className="brand-copy">
             <span className="brand-name">Quảng Trị</span>
-            <small>{language === 'vi' ? 'Thuyết minh tự động đa ngôn ngữ' : 'Multilingual audio guide'}</small>
+            <small>{ui(language, 'brandTagline')}</small>
           </span>
         </NavLink>
         {location.pathname === '/explore' && (
-          <nav className="home-main-nav" aria-label="Điều hướng trang chủ">
-            {homeNavItems.map(({ id, icon: Icon, vi, en }) => (
+          <nav className="home-main-nav" aria-label={ui(language, 'homeNavLabel')}>
+            {homeNavItems.map(({ id, icon: Icon, label }) => (
               <a
                 key={id}
                 className={`home-main-nav-link${activeExploreSection === id ? ' active' : ''}`}
@@ -239,15 +240,15 @@ export default function App() {
                 aria-current={activeExploreSection === id ? 'location' : undefined}
                 onClick={(event) => goToExploreSection(event, id)}
               >
-                <Icon size={14} />{language === 'vi' ? vi : en}
+                <Icon size={14} />{ui(language, label)}
               </a>
             ))}
           </nav>
         )}
         <div className="topbar-right">
-          <NavLink className="device-picker-link" to="/device" title="Chọn thiết bị">
+          <NavLink className="device-picker-link" to="/device" title={ui(language, 'chooseDevice')}>
             <MonitorSmartphone size={15} aria-hidden="true" />
-            <span>Thiết bị</span>
+            <span>{ui(language, 'device')}</span>
           </NavLink>
           <div className="header-navigation" ref={navigationRef}>
             <button
@@ -271,7 +272,7 @@ export default function App() {
                   onClick={() => setNavigationOpen(false)}
                 >
                   <MonitorSmartphone size={17} strokeWidth={1.8} />
-                  <span>Chọn thiết bị</span>
+                  <span>{ui(language, 'chooseDevice')}</span>
                 </NavLink>
                 {items.map(({ to, label, icon: Icon, end }) => (
                   <NavLink
@@ -290,7 +291,7 @@ export default function App() {
             )}
           </div>
           <LanguagePicker />
-          <NavLink className="avatar-link" to={currentUser ? '/profile' : '/login'} aria-label={currentUser ? 'Hồ sơ người dùng' : 'Đăng nhập'}>
+          <NavLink className="avatar-link" to={currentUser ? '/profile' : '/login'} aria-label={ui(language, currentUser ? 'userProfile' : 'signIn')}>
             {currentUser ? getInitials(currentUser.fullName) : 'A'}
           </NavLink>
         </div>

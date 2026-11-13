@@ -4,6 +4,7 @@ import { Headphones, Plus, Radio } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { languages } from '../data/places'
 import { translate } from '../i18n'
+import { ui } from '../uiText'
 import { getOfflinePlacePack } from '../db'
 import { getNarrationAudioLanguage, getNarrationAudioUrl, getNarrationDurationSeconds, getNarrationText, stopSpeaking } from '../speech'
 import { useAppStore } from '../store'
@@ -68,7 +69,7 @@ export function NarrationCard({ place, language, distanceMeters, onStartWalk, on
   return (
     <section className="narration-card" aria-label={translate(language, 'play')}>
       <div className="narration-head">
-        <div className="narration-label"><Headphones size={14} /> AUDIO WALK <span className="duration-dot">·</span> ~{estimatedMinutes} {translate(language, 'minute')}</div>
+        <div className="narration-label"><Headphones size={14} /> {ui(language, 'audioWalk')} <span className="duration-dot">·</span> ~{estimatedMinutes} {translate(language, 'minute')}</div>
         <div className="narration-head-actions">
           <label className="audio-language">
             <span>{translate(language, 'audioLanguage')}</span>
@@ -84,7 +85,7 @@ export function NarrationCard({ place, language, distanceMeters, onStartWalk, on
               {languages.map((item) => <option key={item.code} value={item.code}>{item.flag} {item.label}</option>)}
             </select>
           </label>
-          <span className="now-playing"><span className={playing ? 'sound-bars is-playing' : 'sound-bars'}><i /><i /><i /><i /></span>{playing ? 'NOW PLAYING' : 'AUDIO GUIDE'}</span>
+          <span className="now-playing"><span className={playing ? 'sound-bars is-playing' : 'sound-bars'}><i /><i /><i /><i /></span>{ui(language, playing ? 'nowPlaying' : 'audioGuideTag')}</span>
         </div>
       </div>
       <p className="narration-copy">{audioCopy.narration}</p>
