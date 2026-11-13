@@ -41,14 +41,6 @@ export function DeviceEntryPage() {
     }
   }, [mobileUrl, showQr])
 
-  const openPhoneExperience = () => {
-    if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
-      navigate('/explore')
-      return
-    }
-    setShowQr(true)
-  }
-
   return (
     <section className="device-entry">
       <section className="device-entry-content">
@@ -71,7 +63,7 @@ export function DeviceEntryPage() {
                 </span>
                 <ArrowRight className="device-choice-arrow" size={19} />
               </button>
-              <button className="device-choice-card" type="button" onClick={openPhoneExperience}>
+              <button className="device-choice-card" type="button" onClick={() => setShowQr(true)}>
                 <span className="device-choice-icon"><Smartphone size={25} strokeWidth={1.6} /></span>
                 <span className="device-choice-copy">
                   <strong>{ui(language, 'dvPhone')}</strong>
