@@ -3,9 +3,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, Home, Monitor, QrCode, Smartphone } from 'lucide-react'
 import QRCode from 'qrcode'
 import { useNavigate } from 'react-router-dom'
+import { useAppStore } from '../store'
+import { ui } from '../uiText'
 
 export function DeviceEntryPage() {
   const navigate = useNavigate()
+  const language = useAppStore((state) => state.language)
   const [showQr, setShowQr] = useState(false)
   const [qrImage, setQrImage] = useState('')
   const [qrError, setQrError] = useState('')
@@ -29,7 +32,7 @@ export function DeviceEntryPage() {
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setQrError(error instanceof Error ? error.message : 'Không thể tạo mã QR.')
+          setQrError(error instanceof Error ? error.message : ui(useAppStore.getState().language, 'dvQrError'))
         }
       })
 
@@ -51,28 +54,28 @@ export function DeviceEntryPage() {
       <section className="device-entry-content">
         <div className="device-entry-actions">
           <button className="device-entry-home" type="button" onClick={() => navigate('/explore')}>
-            <Home size={16} /> Về trang chủ
+            <Home size={16} /> {ui(language, 'dvHome')}
           </button>
         </div>
-        <div className="device-entry-eyebrow"><span /> HÀNH TRÌNH KHÁM PHÁ BẮT ĐẦU TỪ ĐÂY</div>
+        <div className="device-entry-eyebrow"><span /> {ui(language, 'dvEyebrow')}</div>
         {!showQr ? (
           <>
-            <h1>Bạn muốn khám phá<br /><em>theo cách nào?</em></h1>
-            <p className="device-entry-intro">Chọn thiết bị để bắt đầu hành trình qua những miền di sản và cảnh đẹp.</p>
+            <h1>{ui(language, 'dvTitle1')}<br /><em>{ui(language, 'dvTitle2')}</em></h1>
+            <p className="device-entry-intro">{ui(language, 'dvIntro')}</p>
             <div className="device-choice-grid">
               <button className="device-choice-card" type="button" onClick={() => navigate('/explore')}>
                 <span className="device-choice-icon"><Monitor size={25} strokeWidth={1.6} /></span>
                 <span className="device-choice-copy">
-                  <strong>Trên máy tính</strong>
-                  <small>Khám phá với màn hình rộng và bản đồ chi tiết.</small>
+                  <strong>{ui(language, 'dvDesktop')}</strong>
+                  <small>{ui(language, 'dvDesktopText')}</small>
                 </span>
                 <ArrowRight className="device-choice-arrow" size={19} />
               </button>
               <button className="device-choice-card" type="button" onClick={openPhoneExperience}>
                 <span className="device-choice-icon"><Smartphone size={25} strokeWidth={1.6} /></span>
                 <span className="device-choice-copy">
-                  <strong>Trên điện thoại</strong>
-                  <small>Tiếp tục hành trình ngay trên thiết bị di động.</small>
+                  <strong>{ui(language, 'dvPhone')}</strong>
+                  <small>{ui(language, 'dvPhoneText')}</small>
                 </span>
                 <ArrowRight className="device-choice-arrow" size={19} />
               </button>
@@ -81,36 +84,36 @@ export function DeviceEntryPage() {
         ) : (
           <div className="device-qr-panel">
             <button className="device-entry-back" type="button" onClick={() => setShowQr(false)}>
-              <ArrowLeft size={16} /> Quay lại chọn thiết bị
+              <ArrowLeft size={16} /> {ui(language, 'dvBack')}
             </button>
             <div className="device-qr-layout">
               <div>
                 <span className="device-qr-icon"><QrCode size={22} /></span>
-                <h1>Mở trên<br /><em>điện thoại</em></h1>
-                <p className="device-entry-intro">Dùng camera điện thoại quét mã QR để tiếp tục khám phá trên thiết bị của bạn.</p>
+                <h1>{ui(language, 'dvQrTitle1')}<br /><em>{ui(language, 'dvQrTitle2')}</em></h1>
+                <p className="device-entry-intro">{ui(language, 'dvQrIntro')}</p>
                 <ol className="device-qr-steps">
-                  <li><span>1</span> Mở camera trên điện thoại</li>
-                  <li><span>2</span> Hướng camera vào mã QR</li>
-                  <li><span>3</span> Chạm vào liên kết hiện ra</li>
+                  <li><span>1</span> {ui(language, 'dvStep1')}</li>
+                  <li><span>2</span> {ui(language, 'dvStep2')}</li>
+                  <li><span>3</span> {ui(language, 'dvStep3')}</li>
                 </ol>
               </div>
               <div className="device-qr-code">
                 {qrImage
-                  ? <img src={qrImage} alt="Mã QR mở ứng dụng Quảng Trị trên điện thoại" />
+                  ? <img src={qrImage} alt={ui(language, 'dvQrAlt')} />
                   : qrError
                     ? <p className="device-qr-error" role="alert">{qrError}</p>
-                    : <div className="device-qr-loading" aria-label="Đang tạo mã QR" />}
-                <span>Quét để bắt đầu</span>
+                    : <div className="device-qr-loading" aria-label={ui(language, 'dvQrLoading')} />}
+                <span>{ui(language, 'dvScan')}</span>
               </div>
             </div>
             {needsLanAddress && (
               <p className="device-qr-warning" role="status">
-                Máy tính đang dùng địa chỉ localhost nên điện thoại không thể mở liên kết này. Hãy chạy ứng dụng bằng <code>npm run dev</code> từ thư mục gốc dự án để tạo mã QR dùng chung mạng Wi-Fi.
+                {ui(language, 'dvLocalhost1')} <code>npm run dev</code> {ui(language, 'dvLocalhost2')}
               </p>
             )}
           </div>
         )}
-        <div className="device-entry-footer"><span /> QUẢNG TRỊ · QUẢNG BÌNH <span /></div>
+        <div className="device-entry-footer"><span /> {ui(language, 'regionName').toLocaleUpperCase(language)} <span /></div>
       </section>
     </section>
   )

@@ -1,5 +1,5 @@
 // Tải thống kê và hiển thị thông tin/biểu mẫu đánh giá của một địa điểm.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Pressable,
@@ -15,8 +15,11 @@ import {
   type PlaceAnalytics,
   type PlaceRatingSummary,
 } from './analytics'
+import { localeOf, mt, type Language } from './uiText'
 
-export function PlaceInfoCard({ placeId, placeTitle }: { placeId: string; placeTitle: string }) {
+export function PlaceInfoCard({ language, placeId, placeTitle }: { language: Language; placeId: string; placeTitle: string }) {
+  const languageRef = useRef(language)
+  languageRef.current = language
   const [analytics, setAnalytics] = useState<PlaceAnalytics | null>(null)
   const [summary, setSummary] = useState<PlaceRatingSummary | null>(null)
   const [rating, setRating] = useState(5)
@@ -31,10 +34,10 @@ export function PlaceInfoCard({ placeId, placeTitle }: { placeId: string; placeT
     setMessage('')
     void getPlaceAnalytics(placeId)
       .then((result) => { if (active) setAnalytics(result) })
-      .catch(() => { if (active) setMessage('Chưa tải được lượt ghé. Kiểm tra kết nối máy chủ.') })
+      .catch(() => { if (active) setMessage(mt(languageRef.current, 'piVisitsError')) })
     void getPlaceRatings(placeId)
       .then((result) => { if (active) setSummary(result) })
-      .catch(() => { if (active) setMessage('Chưa tải được đánh giá. Kiểm tra kết nối máy chủ.') })
+      .catch(() => { if (active) setMessage(mt(languageRef.current, 'piRatingsError')) })
     return () => { active = false }
   }, [placeId])
 
@@ -45,9 +48,9 @@ export function PlaceInfoCard({ placeId, placeTitle }: { placeId: string; placeT
       const updated = await submitPlaceRating(placeId, rating, review)
       setSummary(updated)
       setReview('')
-      setMessage('Cảm ơn bạn đã đánh giá.')
+      setMessage(mt(language, 'piThanks'))
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Không gửi được đánh giá.')
+      setMessage(language === 'vi' && error instanceof Error ? error.message : mt(language, 'piSendError'))
     } finally {
       setBusy(false)
     }
@@ -55,34 +58,34 @@ export function PlaceInfoCard({ placeId, placeTitle }: { placeId: string; placeT
 
   return (
     <View style={styles.card}>
-      <Text style={styles.kicker}>THÔNG TIN ĐỊA ĐIỂM</Text>
+      <Text style={styles.kicker}>{mt(language, 'piKicker')}</Text>
       <Text style={styles.heading}>{placeTitle}</Text>
       <View style={styles.metrics}>
         <View style={styles.metric}>
-          <Text style={styles.metricLabel}>Lượt ghé app · 30 ngày</Text>
-          {analytics ? <Text style={styles.metricValue}>{analytics.visits.toLocaleString('vi-VN')}</Text> : <ActivityIndicator color="#28483A" />}
+          <Text style={styles.metricLabel}>{mt(language, 'piVisitsLabel')}</Text>
+          {analytics ? <Text style={styles.metricValue}>{analytics.visits.toLocaleString(localeOf(language))}</Text> : <ActivityIndicator color="#28483A" />}
         </View>
         <View style={styles.metric}>
-          <Text style={styles.metricLabel}>Đánh giá</Text>
+          <Text style={styles.metricLabel}>{mt(language, 'piRating')}</Text>
           <Text style={styles.metricValue}>{summary?.averageRating == null ? '—' : `${summary.averageRating.toFixed(1)} ★`}</Text>
-          <Text style={styles.help}>{summary?.totalRatings ?? 0} lượt đánh giá</Text>
+          <Text style={styles.help}>{mt(language, 'piRatingCount', { n: summary?.totalRatings ?? 0 })}</Text>
         </View>
       </View>
-      <Text style={styles.help}>Lượt ghé chỉ tính người dùng bật GPS trong ứng dụng; tối đa một lượt/thiết bị/điểm/ngày, không phải tổng khách thực tế.</Text>
+      <Text style={styles.help}>{mt(language, 'piVisitsNote')}</Text>
       {summary?.reviews.slice(0, 3).map((item) => <Text key={`${item.createdAt}-${item.review}`} style={styles.reviewLine}>{'★'.repeat(item.rating)} · {item.review}</Text>)}
-      <Text style={styles.subheading}>Chia sẻ đánh giá</Text>
+      <Text style={styles.subheading}>{mt(language, 'piShare')}</Text>
       <View style={styles.stars}>
         {[1, 2, 3, 4, 5].map((value) => (
-          <Pressable accessibilityRole="button" accessibilityLabel={`${value} sao`} accessibilityState={{ selected: value === rating }} key={value} onPress={() => setRating(value)}>
+          <Pressable accessibilityRole="button" accessibilityLabel={mt(language, 'piStars', { n: value })} accessibilityState={{ selected: value === rating }} key={value} onPress={() => setRating(value)}>
             <Text style={[styles.star, value <= rating && styles.starSelected]}>★</Text>
           </Pressable>
         ))}
       </View>
-      <TextInput maxLength={500} onChangeText={setReview} placeholder="Nhận xét (không bắt buộc)" style={styles.input} value={review} />
+      <TextInput maxLength={500} onChangeText={setReview} placeholder={mt(language, 'piReviewPh')} style={styles.input} value={review} />
       <Pressable accessibilityRole="button" disabled={busy} onPress={() => void sendRating()} style={styles.primaryButton}>
-        <Text style={styles.primaryText}>{busy ? 'Đang gửi…' : 'Gửi đánh giá'}</Text>
+        <Text style={styles.primaryText}>{mt(language, busy ? 'piSending' : 'piSubmit')}</Text>
       </Pressable>
-      <Text style={styles.help}>Mỗi mã thiết bị có thể cập nhật một đánh giá/địa điểm; đánh giá chưa xác minh danh tính.</Text>
+      <Text style={styles.help}>{mt(language, 'piPrivacy')}</Text>
       {message ? <Text accessibilityRole="alert" style={styles.feedback}>{message}</Text> : null}
     </View>
   )

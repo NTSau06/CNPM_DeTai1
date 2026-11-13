@@ -4,7 +4,7 @@ import { LoaderCircle, Star } from 'lucide-react'
 import { getPlaceAnalytics, getPlaceRatings, getVisitorId, submitPlaceRating } from '../api'
 import type { PlaceAnalytics, PlaceRatingSummary } from '../api'
 import { useAppStore } from '../store'
-import { localeOf, ui } from '../uiText'
+import { apiErrorMessage, localeOf, ui } from '../uiText'
 
 export function PlaceRatingPanel({ placeId }: { placeId: string }) {
   const language = useAppStore((state) => state.language)
@@ -57,7 +57,7 @@ export function PlaceRatingPanel({ placeId }: { placeId: string }) {
       setReview('')
       setMessage(ui(language, 'rtThanks'))
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : ui(language, 'rtSendError'))
+      setMessage(apiErrorMessage(language, error, 'rtSendError'))
     } finally {
       setBusy(false)
     }

@@ -9,7 +9,7 @@ import {
 import type { TicketOrder, TicketPrice } from '../api'
 import { useAppStore } from '../store'
 import type { Language } from '../types'
-import { localeOf, ui } from '../uiText'
+import { apiErrorMessage, localeOf, ui } from '../uiText'
 
 const formatVnd = (value: number, language: Language) => `${value.toLocaleString(localeOf(language))} ₫`
 
@@ -39,7 +39,7 @@ export function TicketPurchasePanel({ placeId }: { placeId: string }) {
         setPrice(prices.find((item) => item.placeId === placeId) ?? { placeId, priceVnd: null })
         setOrders(myOrders)
       } catch (requestError) {
-        if (active) setError(requestError instanceof Error ? requestError.message : ui(languageRef.current, 'tkLoadError'))
+        if (active) setError(apiErrorMessage(languageRef.current, requestError, 'tkLoadError'))
       } finally {
         if (active) setLoading(false)
       }
@@ -67,7 +67,7 @@ export function TicketPurchasePanel({ placeId }: { placeId: string }) {
       setOrders((current) => [order, ...current])
       setMessage(ui(language, 'tkSuccess', { n: quantity, total: formatVnd(order.totalPriceVnd, language) }))
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : ui(language, 'tkOrderError'))
+      setError(apiErrorMessage(language, requestError, 'tkOrderError'))
     } finally {
       setBusy(false)
     }

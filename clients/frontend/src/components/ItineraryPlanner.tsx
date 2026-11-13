@@ -4,7 +4,7 @@ import { fetchTicketPrices } from '../api'
 import { categoryKeys, categoryLabels } from '../data/places'
 import { optimizeRouteOrder } from '../routeOptimization'
 import { useAppStore } from '../store'
-import { localeOf, ui } from '../uiText'
+import { apiErrorMessage, localeOf, ui } from '../uiText'
 import type { Category, Place } from '../types'
 import { distance, point } from '@turf/turf'
 
@@ -124,7 +124,7 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
         unpricedCount,
       })
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : ui(language, 'itFailed'))
+      setError(apiErrorMessage(language, reason, 'itFailed'))
     } finally {
       setLoading(false)
     }

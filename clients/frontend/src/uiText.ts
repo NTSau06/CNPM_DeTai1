@@ -1,5 +1,6 @@
 // Chuỗi giao diện bổ sung cho trang khám phá, trang chi tiết và các bảng phụ, đủ 7 ngôn ngữ.
 // Thứ tự tham số của t(): vi, en, ja, fr, zh-CN, ko-KR, es. Dùng {tên} để chèn giá trị động.
+import { translate } from './i18n'
 import type { Language } from './types'
 
 type Entry = Record<Language, string>
@@ -317,6 +318,82 @@ export const uiText = {
   svEyebrow: t('DÀNH CHO MỘT NGÀY KHÁC', 'MADE FOR ANOTHER DAY', 'また別の日に', 'POUR UN AUTRE JOUR', '留待他日', '다른 날을 위해', 'PARA OTRO DÍA'),
   svSignInTitle: t('Đăng nhập để xem hành trình', 'Sign in to see your walks', 'ログインして保存したルートを見る', 'Connectez-vous pour voir vos parcours', '登录以查看行程', '로그인하고 여정 보기', 'Inicia sesión para ver tus rutas'),
   svSignInText: t('Hành trình đã lưu được gắn với tài khoản của bạn.', 'Saved walks are linked to your account.', '保存したルートはアカウントに紐づいています。', 'Les parcours enregistrés sont liés à votre compte.', '已保存的行程与您的账户关联。', '저장한 여정은 계정에 연결됩니다.', 'Las rutas guardadas están vinculadas a tu cuenta.'),
+  // Tài khoản: đăng nhập, đăng ký, hồ sơ
+  usPwShort: t('Mật khẩu cần có ít nhất 8 ký tự.', 'Password must be at least 8 characters.', 'パスワードは8文字以上にしてください。', 'Le mot de passe doit contenir au moins 8 caractères.', '密码至少需要8个字符。', '비밀번호는 8자 이상이어야 합니다.', 'La contraseña debe tener al menos 8 caracteres.'),
+  usPwMismatch: t('Mật khẩu xác nhận chưa khớp.', 'Passwords do not match.', '確認用パスワードが一致しません。', 'Les mots de passe ne correspondent pas.', '两次输入的密码不一致。', '비밀번호 확인이 일치하지 않습니다.', 'Las contraseñas no coinciden.'),
+  usProfileSaveError: t('Không lưu được hồ sơ. Hãy kiểm tra kết nối và thử lại.', 'Could not save your profile. Check your connection and try again.', 'プロフィールを保存できませんでした。接続を確認して再度お試しください。', 'Impossible d’enregistrer le profil. Vérifiez votre connexion et réessayez.', '无法保存个人资料。请检查网络后重试。', '프로필을 저장하지 못했습니다. 연결을 확인하고 다시 시도하세요.', 'No se pudo guardar el perfil. Revisa la conexión e inténtalo de nuevo.'),
+  usNewPwShort: t('Mật khẩu mới cần có ít nhất 8 ký tự.', 'The new password must be at least 8 characters.', '新しいパスワードは8文字以上にしてください。', 'Le nouveau mot de passe doit contenir au moins 8 caractères.', '新密码至少需要8个字符。', '새 비밀번호는 8자 이상이어야 합니다.', 'La nueva contraseña debe tener al menos 8 caracteres.'),
+  usPwChanged: t('Đã đổi mật khẩu. Các thiết bị khác sẽ cần đăng nhập lại.', 'Password changed. Other devices will need to sign in again.', 'パスワードを変更しました。他の端末では再ログインが必要です。', 'Mot de passe modifié. Les autres appareils devront se reconnecter.', '密码已更改。其他设备需要重新登录。', '비밀번호를 변경했습니다. 다른 기기에서는 다시 로그인해야 합니다.', 'Contraseña cambiada. Los demás dispositivos tendrán que volver a iniciar sesión.'),
+  usPwWrong: t('Mật khẩu hiện tại không đúng.', 'The current password is incorrect.', '現在のパスワードが正しくありません。', 'Le mot de passe actuel est incorrect.', '当前密码不正确。', '현재 비밀번호가 올바르지 않습니다.', 'La contraseña actual no es correcta.'),
+  usPwSame: t('Mật khẩu mới phải khác mật khẩu hiện tại.', 'The new password must differ from the current one.', '新しいパスワードは現在のものと異なる必要があります。', 'Le nouveau mot de passe doit être différent de l’actuel.', '新密码不能与当前密码相同。', '새 비밀번호는 현재 비밀번호와 달라야 합니다.', 'La nueva contraseña debe ser distinta de la actual.'),
+  usPwChangeFailed: t('Không đổi được mật khẩu. Hãy thử lại.', 'Could not change the password. Please try again.', 'パスワードを変更できませんでした。もう一度お試しください。', 'Impossible de modifier le mot de passe. Veuillez réessayer.', '密码修改失败，请重试。', '비밀번호를 변경하지 못했습니다. 다시 시도하세요.', 'No se pudo cambiar la contraseña. Inténtalo de nuevo.'),
+  usAccountEyebrow: t('TÀI KHOẢN CỦA BẠN', 'YOUR ACCOUNT', 'あなたのアカウント', 'VOTRE COMPTE', '您的账户', '내 계정', 'TU CUENTA'),
+  usProfileTitle: t('Hồ sơ cá nhân', 'Personal profile', 'プロフィール', 'Profil personnel', '个人资料', '내 프로필', 'Perfil personal'),
+  usProfileIntro: t('Cập nhật thông tin để cá nhân hóa hành trình của bạn.', 'Update your details to personalise your journeys.', '情報を更新して、旅をあなた好みにしましょう。', 'Mettez à jour vos informations pour personnaliser vos parcours.', '更新信息，打造专属行程。', '정보를 업데이트해 나만의 여정을 만들어 보세요.', 'Actualiza tus datos para personalizar tus rutas.'),
+  usSignOut: t('Đăng xuất', 'Sign out', 'ログアウト', 'Se déconnecter', '退出登录', '로그아웃', 'Cerrar sesión'),
+  usFullName: t('Họ và tên', 'Full name', '氏名', 'Nom complet', '姓名', '이름', 'Nombre completo'),
+  usEmail: t('Email', 'Email', 'メールアドレス', 'E-mail', '电子邮箱', '이메일', 'Correo electrónico'),
+  usPhone: t('Số điện thoại', 'Phone number', '電話番号', 'Téléphone', '电话号码', '전화번호', 'Teléfono'),
+  usBirthDate: t('Ngày sinh', 'Date of birth', '生年月日', 'Date de naissance', '出生日期', '생년월일', 'Fecha de nacimiento'),
+  usGender: t('Giới tính', 'Gender', '性別', 'Genre', '性别', '성별', 'Género'),
+  usGenderChoose: t('Chọn (không bắt buộc)', 'Choose (optional)', '選択（任意）', 'Choisir (facultatif)', '请选择（可选）', '선택 (선택 사항)', 'Elegir (opcional)'),
+  usFemale: t('Nữ', 'Female', '女性', 'Femme', '女', '여성', 'Mujer'),
+  usMale: t('Nam', 'Male', '男性', 'Homme', '男', '남성', 'Hombre'),
+  usOther: t('Khác', 'Other', 'その他', 'Autre', '其他', '기타', 'Otro'),
+  usNoAnswer: t('Không muốn trả lời', 'Prefer not to say', '回答しない', 'Je préfère ne pas répondre', '不愿透露', '응답하지 않음', 'Prefiero no decirlo'),
+  usAddress: t('Địa chỉ', 'Address', '住所', 'Adresse', '地址', '주소', 'Dirección'),
+  usAddressPh: t('Tỉnh/thành phố, quốc gia', 'Province/city, country', '都道府県・市、国', 'Province/ville, pays', '省/市，国家', '시/도, 국가', 'Provincia/ciudad, país'),
+  usSaved: t('Đã lưu thông tin', 'Saved', '保存しました', 'Enregistré', '已保存', '저장됨', 'Guardado'),
+  usSave: t('Lưu thông tin', 'Save details', '保存する', 'Enregistrer', '保存信息', '정보 저장', 'Guardar datos'),
+  usChangePw: t('Đổi mật khẩu', 'Change password', 'パスワードを変更', 'Changer le mot de passe', '修改密码', '비밀번호 변경', 'Cambiar contraseña'),
+  usCurrentPw: t('Mật khẩu hiện tại', 'Current password', '現在のパスワード', 'Mot de passe actuel', '当前密码', '현재 비밀번호', 'Contraseña actual'),
+  usNewPw: t('Mật khẩu mới', 'New password', '新しいパスワード', 'Nouveau mot de passe', '新密码', '새 비밀번호', 'Nueva contraseña'),
+  usConfirmNewPw: t('Xác nhận mật khẩu mới', 'Confirm new password', '新しいパスワード（確認）', 'Confirmer le nouveau mot de passe', '确认新密码', '새 비밀번호 확인', 'Confirmar nueva contraseña'),
+  usMin8: t('Ít nhất 8 ký tự', 'At least 8 characters', '8文字以上', 'Au moins 8 caractères', '至少8个字符', '8자 이상', 'Al menos 8 caracteres'),
+  usRegisterTitle: t('Tạo tài khoản', 'Create an account', 'アカウント作成', 'Créer un compte', '创建账户', '계정 만들기', 'Crear una cuenta'),
+  usLoginTitle: t('Chào mừng trở lại', 'Welcome back', 'おかえりなさい', 'Bon retour', '欢迎回来', '다시 오신 것을 환영합니다', 'Bienvenido de nuevo'),
+  usRegisterIntro: t('Tạo hồ sơ để lưu lại những hành trình đáng nhớ.', 'Create a profile to keep your memorable journeys.', 'プロフィールを作成して、思い出の旅を保存しましょう。', 'Créez un profil pour garder vos parcours mémorables.', '创建个人资料，保存难忘的行程。', '프로필을 만들어 기억에 남는 여정을 저장하세요.', 'Crea un perfil para guardar tus rutas memorables.'),
+  usLoginIntro: t('Đăng nhập để tiếp tục hành trình của bạn.', 'Sign in to continue your journey.', 'ログインして旅を続けましょう。', 'Connectez-vous pour poursuivre votre parcours.', '登录以继续您的行程。', '로그인하고 여정을 이어 가세요.', 'Inicia sesión para continuar tu ruta.'),
+  usByEmail: t('bằng email', 'with email', 'メールで', 'par e-mail', '使用邮箱', '이메일로', 'con correo electrónico'),
+  usOptional: t('(không bắt buộc)', '(optional)', '（任意）', '(facultatif)', '（可选）', '(선택)', '(opcional)'),
+  usNamePh: t('Nguyễn Văn An', 'Jane Doe', '山田 花子', 'Marie Dupont', '张伟', '홍길동', 'Ana García'),
+  usEmailPh: t('ban@example.com', 'you@example.com', 'you@example.com', 'vous@example.com', 'you@example.com', 'you@example.com', 'tu@example.com'),
+  usPassword: t('Mật khẩu', 'Password', 'パスワード', 'Mot de passe', '密码', '비밀번호', 'Contraseña'),
+  usConfirmPw: t('Xác nhận mật khẩu', 'Confirm password', 'パスワード（確認）', 'Confirmer le mot de passe', '确认密码', '비밀번호 확인', 'Confirmar contraseña'),
+  usRetypePw: t('Nhập lại mật khẩu', 'Re-enter password', 'パスワードを再入力', 'Saisissez à nouveau le mot de passe', '再次输入密码', '비밀번호 다시 입력', 'Repite la contraseña'),
+  usProcessing: t('Đang xử lý…', 'Processing…', '処理中…', 'Traitement…', '正在处理…', '처리 중…', 'Procesando…'),
+  usHaveAccount: t('Đã có tài khoản?', 'Already have an account?', 'アカウントをお持ちですか？', 'Vous avez déjà un compte ?', '已有账户？', '이미 계정이 있으신가요?', '¿Ya tienes cuenta?'),
+  usNoAccount: t('Chưa có tài khoản?', 'Don’t have an account?', 'アカウントをお持ちでないですか？', 'Pas encore de compte ?', '还没有账户？', '계정이 없으신가요?', '¿No tienes cuenta?'),
+  usRegister: t('Đăng ký', 'Sign up', '新規登録', 'S’inscrire', '注册', '회원가입', 'Registrarse'),
+  usErr401: t('Email hoặc mật khẩu không chính xác.', 'Incorrect email or password.', 'メールアドレスまたはパスワードが正しくありません。', 'E-mail ou mot de passe incorrect.', '邮箱或密码不正确。', '이메일 또는 비밀번호가 올바르지 않습니다.', 'Correo o contraseña incorrectos.'),
+  usErr409: t('Email này đã được đăng ký. Hãy đăng nhập hoặc dùng email khác.', 'This email is already registered. Sign in or use another email.', 'このメールアドレスは登録済みです。ログインするか別のアドレスをご利用ください。', 'Cet e-mail est déjà inscrit. Connectez-vous ou utilisez une autre adresse.', '该邮箱已注册。请登录或使用其他邮箱。', '이미 가입된 이메일입니다. 로그인하거나 다른 이메일을 사용하세요.', 'Este correo ya está registrado. Inicia sesión o usa otro.'),
+  usErr422: t('Thông tin đăng ký chưa hợp lệ. Hãy kiểm tra email và mật khẩu.', 'The details are not valid. Check your email and password.', '入力内容が正しくありません。メールアドレスとパスワードを確認してください。', 'Informations invalides. Vérifiez votre e-mail et votre mot de passe.', '信息无效，请检查邮箱和密码。', '입력 정보가 올바르지 않습니다. 이메일과 비밀번호를 확인하세요.', 'Los datos no son válidos. Revisa el correo y la contraseña.'),
+  usErr404: t('Máy chủ đang chạy phiên bản cũ, chưa có API tài khoản. Hãy khởi động lại backend rồi thử lại.', 'The server is running an old version without the account API. Restart the backend and try again.', 'サーバーが古いバージョンで、アカウントAPIがありません。バックエンドを再起動してから再度お試しください。', 'Le serveur exécute une ancienne version sans API de compte. Redémarrez le backend et réessayez.', '服务器版本过旧，缺少账户API。请重启后端后重试。', '서버가 계정 API가 없는 이전 버전입니다. 백엔드를 다시 시작한 후 시도하세요.', 'El servidor usa una versión antigua sin API de cuentas. Reinicia el backend e inténtalo de nuevo.'),
+  usErrAuth: t('Không thể xác thực tài khoản. Vui lòng thử lại.', 'Could not verify your account. Please try again.', 'アカウントを認証できませんでした。もう一度お試しください。', 'Impossible d’authentifier le compte. Veuillez réessayer.', '无法验证账户，请重试。', '계정을 인증하지 못했습니다. 다시 시도하세요.', 'No se pudo verificar la cuenta. Inténtalo de nuevo.'),
+
+  // Chọn thiết bị
+  dvHome: t('Về trang chủ', 'Back to home', 'ホームへ戻る', 'Retour à l’accueil', '返回首页', '홈으로', 'Volver al inicio'),
+  dvEyebrow: t('HÀNH TRÌNH KHÁM PHÁ BẮT ĐẦU TỪ ĐÂY', 'YOUR JOURNEY STARTS HERE', '旅はここから始まる', 'VOTRE VOYAGE COMMENCE ICI', '探索之旅从这里开始', '여정은 여기서 시작됩니다', 'TU VIAJE EMPIEZA AQUÍ'),
+  dvTitle1: t('Bạn muốn khám phá', 'How would you like', 'どのように', 'Comment souhaitez-vous', '您想以', '어떤 방식으로', '¿Cómo quieres'),
+  dvTitle2: t('theo cách nào?', 'to explore?', '探索しますか？', 'explorer ?', '哪种方式探索？', '탐방하시겠어요?', 'explorar?'),
+  dvIntro: t('Chọn thiết bị để bắt đầu hành trình qua những miền di sản và cảnh đẹp.', 'Choose a device to start your journey through heritage sites and scenery.', 'デバイスを選んで、史跡と絶景をめぐる旅を始めましょう。', 'Choisissez un appareil pour commencer votre voyage entre patrimoine et paysages.', '选择设备，开启遗产与美景之旅。', '기기를 선택해 유산과 절경을 만나는 여정을 시작하세요.', 'Elige un dispositivo para empezar tu viaje por el patrimonio y los paisajes.'),
+  dvDesktop: t('Trên máy tính', 'On a computer', 'パソコンで', 'Sur ordinateur', '在电脑上', '컴퓨터에서', 'En el ordenador'),
+  dvDesktopText: t('Khám phá với màn hình rộng và bản đồ chi tiết.', 'Explore with a large screen and a detailed map.', '大きな画面と詳細な地図で探索します。', 'Explorez sur grand écran avec une carte détaillée.', '在大屏幕上查看详细地图。', '넓은 화면과 자세한 지도로 탐방하세요.', 'Explora con pantalla grande y mapa detallado.'),
+  dvPhone: t('Trên điện thoại', 'On a phone', 'スマートフォンで', 'Sur téléphone', '在手机上', '휴대폰에서', 'En el móvil'),
+  dvPhoneText: t('Tiếp tục hành trình ngay trên thiết bị di động.', 'Continue your journey on your mobile device.', 'モバイル端末で旅を続けます。', 'Poursuivez votre voyage sur votre mobile.', '在移动设备上继续行程。', '모바일 기기에서 여정을 이어 가세요.', 'Continúa tu viaje en el móvil.'),
+  dvBack: t('Quay lại chọn thiết bị', 'Back to device choice', 'デバイス選択に戻る', 'Retour au choix de l’appareil', '返回选择设备', '기기 선택으로 돌아가기', 'Volver a elegir dispositivo'),
+  dvQrTitle1: t('Mở trên', 'Open on', 'スマートフォンで', 'Ouvrir sur', '在手机上', '휴대폰에서', 'Abrir en'),
+  dvQrTitle2: t('điện thoại', 'your phone', '開く', 'votre téléphone', '打开', '열기', 'tu móvil'),
+  dvQrIntro: t('Dùng camera điện thoại quét mã QR để tiếp tục khám phá trên thiết bị của bạn.', 'Scan the QR code with your phone camera to continue exploring on your device.', 'スマートフォンのカメラでQRコードを読み取り、端末で探索を続けましょう。', 'Scannez le QR code avec l’appareil photo de votre téléphone pour continuer.', '用手机相机扫描二维码，在您的设备上继续探索。', '휴대폰 카메라로 QR 코드를 스캔해 기기에서 계속 탐방하세요.', 'Escanea el código QR con la cámara del móvil para seguir explorando.'),
+  dvStep1: t('Mở camera trên điện thoại', 'Open your phone camera', 'スマートフォンのカメラを起動', 'Ouvrez l’appareil photo', '打开手机相机', '휴대폰 카메라 열기', 'Abre la cámara del móvil'),
+  dvStep2: t('Hướng camera vào mã QR', 'Point it at the QR code', 'QRコードにカメラを向ける', 'Visez le QR code', '将相机对准二维码', 'QR 코드에 카메라 맞추기', 'Apunta al código QR'),
+  dvStep3: t('Chạm vào liên kết hiện ra', 'Tap the link that appears', '表示されたリンクをタップ', 'Touchez le lien affiché', '点击出现的链接', '표시된 링크 누르기', 'Toca el enlace que aparece'),
+  dvQrAlt: t('Mã QR mở ứng dụng Quảng Trị trên điện thoại', 'QR code to open the Quang Tri app on your phone', 'スマートフォンでアプリを開くQRコード', 'QR code pour ouvrir l’application sur votre téléphone', '在手机上打开应用的二维码', '휴대폰에서 앱을 여는 QR 코드', 'Código QR para abrir la app en el móvil'),
+  dvQrLoading: t('Đang tạo mã QR', 'Generating QR code', 'QRコードを作成中', 'Génération du QR code', '正在生成二维码', 'QR 코드 생성 중', 'Generando código QR'),
+  dvQrError: t('Không thể tạo mã QR.', 'Could not create the QR code.', 'QRコードを作成できませんでした。', 'Impossible de créer le QR code.', '无法生成二维码。', 'QR 코드를 만들 수 없습니다.', 'No se pudo crear el código QR.'),
+  dvScan: t('Quét để bắt đầu', 'Scan to start', '読み取って開始', 'Scannez pour commencer', '扫码开始', '스캔하여 시작', 'Escanea para empezar'),
+  dvLocalhost1: t('Máy tính đang dùng địa chỉ localhost nên điện thoại không thể mở liên kết này. Hãy chạy ứng dụng bằng', 'This computer uses a localhost address, so your phone cannot open this link. Run the app with', 'このパソコンはlocalhostのアドレスを使っているため、スマートフォンではリンクを開けません。プロジェクトのルートで', 'Cet ordinateur utilise une adresse localhost, votre téléphone ne peut donc pas ouvrir ce lien. Lancez l’application avec', '此电脑使用 localhost 地址，手机无法打开该链接。请在项目根目录运行', '이 컴퓨터는 localhost 주소를 사용하므로 휴대폰에서 링크를 열 수 없습니다. 프로젝트 루트에서', 'Este ordenador usa una dirección localhost, así que el móvil no puede abrir el enlace. Ejecuta la app con'),
+  dvLocalhost2: t('từ thư mục gốc dự án để tạo mã QR dùng chung mạng Wi-Fi.', 'from the project root to create a QR code that works on the same Wi-Fi network.', 'を実行し、同じWi-Fiで使えるQRコードを作成してください。', 'depuis la racine du projet pour créer un QR code utilisable sur le même réseau Wi-Fi.', '，以生成同一Wi-Fi网络可用的二维码。', '을(를) 실행해 같은 Wi-Fi에서 쓸 수 있는 QR 코드를 만드세요.', 'desde la raíz del proyecto para crear un código QR que funcione en la misma red Wi-Fi.'),
 } satisfies Record<string, Entry>
 
 export type UiKey = keyof typeof uiText
@@ -334,3 +411,15 @@ const locales: Record<Language, string> = {
 
 /** Mã locale BCP 47 dùng để định dạng số và ngày theo ngôn ngữ đang chọn. */
 export const localeOf = (language: Language) => locales[language]
+
+/**
+ * Thông báo lỗi khi gọi backend theo ngôn ngữ đang chọn: lỗi mạng và lỗi máy chủ dùng câu đã dịch;
+ * lỗi nghiệp vụ (4xx) giữ nội dung máy chủ trả về khi đang dùng tiếng Việt, ngôn ngữ khác dùng câu dự phòng.
+ */
+export function apiErrorMessage(language: Language, error: unknown, fallback: UiKey): string {
+  const status = typeof error === 'object' && error !== null && 'status' in error ? error.status : undefined
+  if (status === 0) return translate(language, 'apiNetworkError')
+  if (typeof status === 'number' && status >= 500) return translate(language, 'apiServerError')
+  if (language === 'vi' && typeof status === 'number' && error instanceof Error && error.message) return error.message
+  return ui(language, fallback)
+}

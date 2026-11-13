@@ -3,12 +3,15 @@ import { useState, type FormEvent } from 'react'
 import { Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, KeyRound, LogOut, Mail, MapPin, Phone, UserRound } from 'lucide-react'
 import { changePassword, loginAccount, registerAccount } from '../api'
+import { translate } from '../i18n'
 import { useAppStore } from '../store'
-import type { UserProfile } from '../types'
+import type { Language, UserProfile } from '../types'
+import { ui } from '../uiText'
 
 export function UserPage() {
   const location = useLocation()
   const navigate = useNavigate()
+  const language = useAppStore((state) => state.language)
   const currentUser = useAppStore((state) => state.currentUser)
   const authReady = useAppStore((state) => state.authReady)
   const signIn = useAppStore((state) => state.signIn)
@@ -34,12 +37,12 @@ export function UserPage() {
     const email = String(values.get('email') ?? '').trim().toLowerCase()
     const password = String(values.get('password') ?? '')
     if (password.length < 8) {
-      setFeedback('Mật khẩu cần có ít nhất 8 ký tự.')
+      setFeedback(ui(language, 'usPwShort'))
       return
     }
 
     if (isRegister && password !== values.get('confirmPassword')) {
-      setFeedback('Mật khẩu xác nhận chưa khớp.')
+      setFeedback(ui(language, 'usPwMismatch'))
       return
     }
 
@@ -72,7 +75,7 @@ export function UserPage() {
         navigate(returnTo, { replace: true })
       }
     } catch (error) {
-      setFeedback(getAuthErrorMessage(error))
+      setFeedback(getAuthErrorMessage(error, language))
     } finally {
       setSubmitting(false)
     }
@@ -95,7 +98,7 @@ export function UserPage() {
       setSaved(true)
       window.setTimeout(() => setSaved(false), 2500)
     } catch {
-      setProfileError('Không lưu được hồ sơ. Hãy kiểm tra kết nối và thử lại.')
+      setProfileError(ui(language, 'usProfileSaveError'))
     }
   }
 
@@ -106,11 +109,11 @@ export function UserPage() {
     const currentPassword = String(values.get('currentPassword') ?? '')
     const newPassword = String(values.get('newPassword') ?? '')
     if (newPassword.length < 8) {
-      setPasswordMessage({ ok: false, text: 'Mật khẩu mới cần có ít nhất 8 ký tự.' })
+      setPasswordMessage({ ok: false, text: ui(language, 'usNewPwShort') })
       return
     }
     if (newPassword !== values.get('confirmNewPassword')) {
-      setPasswordMessage({ ok: false, text: 'Mật khẩu xác nhận chưa khớp.' })
+      setPasswordMessage({ ok: false, text: ui(language, 'usPwMismatch') })
       return
     }
     const token = useAppStore.getState().authToken
@@ -119,14 +122,14 @@ export function UserPage() {
       const result = await changePassword(token, currentPassword, newPassword)
       replaceSession(result.token)
       form.reset()
-      setPasswordMessage({ ok: true, text: 'Đã đổi mật khẩu. Các thiết bị khác sẽ cần đăng nhập lại.' })
+      setPasswordMessage({ ok: true, text: ui(language, 'usPwChanged') })
     } catch (error) {
       const status = typeof error === 'object' && error !== null && 'status' in error ? error.status : undefined
       setPasswordMessage({
         ok: false,
-        text: status === 403 ? 'Mật khẩu hiện tại không đúng.'
-          : status === 422 ? 'Mật khẩu mới phải khác mật khẩu hiện tại.'
-          : 'Không đổi được mật khẩu. Hãy thử lại.',
+        text: status === 403 ? ui(language, 'usPwWrong')
+          : status === 422 ? ui(language, 'usPwSame')
+          : ui(language, 'usPwChangeFailed'),
       })
     }
   }
@@ -134,64 +137,64 @@ export function UserPage() {
   if (isProfile && currentUser) {
     return (
       <section className="user-page">
-        <NavLink to="/explore" className="user-back"><ArrowLeft size={15} /> Trở về khám phá</NavLink>
+        <NavLink to="/explore" className="user-back"><ArrowLeft size={15} /> {ui(language, 'backToExplore')}</NavLink>
         <div className="user-card profile-card">
           <div className="user-page-heading">
             <span className="user-avatar-large">{getInitials(currentUser.fullName)}</span>
             <div>
-              <span className="user-eyebrow">TÀI KHOẢN CỦA BẠN</span>
-              <h1>Hồ sơ cá nhân</h1>
-              <p>Cập nhật thông tin để cá nhân hóa hành trình của bạn.</p>
+              <span className="user-eyebrow">{ui(language, 'usAccountEyebrow')}</span>
+              <h1>{ui(language, 'usProfileTitle')}</h1>
+              <p>{ui(language, 'usProfileIntro')}</p>
             </div>
             <button className="signout-button" onClick={() => { void signOut().then(() => navigate('/login', { replace: true })) }}>
-              <LogOut size={15} /> Đăng xuất
+              <LogOut size={15} /> {ui(language, 'usSignOut')}
             </button>
           </div>
           <form className="user-form profile-form" onSubmit={(event) => { void onSaveProfile(event) }}>
-            <label>Họ và tên
+            <label>{ui(language, 'usFullName')}
               <span className="input-with-icon"><UserRound size={16} /><input name="fullName" required maxLength={80} defaultValue={currentUser.fullName} autoComplete="name" /></span>
             </label>
-            <label>Email
+            <label>{ui(language, 'usEmail')}
               <span className="input-with-icon"><Mail size={16} /><input type="email" value={currentUser.email} readOnly /></span>
             </label>
-            <label>Số điện thoại
+            <label>{ui(language, 'usPhone')}
               <span className="input-with-icon"><Phone size={16} /><input name="phone" type="tel" maxLength={20} defaultValue={currentUser.phone} autoComplete="tel" /></span>
             </label>
-            <label>Ngày sinh
+            <label>{ui(language, 'usBirthDate')}
               <input name="birthDate" type="date" defaultValue={currentUser.birthDate} />
             </label>
-            <label>Giới tính
+            <label>{ui(language, 'usGender')}
               <select name="gender" defaultValue={currentUser.gender}>
-                <option value="">Chọn (không bắt buộc)</option>
-                <option value="female">Nữ</option>
-                <option value="male">Nam</option>
-                <option value="other">Khác</option>
-                <option value="prefer-not-to-say">Không muốn trả lời</option>
+                <option value="">{ui(language, 'usGenderChoose')}</option>
+                <option value="female">{ui(language, 'usFemale')}</option>
+                <option value="male">{ui(language, 'usMale')}</option>
+                <option value="other">{ui(language, 'usOther')}</option>
+                <option value="prefer-not-to-say">{ui(language, 'usNoAnswer')}</option>
               </select>
             </label>
-            <label className="profile-address">Địa chỉ
-              <span className="input-with-icon"><MapPin size={16} /><input name="address" maxLength={160} defaultValue={currentUser.address} autoComplete="street-address" placeholder="Tỉnh/thành phố, quốc gia" /></span>
+            <label className="profile-address">{ui(language, 'usAddress')}
+              <span className="input-with-icon"><MapPin size={16} /><input name="address" maxLength={160} defaultValue={currentUser.address} autoComplete="street-address" placeholder={ui(language, 'usAddressPh')} /></span>
             </label>
             <div className="profile-actions">
-              {saved && <span className="profile-saved" role="status"><Check size={15} /> Đã lưu thông tin</span>}
-              <button className="user-submit" type="submit">Lưu thông tin</button>
+              {saved && <span className="profile-saved" role="status"><Check size={15} /> {ui(language, 'usSaved')}</span>}
+              <button className="user-submit" type="submit">{ui(language, 'usSave')}</button>
             </div>
             {profileError && <p className="user-feedback" role="alert">{profileError}</p>}
           </form>
           <form className="user-form profile-form" onSubmit={(event) => { void onChangePassword(event) }}>
-            <h2 className="profile-address"><KeyRound size={16} /> Đổi mật khẩu</h2>
-            <label>Mật khẩu hiện tại
+            <h2 className="profile-address"><KeyRound size={16} /> {ui(language, 'usChangePw')}</h2>
+            <label>{ui(language, 'usCurrentPw')}
               <input name="currentPassword" type="password" required minLength={8} autoComplete="current-password" />
             </label>
-            <label>Mật khẩu mới
-              <input name="newPassword" type="password" required minLength={8} autoComplete="new-password" placeholder="Ít nhất 8 ký tự" />
+            <label>{ui(language, 'usNewPw')}
+              <input name="newPassword" type="password" required minLength={8} autoComplete="new-password" placeholder={ui(language, 'usMin8')} />
             </label>
-            <label>Xác nhận mật khẩu mới
+            <label>{ui(language, 'usConfirmNewPw')}
               <input name="confirmNewPassword" type="password" required minLength={8} autoComplete="new-password" />
             </label>
             <div className="profile-actions">
               {passwordMessage && <p className="user-feedback" role="status">{passwordMessage.text}</p>}
-              <button className="user-submit" type="submit">Đổi mật khẩu</button>
+              <button className="user-submit" type="submit">{ui(language, 'usChangePw')}</button>
             </div>
           </form>
         </div>
@@ -201,44 +204,44 @@ export function UserPage() {
 
   return (
     <section className="user-page">
-      <NavLink to="/explore" className="user-back"><ArrowLeft size={15} /> Trở về khám phá</NavLink>
+      <NavLink to="/explore" className="user-back"><ArrowLeft size={15} /> {ui(language, 'backToExplore')}</NavLink>
       <div className="user-card auth-card">
         <div className="auth-heading">
           <span className="user-avatar-large"><UserRound size={24} /></span>
-          <span className="user-eyebrow">QUẢNG TRỊ · QUẢNG BÌNH</span>
-          <h1>{isRegister ? 'Tạo tài khoản' : 'Chào mừng trở lại'}</h1>
-          <p>{isRegister ? 'Tạo hồ sơ để lưu lại những hành trình đáng nhớ.' : 'Đăng nhập để tiếp tục hành trình của bạn.'}</p>
+          <span className="user-eyebrow">{ui(language, 'regionName').toLocaleUpperCase(language)}</span>
+          <h1>{ui(language, isRegister ? 'usRegisterTitle' : 'usLoginTitle')}</h1>
+          <p>{ui(language, isRegister ? 'usRegisterIntro' : 'usLoginIntro')}</p>
         </div>
-        <div className="auth-divider"><span>bằng email</span></div>
+        <div className="auth-divider"><span>{ui(language, 'usByEmail')}</span></div>
         <form className="user-form" onSubmit={onSubmitAuth}>
           {isRegister && (
             <>
-              <label>Họ và tên
-                <span className="input-with-icon"><UserRound size={16} /><input name="fullName" required maxLength={80} autoComplete="name" placeholder="Nguyễn Văn An" /></span>
+              <label>{ui(language, 'usFullName')}
+                <span className="input-with-icon"><UserRound size={16} /><input name="fullName" required maxLength={80} autoComplete="name" placeholder={ui(language, 'usNamePh')} /></span>
               </label>
-              <label>Số điện thoại <small>(không bắt buộc)</small>
+              <label>{ui(language, 'usPhone')} <small>{ui(language, 'usOptional')}</small>
                 <span className="input-with-icon"><Phone size={16} /><input name="phone" type="tel" maxLength={20} autoComplete="tel" placeholder="+84" /></span>
               </label>
             </>
           )}
-          <label>Email
-            <span className="input-with-icon"><Mail size={16} /><input name="email" type="email" required maxLength={254} autoComplete="email" placeholder="ban@example.com" /></span>
+          <label>{ui(language, 'usEmail')}
+            <span className="input-with-icon"><Mail size={16} /><input name="email" type="email" required maxLength={254} autoComplete="email" placeholder={ui(language, 'usEmailPh')} /></span>
           </label>
-          <label>Mật khẩu
-            <input name="password" type="password" required minLength={8} autoComplete={isRegister ? 'new-password' : 'current-password'} placeholder="Ít nhất 8 ký tự" />
+          <label>{ui(language, 'usPassword')}
+            <input name="password" type="password" required minLength={8} autoComplete={isRegister ? 'new-password' : 'current-password'} placeholder={ui(language, 'usMin8')} />
           </label>
-          {isRegister && <label>Xác nhận mật khẩu
-            <input name="confirmPassword" type="password" required minLength={8} autoComplete="new-password" placeholder="Nhập lại mật khẩu" />
+          {isRegister && <label>{ui(language, 'usConfirmPw')}
+            <input name="confirmPassword" type="password" required minLength={8} autoComplete="new-password" placeholder={ui(language, 'usRetypePw')} />
           </label>}
           {feedback && <p className="user-feedback" role="status">{feedback}</p>}
           <button className="user-submit" type="submit" disabled={submitting}>
-            {submitting ? 'Đang xử lý…' : isRegister ? 'Tạo tài khoản' : 'Đăng nhập'}
+            {submitting ? ui(language, 'usProcessing') : ui(language, isRegister ? 'usRegisterTitle' : 'signIn')}
           </button>
         </form>
         <p className="auth-switch">
-          {isRegister ? 'Đã có tài khoản?' : 'Chưa có tài khoản?'}{' '}
+          {ui(language, isRegister ? 'usHaveAccount' : 'usNoAccount')}{' '}
           <NavLink to={isRegister ? '/login' : '/register'} state={location.state}>
-            {isRegister ? 'Đăng nhập' : 'Đăng ký'}
+            {ui(language, isRegister ? 'signIn' : 'usRegister')}
           </NavLink>
         </p>
       </div>
@@ -246,17 +249,17 @@ export function UserPage() {
   )
 }
 
-function getAuthErrorMessage(error: unknown) {
+function getAuthErrorMessage(error: unknown, language: Language) {
   if (typeof error !== 'object' || error === null || !('status' in error)) {
-    return 'Không thể kết nối máy chủ. Hãy kiểm tra kết nối mạng và thử lại.'
+    return translate(language, 'apiNetworkError')
   }
   const status = error.status
-  if (status === 401) return 'Email hoặc mật khẩu không chính xác.'
-  if (status === 409) return 'Email này đã được đăng ký. Hãy đăng nhập hoặc dùng email khác.'
-  if (status === 422) return 'Thông tin đăng ký chưa hợp lệ. Hãy kiểm tra email và mật khẩu.'
-  if (status === 404) return 'Máy chủ đang chạy phiên bản cũ, chưa có API tài khoản. Hãy khởi động lại backend rồi thử lại.'
-  if (status === 0) return 'Không kết nối được máy chủ. Hãy kiểm tra backend và thử lại.'
-  return 'Không thể xác thực tài khoản. Vui lòng thử lại.'
+  if (status === 401) return ui(language, 'usErr401')
+  if (status === 409) return ui(language, 'usErr409')
+  if (status === 422) return ui(language, 'usErr422')
+  if (status === 404) return ui(language, 'usErr404')
+  if (status === 0) return translate(language, 'apiNetworkError')
+  return ui(language, 'usErrAuth')
 }
 
 function getInitials(name: string) {

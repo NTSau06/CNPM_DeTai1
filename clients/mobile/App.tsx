@@ -23,9 +23,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { PlaceInfoCard } from './PlaceInfo'
 import { recordNearbyVisit } from './analytics'
+import { categoryLabels, mt, type Category, type Language } from './uiText'
 
-type Language = 'vi' | 'en' | 'ja' | 'fr' | 'zh-CN' | 'ko-KR' | 'es'
-type Category = 'landmark' | 'food' | 'craft' | 'rest'
 type Copy = { title: string; subtitle: string; narration: string }
 type Place = {
   id: string
@@ -48,6 +47,7 @@ const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api/
 const PLACES_KEY = 'quang-tri:places:v1'
 const AUTH_KEY = 'quang-tri:auth-token:v1'
 const PRESENCE_KEY = 'quang-tri:presence-id:v1'
+const LANGUAGE_KEY = 'quang-tri:language:v1'
 const TOURS_KEY = 'quang-tri:tours:v2'
 const RETIRED_PLACE_IDS = new Set(['truong-son-cemetery'])
 const locales: Language[] = ['vi', 'en', 'ja', 'fr', 'zh-CN', 'ko-KR', 'es']
@@ -55,6 +55,7 @@ const languages: { code: Language; label: string }[] = [
   { code: 'vi', label: 'VI' },
   { code: 'en', label: 'EN' },
   { code: 'zh-CN', label: '中文' },
+  { code: 'ko-KR', label: '한국어' },
   { code: 'fr', label: 'FR' },
   { code: 'ja', label: '日本語' },
   { code: 'es', label: 'ES' },
@@ -156,6 +157,20 @@ export default function App() {
   const playPlaceRef = useRef<((place: Place) => Promise<void>) | null>(null)
   languageRef.current = language
   const currentLanguage = words[language]
+
+  // Khôi phục ngôn ngữ đã chọn ở lần mở trước; lựa chọn mới được lưu trong chooseLanguage.
+  useEffect(() => {
+    void AsyncStorage.getItem(LANGUAGE_KEY)
+      .then((stored) => {
+        if (stored && (locales as string[]).includes(stored)) setLanguage(stored as Language)
+      })
+      .catch(() => {})
+  }, [])
+
+  const chooseLanguage = (next: Language) => {
+    setLanguage(next)
+    void AsyncStorage.setItem(LANGUAGE_KEY, next).catch(() => {})
+  }
 
   const filteredPlaces = useMemo(() => {
     const value = query.trim().toLocaleLowerCase()
@@ -357,7 +372,7 @@ export default function App() {
             recordedVisits.current.add(visitKey)
             void recordNearbyVisit(place.id, user).catch(() => {
               recordedVisits.current.delete(visitKey)
-              setMessage('Không ghi nhận được lượt ghé. Kiểm tra kết nối máy chủ.')
+              setMessage(mt(languageRef.current, 'visitError'))
             })
           }
           const nearby = places.find((place) =>
@@ -382,14 +397,14 @@ export default function App() {
       return
     }
     Alert.alert(
-      'Ghi nhận lượt ghé bằng GPS',
-      'Khi bật hướng dẫn, ứng dụng gửi vị trí gần điểm dừng để ghi nhận tối đa một lượt ghé ẩn danh cho mỗi thiết bị, mỗi điểm mỗi ngày.',
+      mt(language, 'gpsTitle'),
+      mt(language, 'gpsBody'),
       [
-        { text: 'Hủy', style: 'cancel' },
-        { text: 'Đồng ý', onPress: () => { void beginWalk() } },
+        { text: mt(language, 'cancel'), style: 'cancel' },
+        { text: mt(language, 'agree'), onPress: () => { void beginWalk() } },
       ],
     )
-  }, [beginWalk, stopWalk, walking])
+  }, [beginWalk, language, stopWalk, walking])
 
   const toggleRoute = (placeId: string) => {
     if (!account) {
@@ -426,7 +441,7 @@ export default function App() {
           await AsyncStorage.removeItem(draftTourStorageKey(owner.id))
         }
         if (!draftId) setRouteIds([])
-        setMessage(language === 'vi' ? 'Đã cập nhật hành trình đã lưu.' : 'Saved walk updated.')
+        setMessage(mt(language, 'walkUpdated'))
         return true
       }
       const tour: Tour = {
@@ -451,7 +466,7 @@ export default function App() {
       setActiveRouteTourId(saved.id)
       await AsyncStorage.setItem(tourStorageKey(owner.id), JSON.stringify(updated))
       await AsyncStorage.setItem(draftTourStorageKey(owner.id), saved.id)
-      setMessage(language === 'vi' ? 'Đã tự lưu vào hành trình của bạn.' : 'Automatically saved to your walk.')
+      setMessage(mt(language, 'autoSaved'))
       return true
     } catch {
       setMessage(currentLanguage.offline)
@@ -465,15 +480,15 @@ export default function App() {
   const authenticate = async () => {
     setAuthError('')
     if (authMode === 'register' && !authName.trim()) {
-      setAuthError(language === 'vi' ? 'Vui lòng nhập họ và tên.' : 'Enter your name.')
+      setAuthError(mt(language, 'nameRequired'))
       return
     }
     if (authPassword.length < 8) {
-      setAuthError(language === 'vi' ? 'Mật khẩu cần có ít nhất 8 ký tự.' : 'Password must be at least 8 characters.')
+      setAuthError(mt(language, 'pwShort'))
       return
     }
     if (authMode === 'register' && authPassword !== authConfirmPassword) {
-      setAuthError(language === 'vi' ? 'Mật khẩu xác nhận chưa khớp.' : 'Passwords do not match.')
+      setAuthError(mt(language, 'pwMismatch'))
       return
     }
     setAuthBusy(true)
@@ -511,7 +526,7 @@ export default function App() {
       setAuthConfirmPassword('')
       setMessage('')
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : currentLanguage.error)
+      setAuthError(language === 'vi' && error instanceof Error ? error.message : mt(language, 'authFailed'))
     } finally {
       setAuthBusy(false)
     }
@@ -556,7 +571,7 @@ export default function App() {
       try {
         await AsyncStorage.removeItem(key)
         setOfflineGuideSaved(false)
-        setMessage(language === 'vi' ? 'Đã gỡ lời thuyết minh ngoại tuyến.' : 'Offline narration removed.')
+        setMessage(mt(language, 'offlineRemoved'))
       } catch {
         setMessage(currentLanguage.error)
       }
@@ -569,7 +584,7 @@ export default function App() {
         JSON.stringify({ placeId: selectedPlace.id, language, ...copy, savedAt: Date.now() }),
       )
       setOfflineGuideSaved(true)
-      setMessage(language === 'vi' ? 'Đã lưu lời thuyết minh để dùng ngoại tuyến.' : 'Narration saved for offline use.')
+      setMessage(mt(language, 'offlineSaved'))
     } catch {
       setMessage(currentLanguage.error)
     }
@@ -580,17 +595,17 @@ export default function App() {
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
         <View style={styles.topbar}>
-          <Text style={styles.brand}>QUẢNG TRỊ</Text>
+          <Text style={styles.brand}>{mt(language, 'brand')}</Text>
           <Pressable
             accessibilityRole="button"
             onPress={() => {
               if (account) {
                 Alert.alert(
-                  language === 'vi' ? 'Tài khoản' : 'Account',
+                  mt(language, 'account'),
                   account.fullName,
                   [
-                    { text: language === 'vi' ? 'Hủy' : 'Cancel', style: 'cancel' },
-                    { text: language === 'vi' ? 'Đăng xuất' : 'Sign out', onPress: () => { void signOut() } },
+                    { text: mt(language, 'cancel'), style: 'cancel' },
+                    { text: mt(language, 'signOut'), onPress: () => { void signOut() } },
                   ],
                 )
               } else {
@@ -601,26 +616,26 @@ export default function App() {
             style={styles.accountButton}
           >
             <Text style={styles.accountButtonText}>
-              {account ? account.fullName : language === 'vi' ? 'Đăng nhập' : 'Sign in'}
+              {account ? account.fullName : mt(language, 'signIn')}
             </Text>
           </Pressable>
         </View>
 
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>{currentLanguage.kicker}</Text>
-          <Text style={styles.heroTitle}>Quảng Trị</Text>
+          <Text style={styles.heroTitle}>{mt(language, 'heroTitle')}</Text>
           <Text style={styles.heroBody}>{currentLanguage.intro}</Text>
-          <View style={styles.regionPill}><Text style={styles.regionText}>QUẢNG TRỊ · QUẢNG BÌNH</Text></View>
+          <View style={styles.regionPill}><Text style={styles.regionText}>{mt(language, 'region')}</Text></View>
           <View style={styles.landscape}><View style={styles.sun} /><View style={styles.hillBack} /><View style={styles.hillFront} /></View>
         </View>
 
-        <View style={styles.languageRow} accessibilityLabel="Narration language">
+        <View style={styles.languageRow} accessibilityLabel={mt(language, 'narrationLanguage')}>
           {languages.map((item) => (
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ selected: language === item.code }}
               key={item.code}
-              onPress={() => setLanguage(item.code)}
+              onPress={() => chooseLanguage(item.code)}
               style={[styles.languageChip, language === item.code && styles.languageChipActive]}
             >
               <Text style={[styles.languageText, language === item.code && styles.languageTextActive]}>{item.label}</Text>
@@ -659,7 +674,7 @@ export default function App() {
               <View style={styles.placeCopy}>
                 <Text style={styles.placeTitle}>{copy.title}</Text>
                 <Text style={styles.placeSubtitle}>{copy.subtitle}</Text>
-                <Text style={styles.placeMeta}>{place.duration} min · {place.category.toUpperCase()}</Text>
+                <Text style={styles.placeMeta}>{mt(language, 'minutes', { n: place.duration })} · {categoryLabels[language][place.category].toLocaleUpperCase(language)}</Text>
                 <View style={styles.actions}>
                   <Pressable accessibilityRole="button" onPress={() => playing && active ? (Speech.stop(), setPlaying(false)) : void playPlace(place)} style={styles.listenButton}>
                     <Text style={styles.listenButtonText}>{playing && active ? `■ ${currentLanguage.stop}` : `▶ ${currentLanguage.listen}`}</Text>
@@ -673,31 +688,23 @@ export default function App() {
           )
         })}
 
-        {selectedPlace && <PlaceInfoCard key={selectedPlace.id} placeId={selectedPlace.id} placeTitle={selectedPlace.copy[language]?.title ?? selectedPlace.copy.vi.title} />}
+        {selectedPlace && <PlaceInfoCard key={selectedPlace.id} language={language} placeId={selectedPlace.id} placeTitle={selectedPlace.copy[language]?.title ?? selectedPlace.copy.vi.title} />}
 
         {selectedPlace && (
           <View style={styles.experienceCard}>
-            <Text style={styles.experienceTitle}>{language === 'vi' ? 'Thuyết minh ngoại tuyến' : 'Offline narration'}</Text>
-            <Text style={styles.experienceHint}>{language === 'vi'
-              ? 'Lưu lời đọc để nghe khi mất mạng. Giọng đọc dùng TTS đã cài trên thiết bị, không phải tệp MP3.'
-              : 'Save narration for offline listening. Speech uses a voice installed on your device, not an MP3 file.'}</Text>
+            <Text style={styles.experienceTitle}>{mt(language, 'offlineTitle')}</Text>
+            <Text style={styles.experienceHint}>{mt(language, 'offlineHint')}</Text>
             <Pressable accessibilityRole="button" onPress={() => void saveOfflineGuide()} style={styles.experienceSecondaryButton}>
-              <Text style={styles.experienceSecondaryText}>{offlineGuideSaved ? (language === 'vi' ? 'Gỡ gói ngoại tuyến' : 'Remove offline package') : (language === 'vi' ? 'Lưu lời đọc ngoại tuyến' : 'Save offline narration')}</Text>
+              <Text style={styles.experienceSecondaryText}>{mt(language, offlineGuideSaved ? 'offlineRemove' : 'offlineSave')}</Text>
             </Pressable>
           </View>
         )}
 
         {selectedPlace?.id === 'quang-tri-citadel' && (
           <View style={styles.experienceCard}>
-            <Text style={styles.experienceTitle}>{language === 'vi' ? 'Gợi ý ứng xử theo thời điểm' : 'Respectful visit suggestions'}</Text>
-            <Text style={styles.ritualBody}>{vietnamHour < 11
-              ? (language === 'vi' ? 'Buổi sáng: dành thời gian đọc thông tin tại di tích, đi nhẹ và giữ không gian yên tĩnh.' : 'Morning: read the site information, walk quietly, and keep the space peaceful.')
-              : vietnamHour < 17
-                ? (language === 'vi' ? 'Buổi chiều: tham quan theo lối quy định, tránh làm ảnh hưởng người đang tưởng niệm.' : 'Afternoon: follow marked paths and avoid disturbing people paying their respects.')
-                : (language === 'vi' ? 'Buổi tối: nếu di tích còn mở cửa, giữ thái độ trang nghiêm và làm theo hướng dẫn tại chỗ.' : 'Evening: if the site is open, remain respectful and follow on-site guidance.')}</Text>
-            <Text style={styles.experienceHint}>{language === 'vi'
-              ? 'Đây là gợi ý chung, không phải lịch tổ chức nghi lễ. Hãy xác nhận giờ mở cửa và sự kiện với đơn vị quản lý.'
-              : 'General etiquette only, not a ceremony schedule. Confirm opening hours and events with the site operator.'}</Text>
+            <Text style={styles.experienceTitle}>{mt(language, 'ritualTitle')}</Text>
+            <Text style={styles.ritualBody}>{mt(language, vietnamHour < 11 ? 'ritualMorning' : vietnamHour < 17 ? 'ritualAfternoon' : 'ritualEvening')}</Text>
+            <Text style={styles.experienceHint}>{mt(language, 'ritualNote')}</Text>
           </View>
         )}
 
@@ -712,7 +719,7 @@ export default function App() {
         {routeIds.length > 0 && (
           <View style={styles.tourCard}>
             <Text style={styles.tourTitle}>{routeIds.length} {currentLanguage.places.toLocaleLowerCase()}</Text>
-            <Text style={styles.tourSavedText}>{language === 'vi' ? 'Đã tự lưu vào hành trình đã lưu.' : 'Automatically saved to your saved walks.'}</Text>
+            <Text style={styles.tourSavedText}>{mt(language, 'tourSaved')}</Text>
           </View>
         )}
 
@@ -724,11 +731,11 @@ export default function App() {
         {tours.map((tour) => (
           <View key={tour.id} style={styles.savedCard}>
             <Text style={styles.savedNames}>{tour.placeIds.map((id) => places.find((place) => place.id === id)?.copy[language]?.title ?? id).join(' · ')}</Text>
-            <Text style={styles.placeMeta}>{tour.placeIds.length} stops · {tour.distanceKm.toFixed(1)} km</Text>
-            <Pressable accessibilityRole="button" onPress={() => void deleteTour(tour.id)}><Text style={styles.removeText}>Remove</Text></Pressable>
+            <Text style={styles.placeMeta}>{mt(language, 'stopsDistance', { n: tour.placeIds.length, km: tour.distanceKm.toFixed(1) })}</Text>
+            <Pressable accessibilityRole="button" onPress={() => void deleteTour(tour.id)}><Text style={styles.removeText}>{mt(language, 'remove')}</Text></Pressable>
           </View>
         ))}
-        <Text style={styles.footer}>QUẢNG TRỊ · QUẢNG BÌNH{'\n'}A SMALL GUIDE TO SLOW TRAVEL</Text>
+        <Text style={styles.footer}>{mt(language, 'region')}{'\n'}{mt(language, 'footer')}</Text>
       </ScrollView>
       <Modal
         animationType="slide"
@@ -747,8 +754,8 @@ export default function App() {
             <View style={styles.authHeader}>
               <Text style={styles.authTitle}>
                 {authMode === 'register'
-                  ? language === 'vi' ? 'Tạo tài khoản' : 'Create account'
-                  : language === 'vi' ? 'Đăng nhập để thêm hành trình' : 'Sign in to add a walk'}
+                  ? mt(language, 'createAccount')
+                  : mt(language, 'signInToAdd')}
               </Text>
               <Pressable
                 accessibilityRole="button"
@@ -765,7 +772,7 @@ export default function App() {
                 autoComplete="name"
                 autoCapitalize="words"
                 onChangeText={setAuthName}
-                placeholder={language === 'vi' ? 'Họ và tên' : 'Full name'}
+                placeholder={mt(language, 'fullName')}
                 style={styles.authInput}
                 value={authName}
               />
@@ -782,7 +789,7 @@ export default function App() {
             <TextInput
               autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
               onChangeText={setAuthPassword}
-              placeholder={language === 'vi' ? 'Mật khẩu (ít nhất 8 ký tự)' : 'Password (at least 8 characters)'}
+              placeholder={mt(language, 'passwordPh')}
               secureTextEntry
               style={styles.authInput}
               value={authPassword}
@@ -791,7 +798,7 @@ export default function App() {
               <TextInput
                 autoComplete="new-password"
                 onChangeText={setAuthConfirmPassword}
-                placeholder={language === 'vi' ? 'Xác nhận mật khẩu' : 'Confirm password'}
+                placeholder={mt(language, 'confirmPassword')}
                 secureTextEntry
                 style={styles.authInput}
                 value={authConfirmPassword}
@@ -806,10 +813,8 @@ export default function App() {
             >
               <Text style={styles.authSubmitText}>
                 {authBusy
-                  ? language === 'vi' ? 'Đang xử lý…' : 'Please wait…'
-                  : authMode === 'register'
-                    ? language === 'vi' ? 'Tạo tài khoản' : 'Create account'
-                    : language === 'vi' ? 'Đăng nhập' : 'Sign in'}
+                  ? mt(language, 'processing')
+                  : mt(language, authMode === 'register' ? 'createAccount' : 'signIn')}
               </Text>
             </Pressable>
             <Pressable
@@ -821,8 +826,8 @@ export default function App() {
             >
               <Text style={styles.authSwitch}>
                 {authMode === 'register'
-                  ? language === 'vi' ? 'Đã có tài khoản? Đăng nhập' : 'Already registered? Sign in'
-                  : language === 'vi' ? 'Chưa có tài khoản? Đăng ký' : 'New here? Create an account'}
+                  ? mt(language, 'haveAccount')
+                  : mt(language, 'noAccount')}
               </Text>
             </Pressable>
           </View>
