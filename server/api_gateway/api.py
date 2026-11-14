@@ -4,9 +4,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
 
+from api_gateway.pairing import PAIRING_TTL_SECONDS
 from api_gateway.proxy import request_service
 from api_gateway.schemas import (
     LoginRequest,
+    PairingCreate,
     PasswordChange,
     ProfileUpdate,
     RegisterRequest,
@@ -541,6 +543,63 @@ async def delete_tour(
         params={"userId": user["id"]},
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/pairing", status_code=status.HTTP_201_CREATED)
+def create_pairing(
+    payload: PairingCreate,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    """Máy tính tạo mã QR; nếu đang đăng nhập thì điện thoại sẽ được cấp phiên riêng."""
+    user_id = None
+    if authorization is not None and authorization.startswith("Bearer "):
+        user = request.app.state.auth_repository.authenticate(authorization[7:])
+        if user is not None:
+            user_id = user["id"]
+    code, expires_at = request.app.state.pairing_repository.create(
+        user_id,
+        payload.language,
+        payload.place_id,
+        payload.path,
+    )
+    return {
+        "code": code,
+        "expiresAt": expires_at,
+        "expiresIn": PAIRING_TTL_SECONDS,
+        "signedIn": user_id is not None,
+    }
+
+
+@router.get("/pairing/{code}")
+def get_pairing_status(code: str, request: Request) -> dict:
+    result = request.app.state.pairing_repository.status(code)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Pairing code was not found.")
+    return result
+
+
+@router.post("/pairing/{code}/claim")
+def claim_pairing(code: str, request: Request) -> dict:
+    """Điện thoại dùng mã QR đúng một lần để nhận ngôn ngữ, địa điểm và phiên đăng nhập."""
+    pairing = request.app.state.pairing_repository.claim(code)
+    if pairing is None:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="This QR code has expired or was already used.",
+        )
+    result: dict = {
+        "language": pairing["language"],
+        "placeId": pairing["placeId"],
+        "path": pairing["path"],
+        "token": None,
+        "user": None,
+    }
+    if pairing["userId"] is not None:
+        session = request.app.state.auth_repository.issue_session(pairing["userId"])
+        if session is not None:
+            result["token"], result["user"] = session
+    return result
 
 
 @router.get("/health")

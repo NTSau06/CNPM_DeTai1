@@ -304,6 +304,13 @@ class AuthRepository:
             else:
                 connection.execute("UPDATE users SET is_admin = 1 WHERE id = ?", row[0])
 
+    def issue_session(self, user_id: str) -> tuple[str, dict] | None:
+        """Cấp một phiên mới, độc lập cho thiết bị khác của cùng tài khoản."""
+        user = self._get_user(user_id)
+        if user is None:
+            return None
+        return self._create_session(user_id), user
+
     def _create_session(self, user_id: str) -> str:
         token = secrets.token_urlsafe(32)
         now = int(time.time())

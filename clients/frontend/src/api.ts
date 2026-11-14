@@ -170,6 +170,49 @@ export async function loginAccount(email: string, password: string): Promise<Aut
   })
 }
 
+export interface PairingTicket {
+  code: string
+  expiresAt: number
+  expiresIn: number
+  signedIn: boolean
+}
+
+export type PairingStatus = 'pending' | 'claimed' | 'expired'
+
+export interface PairingClaim {
+  language: Language
+  placeId: string | null
+  path: string
+  token: string | null
+  user: UserProfile | null
+}
+
+// Máy tính tạo phiên ghép nối; gửi kèm token để điện thoại được cấp phiên đăng nhập riêng.
+export async function createPairing(
+  language: Language,
+  placeId: string | null,
+  token: string | null,
+): Promise<PairingTicket> {
+  return request<PairingTicket>('/pairing', {
+    method: 'POST',
+    body: JSON.stringify({ language, placeId, path: '/explore' }),
+  }, token ?? undefined)
+}
+
+export async function getPairingStatus(code: string): Promise<PairingStatus> {
+  try {
+    const result = await request<{ status: PairingStatus }>(`/pairing/${encodeURIComponent(code)}`)
+    return result.status
+  } catch (error) {
+    if (error instanceof BackendApiError && error.status === 404) return 'expired'
+    throw error
+  }
+}
+
+export async function claimPairing(code: string): Promise<PairingClaim> {
+  return request<PairingClaim>(`/pairing/${encodeURIComponent(code)}/claim`, { method: 'POST' })
+}
+
 export async function fetchCurrentUser(token: string): Promise<UserProfile> {
   return request<UserProfile>('/auth/me', undefined, token)
 }

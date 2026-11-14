@@ -2,7 +2,7 @@
 import type React from 'react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { AlertCircle, Bookmark, ChevronDown, Compass, House, Info, Map, MapPinned, Menu, MonitorSmartphone, Settings2, X } from 'lucide-react'
+import { AlertCircle, Bookmark, ChevronDown, Compass, House, Info, Map, MapPinned, Menu, Settings2, Smartphone, X } from 'lucide-react'
 import { translate } from './i18n'
 import { ui, type UiKey } from './uiText'
 import { languages } from './data/places'
@@ -15,6 +15,7 @@ import { sendSessionHeartbeat } from './api'
 const ExplorePage = lazy(() => import('./pages/ExplorePage').then((module) => ({ default: module.ExplorePage })))
 const SavedPage = lazy(() => import('./pages/SavedPage').then((module) => ({ default: module.SavedPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })))
+const PairPage = lazy(() => import('./pages/PairPage').then((module) => ({ default: module.PairPage })))
 const UserPage = lazy(() => import('./pages/UserPage').then((module) => ({ default: module.UserPage })))
 const OnlineDashboardPage = lazy(() => import('./pages/OnlineDashboardPage').then((module) => ({ default: module.OnlineDashboardPage })))
 const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage').then((module) => ({ default: module.AdminLoginPage })))
@@ -246,9 +247,10 @@ export default function App() {
           </nav>
         )}
         <div className="topbar-right">
-          <NavLink className="device-picker-link" to="/device" title={ui(language, 'chooseDevice')}>
-            <MonitorSmartphone size={15} aria-hidden="true" />
-            <span>{ui(language, 'device')}</span>
+          {/* Chỉ hiện trên máy tính: tạo mã QR để mang hành trình sang điện thoại. */}
+          <NavLink className="device-picker-link" to="/device" title={ui(language, 'openOnPhone')} aria-label={ui(language, 'openOnPhone')}>
+            <Smartphone size={15} aria-hidden="true" />
+            <span>{ui(language, 'openOnPhone')}</span>
           </NavLink>
           <div className="header-navigation" ref={navigationRef}>
             <button
@@ -268,11 +270,11 @@ export default function App() {
               <nav className="header-navigation-menu" id="header-navigation-menu" aria-label={translate(language, 'navMenu')}>
                 <NavLink
                   to="/device"
-                  className={({ isActive }) => `header-navigation-item${isActive ? ' active' : ''}`}
+                  className={({ isActive }) => `header-navigation-item header-navigation-phone${isActive ? ' active' : ''}`}
                   onClick={() => setNavigationOpen(false)}
                 >
-                  <MonitorSmartphone size={17} strokeWidth={1.8} />
-                  <span>{ui(language, 'chooseDevice')}</span>
+                  <Smartphone size={17} strokeWidth={1.8} />
+                  <span>{ui(language, 'openOnPhone')}</span>
                 </NavLink>
                 {items.map(({ to, label, icon: Icon, end }) => (
                   <NavLink
@@ -306,6 +308,7 @@ export default function App() {
         <Suspense fallback={<div className="page-loading" aria-label={translate(language, 'loading')}><span className="skeleton page-skeleton-title" /><span className="skeleton page-skeleton-line" /><span className="skeleton page-skeleton-block" /></div>}>
           <Routes>
             <Route path="/device" element={<DeviceEntryPage />} />
+            <Route path="/pair" element={<PairPage />} />
             <Route path="/explore" element={<ExplorePage />} />
             <Route path="/saved" element={<SavedPage />} />
             <Route path="/offline" element={<SettingsPage />} />

@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api_gateway.api import router
 from api_gateway.auth import AuthRepository
+from api_gateway.pairing import PairingRepository
 from api_gateway.tickets import TicketRepository
 from services.common.database import Database
 
@@ -30,6 +31,7 @@ def create_app(
     shared_database = database or Database()
     auth_repository = AuthRepository(shared_database)
     ticket_repository = TicketRepository(shared_database)
+    pairing_repository = PairingRepository(shared_database)
     configured_admin_email = admin_email if admin_email is not None else os.getenv("ADMIN_EMAIL", "")
     configured_admin_password = (
         admin_password if admin_password is not None else os.getenv("ADMIN_PASSWORD", "")
@@ -40,6 +42,7 @@ def create_app(
         auth_repository.initialize()
         auth_repository.ensure_admin(configured_admin_email, configured_admin_password)
         ticket_repository.initialize()
+        pairing_repository.initialize()
         yield
 
     app = FastAPI(
@@ -65,6 +68,7 @@ def create_app(
     app.state.service_urls = urls
     app.state.auth_repository = auth_repository
     app.state.ticket_repository = ticket_repository
+    app.state.pairing_repository = pairing_repository
     app.include_router(router)
     return app
 

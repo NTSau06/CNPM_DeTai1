@@ -73,6 +73,22 @@ class ProfileUpdate(BaseModel):
         return value
 
 
+class PairingCreate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    language: Literal["vi", "en", "ja", "fr", "zh-CN", "ko-KR", "es"] = "vi"
+    place_id: Annotated[str | None, Field(alias="placeId", default=None, max_length=120)]
+    path: Annotated[str, Field(default="/explore", min_length=1, max_length=200)]
+
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, value: str) -> str:
+        # Chỉ cho phép đường dẫn nội bộ của ứng dụng để tránh chuyển hướng ra trang ngoài.
+        if re.fullmatch(r"/(?!/)[A-Za-z0-9\-._~/?=&%]*", value) is None or "://" in value:
+            raise ValueError("Path must be an in-app path.")
+        return value
+
+
 class PasswordChange(BaseModel):
     current_password: Annotated[
         str, Field(alias="currentPassword", min_length=8, max_length=128)
