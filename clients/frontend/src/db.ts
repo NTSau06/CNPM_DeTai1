@@ -50,19 +50,50 @@ const getDatabase = () => {
 
 export async function cachePlaces(places: Place[]) {
   const db = await getDatabase()
-  const tx = db.transaction('places', 'readwrite')
-  await Promise.all([...places.map((place) => tx.store.put(place)), tx.done])
+  const tx = db.transaction(['places', 'settings'], 'readwrite')
+  const store = tx.objectStore('places')
+  // Bỏ lần nạp mẫu cũ nếu danh mục server đã được ghi trước đó.
+  if ((await tx.objectStore('settings').get('catalogSynced'))?.value) {
+    await tx.done
+    return
+  }
+  // Dữ liệu mẫu chỉ bổ sung ID thiếu, không ghi đè nội dung admin đã sửa.
+  for (const place of places) {
+    if (!await store.get(place.id)) await store.add(place)
+  }
+  await tx.done
 }
 
 export async function getCachedPlaces() {
   return (await getDatabase()).getAll('places')
 }
 
-export async function replaceCachedPlaces(places: Place[]) {
-  const tx = (await getDatabase()).transaction('places', 'readwrite')
-  await tx.store.clear()
-  await Promise.all(places.map((place) => tx.store.put(place)))
-  await tx.done
+export async function replaceCachedPlaces(places: Place[], isCurrent = () => true) {
+  const tx = (await getDatabase()).transaction(['places', 'settings'], 'readwrite')
+  const store = tx.objectStore('places')
+  // Chờ transaction sẵn sàng rồi bỏ phản hồi đã bị thay thế.
+  await tx.objectStore('settings').get('catalogSynced')
+  if (!isCurrent()) {
+    await tx.done
+    return
+  }
+  try {
+    await store.clear()
+    await Promise.all(places.map((place) => store.put(place)))
+    // Ghi cùng danh mục để lần khởi động sau không phục hồi điểm đã xoá.
+    await tx.objectStore('settings').put({ key: 'catalogSynced', value: true })
+    if (!isCurrent()) {
+      tx.abort()
+      await tx.done.catch(() => undefined)
+      return
+    }
+    await tx.done
+  } catch (error) {
+    // Lỗi dữ liệu đồng bộ cũng phải huỷ clear, kể cả lỗi put đồng bộ.
+    try { tx.abort() } catch { /* Transaction có thể đã tự huỷ. */ }
+    await tx.done.catch(() => undefined)
+    throw error
+  }
 }
 
 export function sortTours(tours: SavedTour[]) {

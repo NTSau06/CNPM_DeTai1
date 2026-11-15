@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Navigate, NavLink, useNavigate } from 'react-router-dom'
 import { Activity, ArrowLeft, ArrowRight, BookOpen, ChartNoAxesColumn, Clock3, Home, Lightbulb, LogOut, Map, MapPin, Menu, Pencil, Plus, Ticket, Trash2, Users, X } from 'lucide-react'
 import {
@@ -96,9 +96,12 @@ export function OnlineDashboardPage() {
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({})
   const [savingPricePlaceId, setSavingPricePlaceId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const refreshRevision = useRef(0)
 
   const refresh = useCallback(async () => {
     if (!authToken) return
+    const revision = useAppStore.getState().beginPlacesSync()
+    refreshRevision.current = revision
     setLoading(true)
     setMessage('')
     try {
@@ -108,11 +111,12 @@ export function OnlineDashboardPage() {
         fetchPlaces(),
         fetchTicketPrices().catch(() => []),
       ])
+      if (useAppStore.getState().placesRevision !== revision) return
       const mergedPlaces = mergeRemotePlaces(useAppStore.getState().places, remotePlaces)
       setOverview(nextOverview)
       setUsers(nextUsers)
       setPlacesList(remotePlaces)
-      setPlaces(mergedPlaces)
+      setPlaces(mergedPlaces, revision)
       setPriceDrafts((current) => Object.fromEntries(
         remotePlaces.map((place) => [
           place.id,
@@ -120,11 +124,12 @@ export function OnlineDashboardPage() {
         ]),
       ))
     } catch (error) {
+      if (useAppStore.getState().placesRevision !== revision) return
       setMessage(error instanceof Error && 'status' in error && error.status === 403
         ? 'Tài khoản của bạn chưa được cấp quyền quản trị.'
         : error instanceof Error ? error.message : 'Không tải được dữ liệu quản trị.')
     } finally {
-      setLoading(false)
+      if (refreshRevision.current === revision) setLoading(false)
     }
   }, [authToken, setPlaces])
 

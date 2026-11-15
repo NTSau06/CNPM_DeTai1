@@ -43,6 +43,7 @@ export type AppErrorKey = 'savingError' | 'offlinePackError' | 'backendUnavailab
 interface AppState {
   language: Language
   places: Place[]
+  placesRevision: number
   selectedPlaceId: string
   routeIds: string[]
   suggestedRouteIds: string[]
@@ -60,7 +61,8 @@ interface AppState {
   bootstrapped: boolean
   authReady: boolean
   setLanguage: (language: Language) => void
-  setPlaces: (places: Place[]) => void
+  beginPlacesSync: () => number
+  setPlaces: (places: Place[], revision?: number) => void
   setSelectedPlace: (id: string) => void
   setLocation: (location: [number, number] | null) => void
   setOnline: (online: boolean) => void
@@ -86,6 +88,7 @@ interface AppState {
 export const useAppStore = create<AppState>((set, get) => ({
   language: 'vi',
   places: bundledPlaces,
+  placesRevision: 0,
   selectedPlaceId: 'phong-nha-cave',
   routeIds: [],
   suggestedRouteIds: [],
@@ -107,14 +110,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     void writeSetting('language', language).catch(() => set({ storageError: 'savingError' }))
   },
   setSelectedPlace: (selectedPlaceId) => set({ selectedPlaceId }),
-  setPlaces: (places) => {
+  beginPlacesSync: () => {
+    const revision = get().placesRevision + 1
+    set({ placesRevision: revision })
+    return revision
+  },
+  setPlaces: (places, revision = get().beginPlacesSync()) => {
+    const isCurrent = () => get().placesRevision === revision
+    if (!isCurrent()) return
     set((state) => ({
       places,
       selectedPlaceId: places.some((place) => place.id === state.selectedPlaceId)
         ? state.selectedPlaceId
         : places[0]?.id ?? state.selectedPlaceId,
     }))
-    void replaceCachedPlaces(places).catch(() => set({ storageError: 'savingError' }))
+    void replaceCachedPlaces(places, isCurrent).catch(() => {
+      if (isCurrent()) set({ storageError: 'savingError' })
+    })
   },
   setLocation: (location) => set({ location }),
   setOnline: (online) => {
@@ -407,19 +419,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
   bootstrapInner: async () => {
+    const localRevision = get().placesRevision
     try {
       const [cachedPlaces, offlineMap, language, offlineMode, catalogSynced] = await Promise.all([
         getCachedPlaces(), getOfflineMap(), readSetting('language'), readSetting('useOfflineMap'), readSetting('catalogSynced'),
       ])
-      // Sau l?n ??ng b? ??u, kh?ng h?i sinh ??a ?i?m m? qu?n tr? vi?n ?? x?a.
+      // Sau lần đồng bộ đầu, không phục hồi địa điểm admin đã xoá.
       const missing = catalogSynced?.value ? [] : bundledPlaces.filter((place) => !cachedPlaces.some((cached) => cached.id === place.id))
       if (missing.length) await cachePlaces(missing)
       const selectedLanguage = language?.value
-      const localPlaces = [...cachedPlaces, ...missing].filter((place) => place.id !== 'truong-son-cemetery')
+      const localPlaces = (await getCachedPlaces()).filter((place) => place.id !== 'truong-son-cemetery')
         .sort((a, b) => (placeOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (placeOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER)
           || a.copy.vi.title.localeCompare(b.copy.vi.title, 'vi'))
       set({
-        places: localPlaces,
+        ...(get().placesRevision === localRevision ? { places: localPlaces } : {}),
         savedTours: [],
         offlineMap: offlineMap ?? null,
         language: languages.find((item) => item.code === selectedLanguage)?.code ?? 'vi',
@@ -446,12 +459,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       } catch { set({ storageError: 'savingError' }) }
     }
     if (typeof navigator === 'undefined' || !navigator.onLine) return
+    const revision = get().beginPlacesSync()
     try {
       const places = mergeRemotePlaces(get().places, await fetchPlaces())
-      set({ places })
-      await replaceCachedPlaces(places)
-      await writeSetting('catalogSynced', true)
-    } catch { set({ storageError: 'backendUnavailable' }) }
+      if (get().placesRevision === revision) {
+        set({ places })
+        await replaceCachedPlaces(places, () => get().placesRevision === revision)
+      }
+    } catch {
+      if (get().placesRevision === revision) set({ storageError: 'backendUnavailable' })
+    }
     if (!authToken) return
     try {
       const currentUser = await fetchCurrentUser(authToken)
