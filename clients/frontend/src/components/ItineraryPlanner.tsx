@@ -40,16 +40,26 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
   const setSuggestedRoute = useAppStore((state) => state.setSuggestedRoute)
   const currentUser = useAppStore((state) => state.currentUser)
   const routeIds = useAppStore((state) => state.routeIds)
-  const suggestedRouteIds = useAppStore((state) => state.suggestedRouteIds)
   const applySuggestedRoute = useAppStore((state) => state.applySuggestedRoute)
   const online = useAppStore((state) => state.online)
   const saving = useAppStore((state) => state.isSavingRoute)
   const [saveChoice, setSaveChoice] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
+  const [planSaved, setPlanSaved] = useState(false)
   const savePlan = async (mode: 'replace' | 'new') => {
-    const ok = await applySuggestedRoute(mode)
-    setSaveMessage(ui(language, ok ? 'suggestionSaved' : 'suggestionFailed'))
-    if (ok) setSaveChoice(false)
+    if (!plan || saving || loading) return
+    setSaveMessage('')
+    // Lưu đúng kết quả đang xem, kể cả khi tuyến gợi ý trên bản đồ đã bị xoá.
+    setSuggestedRoute(plan.days.flatMap((day) => day.places.map((place) => place.id)))
+    try {
+      const ok = await applySuggestedRoute(mode)
+      setSaveMessage(ui(language, ok ? 'suggestionSaved'
+        : !useAppStore.getState().online || !navigator.onLine ? 'routeOffline' : 'suggestionFailed'))
+      if (ok) { setSaveChoice(false); setPlanSaved(true) }
+    } catch (reason) {
+      setSaveMessage(ui(language, reason instanceof Error && 'status' in reason && reason.status === 401
+        ? 'suggestionSignIn' : 'suggestionFailed'))
+    }
   }
   const [days, setDays] = useState(2)
   const [budget, setBudget] = useState('1000000')
@@ -139,6 +149,7 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
         ticketTotal,
         unpricedCount,
       })
+      setPlanSaved(false)
     } catch (reason) {
       setError(apiErrorMessage(language, reason, 'itFailed'))
     } finally {
@@ -173,7 +184,7 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
             </label>
           ))}
         </fieldset>
-        <button className="itinerary-submit" type="submit" disabled={loading}>
+        <button className="itinerary-submit" type="submit" disabled={loading || saving}>
           {loading ? <LoaderCircle className="loading-spinner" size={15} /> : <MapPinned size={15} />}
           {ui(language, loading ? 'itCreating' : 'itCreate')}
         </button>
@@ -182,15 +193,15 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
       {error && <p className="itinerary-message is-error" role="alert">{error}</p>}
       {plan && (
         <div className="itinerary-result" aria-live="polite">
-          {saveMessage && <p role="status">{saveMessage}</p>}
-          {!currentUser ? <Link to="/login">{ui(language, 'signIn')}</Link> : suggestedRouteIds.length > 0 && <>
-            <button type="button" disabled={!online || saving} onClick={() => routeIds.length ? setSaveChoice(true) : void savePlan('new')}>
-              {ui(language, 'saveSuggestion')}{saving && <LoaderCircle className="loading-spinner" size={15} />}
+          {saveMessage && <p role="status">{saveMessage}{currentUser && saveMessage === ui(language, 'suggestionSignIn') && <> <Link to="/login">{ui(language, 'signIn')}</Link></>}</p>}
+          {!currentUser ? <p>{ui(language, 'suggestionSignIn')} <Link to="/login">{ui(language, 'signIn')}</Link></p> : !planSaved && <>
+            <button type="button" disabled={!online || saving || loading} onClick={() => routeIds.length ? setSaveChoice(true) : void savePlan('new')}>
+              {ui(language, saving ? 'suggestionSaving' : 'saveSuggestion')}{saving && <LoaderCircle className="loading-spinner" size={15} />}
             </button>
             {!online && <p>{ui(language, 'routeOffline')}</p>}
             {saveChoice && <div role="group" aria-label={ui(language, 'saveSuggestion')}>
-              <button type="button" disabled={!online || saving} onClick={() => void savePlan('replace')}>{ui(language, 'replaceRoute')}</button>
-              <button type="button" disabled={!online || saving} onClick={() => void savePlan('new')}>{ui(language, 'newRoute')}</button>
+              <button type="button" disabled={!online || saving || loading} onClick={() => void savePlan('replace')}>{ui(language, 'replaceRoute')}</button>
+              <button type="button" disabled={!online || saving || loading} onClick={() => void savePlan('new')}>{ui(language, 'newRoute')}</button>
             </div>}
           </>}
           <p className="itinerary-budget">

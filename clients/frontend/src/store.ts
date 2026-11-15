@@ -314,7 +314,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSuggestedRoute: (suggestedRouteIds) => set({ suggestedRouteIds }),
   applySuggestedRoute: async (mode) => {
     const { suggestedRouteIds: placeIds, places, currentUser, authToken, activeTourId, isSavingRoute, online } = get()
-    if (!currentUser || !authToken || isSavingRoute || !placeIds.length) return false
+    if (!currentUser || !authToken) throw new BackendApiError('Authentication required.', 401)
+    if (isSavingRoute || !placeIds.length) return false
     if (!online || !navigator.onLine) { set({ storageError: 'routeOffline' }); return false }
     beginTourChange()
     set({ isSavingRoute: true })
@@ -330,11 +331,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (get().authToken !== authToken) return false
       set((state) => ({ savedTours: sortTours([saved, ...state.savedTours.filter((item) => item.id !== saved.id)]),
         activeTourId: saved.id, routeIds: saved.placeIds, suggestedRouteIds: [], storageError: null }))
-      localStorage.setItem(draftTourStorageKey(currentUser.id), saved.id)
-      await saveTour(saved, currentUser.id)
-      return true
+      try {
+        await saveTour(saved, currentUser.id)
+        localStorage.setItem(draftTourStorageKey(currentUser.id), saved.id)
+      } catch {
+        // Server đã lưu thành công; báo lỗi cache để tránh tạo trùng khi thử lại.
+        if (get().authToken === authToken) set({ storageError: 'savingError' })
+      }
+      return get().authToken === authToken
     } catch (error) {
-      if (get().authToken === authToken) set({ storageError: routeFailure(error) })
+      if (get().authToken !== authToken) return false
+      if (error instanceof BackendApiError && error.status === 401) throw error
+      set({ storageError: routeFailure(error) })
       return false
     }
     finally { endTourChange(); set({ isSavingRoute: false }) }

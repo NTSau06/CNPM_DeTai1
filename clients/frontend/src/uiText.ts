@@ -19,6 +19,8 @@ export const uiText = {
   replaceRoute: t('Thay thế hành trình hiện tại', 'Replace current itinerary', '現在の旅程を置き換える', 'Remplacer le parcours actuel', '替换当前行程', '현재 여정 바꾸기', 'Reemplazar itinerario actual'),
   newRoute: t('Lưu thành hành trình mới', 'Save as a new itinerary', '新しい旅程として保存', 'Enregistrer un nouveau parcours', '另存为新行程', '새 여정으로 저장', 'Guardar como nuevo itinerario'),
   suggestionSaved: t('Đã lưu lịch trình.', 'Itinerary saved.', '旅程を保存しました。', 'Parcours enregistré.', '行程已保存。', '일정이 저장되었습니다.', 'Itinerario guardado.'),
+  suggestionSaving: t('Đang lưu lịch trình…', 'Saving itinerary…', '旅程を保存中…', 'Enregistrement du parcours…', '正在保存行程…', '일정 저장 중…', 'Guardando itinerario…'),
+  suggestionSignIn: t('Đăng nhập để lưu lịch trình này vào hành trình của bạn.', 'Sign in to save this itinerary to your account.', 'この旅程を保存するにはログインしてください。', 'Connectez-vous pour enregistrer ce parcours dans votre compte.', '请登录以将此行程保存到您的账户。', '이 일정을 계정에 저장하려면 로그인하세요.', 'Inicia sesión para guardar este itinerario en tu cuenta.'),
   suggestionFailed: t('Không lưu được lịch trình. Vui lòng thử lại.', 'Could not save. Please retry.', '保存できませんでした。もう一度お試しください。', 'Enregistrement impossible. Réessayez.', '无法保存，请重试。', '저장하지 못했습니다. 다시 시도하세요.', 'No se pudo guardar. Inténtalo de nuevo.'),
 
   // Thanh đầu trang

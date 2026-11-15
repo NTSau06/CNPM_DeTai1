@@ -12,7 +12,7 @@ const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.Modu
 const dbCompiled = ts.transpileModule(fs.readFileSync(path.join(root, 'clients/frontend/src/db.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
 const user = { id: 'a', fullName: 'A' }
 const tour = { id: 'tour-a', ownerId: 'a', placeIds: ['one', 'two'], createdAt: 1, distanceKm: 2, durationMinutes: 3 }
-class BackendApiError extends Error { constructor(status) { super('API'); this.status = status } }
+class BackendApiError extends Error { constructor(message, status) { super('API'); this.status = status ?? message } }
 function tourCache(initial) {
   const items = new Map(initial.map(t => [t.id, t]))
   let pauseRead = false, resumeRead
@@ -34,7 +34,7 @@ function tourCache(initial) {
   vm.runInNewContext(dbCompiled, { exports, require: () => ({ openDB: async () => database }) })
   return { api: exports, items: () => [...items.values()], pause: () => { pauseRead = true }, resume: () => resumeRead() }
 }
-function setup({ online = false, status, cachedToken = 'token-a' } = {}) {
+function setup({ online = false, status, cachedToken = 'token-a', draftWriteFails = false } = {}) {
   const local = new Map([['token', 'token-a'], ['quang-tri:draft-tour:a', tour.id]])
   const settings = new Map([['currentUser', JSON.stringify({ authToken: cachedToken, user })]])
   const cache = tourCache([tour, { ...tour, id: 'tour-b', ownerId: 'b' }, { ...tour, id: 'legacy', ownerId: undefined }])
@@ -59,10 +59,13 @@ function setup({ online = false, status, cachedToken = 'token-a' } = {}) {
     deleteRemoteTour: async () => { if (status !== undefined) throw new BackendApiError(status) },
   }
   const exports = {}
-  const context = { exports, navigator, localStorage: { getItem: key => local.get(key) ?? null, setItem: (key, value) => local.set(key, value), removeItem: key => local.delete(key) },
+  const context = { exports, navigator, localStorage: { getItem: key => local.get(key) ?? null, setItem: (key, value) => {
+    if (draftWriteFails) throw new Error('Storage unavailable')
+    local.set(key, value)
+  }, removeItem: key => local.delete(key) },
     require: name => ({ zustand: { create }, './db': db, './api': api, '@turf/turf': turf, './data/places': { places: [], languages: [{ code: 'vi' }] } })[name] }
   vm.runInNewContext(compiled, context)
-  return { store: exports.useAppStore, settings, local, navigator, api, cache, tours: cache.items, remote: items => { remote = items } }
+  return { store: exports.useAppStore, settings, local, navigator, api, db, cache, tours: cache.items, remote: items => { remote = items } }
 }
 async function run() {
   let x = setup()
@@ -263,4 +266,5 @@ async function run() {
   assert.equal(accepts('/api/v1/tours'), false)
   console.log('PASS: service worker navigation fallback and private API cache exclusion')
 }
-run().catch(error => { console.error(error); process.exitCode = 1 })
+module.exports = { setup, BackendApiError, tour }
+if (require.main === module) run().catch(error => { console.error(error); process.exitCode = 1 })
