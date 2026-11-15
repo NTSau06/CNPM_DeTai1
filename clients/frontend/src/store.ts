@@ -1,6 +1,6 @@
 ﻿// Quản lý trạng thái chung và khởi tạo/đồng bộ dữ liệu với IndexedDB, backend.
 import { create } from 'zustand'
-import { cachePlaces, replaceCachedPlaces, replaceUserTours, sortTours, getSavedTours, deleteSetting, deleteOfflineMap, deleteTour, getCachedPlaces, getOfflineMap, readSetting, saveOfflineMap, saveTour, writeSetting } from './db'
+import { cachePlaces, replaceCachedPlaces, replaceUserTours, sortTours, getSavedToursByUser, clearToursOfUser, deleteSetting, deleteOfflineMap, deleteTour, getCachedPlaces, getOfflineMap, readSetting, saveOfflineMap, saveTour, writeSetting } from './db'
 import { BackendApiError, createTour, deleteRemoteTour, fetchCurrentUser, fetchPlaces, fetchTours, generateId, getStoredAuthToken, logoutAccount, mergeRemotePlaces, storeAuthToken, updateProfile } from './api'
 import { languages, places as bundledPlaces } from './data/places'
 import type { Language, OfflineMapPack, Place, SavedTour, UserProfile } from './types'
@@ -19,9 +19,33 @@ function endTourChange() {
   pendingTourChanges -= 1
 }
 
-function cacheCurrentUser(authToken: string, user: UserProfile) {
-  // Gắn hồ sơ với phiên để không khôi phục nhầm tài khoản.
-  return writeSetting('currentUser', JSON.stringify({ authToken, user }))
+function cacheCurrentUser(user: UserProfile) {
+  return writeSetting('cachedUser', JSON.stringify(user)).then(() => deleteSetting('currentUser'))
+}
+
+function parseCachedUser(value: string | boolean | undefined): UserProfile | null {
+  if (typeof value !== 'string') return null
+  const parsed: unknown = JSON.parse(value)
+  return typeof parsed === 'object' && parsed !== null
+    && 'id' in parsed && typeof parsed.id === 'string'
+    && 'fullName' in parsed && typeof parsed.fullName === 'string'
+    && 'email' in parsed && typeof parsed.email === 'string'
+    && 'phone' in parsed && typeof parsed.phone === 'string'
+    && 'birthDate' in parsed && typeof parsed.birthDate === 'string'
+    && 'address' in parsed && typeof parsed.address === 'string'
+    ? parsed as UserProfile
+    : null
+}
+
+async function clearCachedUserData(userId: string | null) {
+  const cleanup = [deleteSetting('cachedUser'), deleteSetting('currentUser')]
+  if (userId) {
+    cleanup.push(clearToursOfUser(userId))
+  }
+  await Promise.all(cleanup)
+  if (userId) {
+    localStorage.removeItem(draftTourStorageKey(userId))
+  }
 }
 
 function routeFailure(error: unknown): AppErrorKey {
@@ -137,8 +161,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     toursRevision += 1
     storeAuthToken(authToken)
     set({ authToken, currentUser, savedTours: [], routeIds: [], activeTourId: null, suggestedRouteIds: [], storageError: null })
-    await cacheCurrentUser(authToken, currentUser)
+    await cacheCurrentUser(currentUser)
     if (get().authToken !== authToken) return
+    try {
+      const savedTours = sortTours((await getSavedToursByUser(currentUser.id))
+        .map((tour) => ({ ...tour, userId: currentUser.id })))
+      if (get().authToken !== authToken) return
+      await replaceUserTours(currentUser.id, savedTours, () => get().authToken === authToken)
+      const activeTourId = getDraftTourId(currentUser.id, savedTours)
+      set({
+        savedTours,
+        activeTourId,
+        routeIds: savedTours.find((tour) => tour.id === activeTourId)?.placeIds ?? [],
+      })
+    } catch {
+      set({ storageError: 'savingError' })
+    }
     await get().syncTours()
   },
   syncTours: async () => {
@@ -148,7 +186,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const isCurrent = () => revision === toursRevision && get().authToken === authToken
       && getStoredAuthToken() === authToken && get().currentUser?.id === currentUser.id
     try {
-      const savedTours = sortTours((await fetchTours(authToken)).map((tour) => ({ ...tour, ownerId: currentUser.id })))
+      const savedTours = sortTours((await fetchTours(authToken)).map((tour) => ({ ...tour, userId: currentUser.id })))
       if (!isCurrent()) return
       await replaceUserTours(currentUser.id, savedTours, isCurrent)
       if (!isCurrent()) return
@@ -158,8 +196,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!isCurrent()) return
       if (error instanceof BackendApiError && error.status === 401) {
         storeAuthToken(null)
+        toursRevision += 1
         set({ authToken: null, currentUser: null, savedTours: [], activeTourId: null, routeIds: [] })
-        await deleteSetting('currentUser')
+        try {
+          await clearCachedUserData(currentUser.id)
+        } catch {
+          set({ storageError: 'savingError' })
+        }
       } else set({ storageError: 'backendUnavailable' })
     }
   },
@@ -169,21 +212,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     const currentUser = await updateProfile(authToken, user)
     if (get().authToken !== authToken) return
     set({ currentUser })
-    await cacheCurrentUser(authToken, currentUser)
+    await cacheCurrentUser(currentUser)
   },
   replaceSession: (authToken) => {
     toursRevision += 1
     storeAuthToken(authToken)
     set({ authToken })
     const { currentUser } = get()
-    if (currentUser) void cacheCurrentUser(authToken, currentUser).catch(() => set({ storageError: 'savingError' }))
+    if (currentUser) void cacheCurrentUser(currentUser).catch(() => set({ storageError: 'savingError' }))
   },
   signOut: async () => {
     toursRevision += 1
-    const { authToken } = get()
+    const { authToken, currentUser } = get()
     storeAuthToken(null)
     set({ currentUser: null, authToken: null, savedTours: [], routeIds: [], activeTourId: null, suggestedRouteIds: [] })
-    await deleteSetting('currentUser')
+    try {
+      await clearCachedUserData(currentUser?.id ?? null)
+    } catch {
+      set({ storageError: 'savingError' })
+    }
     if (!authToken) return
     try {
       await logoutAccount(authToken)
@@ -232,6 +279,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         ? length(lineString(coordinates), { units: 'kilometers' })
         : 0
       const tour: SavedTour = {
+        userId: currentUser.id,
         id: activeTourId ?? generateId(),
         placeIds: nextRouteIds,
         createdAt: get().savedTours.find((item) => item.id === activeTourId)?.createdAt ?? Date.now(),
@@ -241,7 +289,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           0,
         ),
       }
-      const remoteTour = { ...await createTour(tour, authToken), ownerId: currentUser.id }
+      const remoteTour = { ...await createTour(tour, authToken), userId: currentUser.id }
       if (get().authToken !== authToken) return false
       set((state) => ({
         routeIds: nextRouteIds,
@@ -290,6 +338,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         .map((placeId) => allPlaces.find((place) => place.id === placeId)?.coordinates)
         .filter((coordinate): coordinate is [number, number] => coordinate !== undefined)
       const tour: SavedTour = {
+        userId: currentUser.id,
         id: activeTourId ?? generateId(),
         placeIds,
         createdAt: get().savedTours.find((item) => item.id === activeTourId)?.createdAt ?? Date.now(),
@@ -299,7 +348,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           0,
         ),
       }
-      const remoteTour = { ...await createTour(tour, authToken), ownerId: currentUser.id }
+      const remoteTour = { ...await createTour(tour, authToken), userId: currentUser.id }
       if (get().authToken !== authToken) return false
       set((state) => ({
         routeIds: placeIds,
@@ -337,9 +386,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         .filter((item): item is [number, number] => Boolean(item))
       const id = mode === 'replace' ? activeTourId ?? generateId() : generateId()
       const tour = { id, placeIds, createdAt: get().savedTours.find((item) => item.id === id)?.createdAt ?? Date.now(),
+        userId: currentUser.id,
         distanceKm: coordinates.length > 1 ? length(lineString(coordinates), { units: 'kilometers' }) : 0,
         durationMinutes: placeIds.reduce((sum, id) => sum + (places.find((place) => place.id === id)?.duration ?? 0), 0) }
-      const saved = { ...await createTour(tour, authToken), ownerId: currentUser.id }
+      const saved = { ...await createTour(tour, authToken), userId: currentUser.id }
       if (get().authToken !== authToken) return false
       set((state) => ({ savedTours: sortTours([saved, ...state.savedTours.filter((item) => item.id !== saved.id)]),
         activeTourId: saved.id, routeIds: saved.placeIds, suggestedRouteIds: [], storageError: null }))
@@ -446,12 +496,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     const authToken = getStoredAuthToken()
     if (authToken) {
       try {
-        const cached = await readSetting('currentUser')
-        const session = typeof cached?.value === 'string'
-          ? JSON.parse(cached.value) as { authToken?: string; user?: UserProfile } : null
-        const currentUser = session?.authToken === authToken ? session.user : null
+        const cached = await readSetting('cachedUser')
+        let currentUser = parseCachedUser(cached?.value)
+        if (!currentUser) {
+          const legacy = await readSetting('currentUser')
+          if (typeof legacy?.value === 'string') {
+            const session: unknown = JSON.parse(legacy.value)
+            if (typeof session === 'object' && session !== null && 'authToken' in session
+              && session.authToken === authToken && 'user' in session) {
+              currentUser = parseCachedUser(JSON.stringify(session.user))
+              if (currentUser) await cacheCurrentUser(currentUser)
+            }
+          }
+        }
         if (currentUser) {
-          const savedTours = sortTours((await getSavedTours()).filter((tour) => tour.ownerId === currentUser.id))
+          const savedTours = sortTours((await getSavedToursByUser(currentUser.id))
+            .map((tour) => ({ ...tour, userId: currentUser.id })))
+          if (getStoredAuthToken() !== authToken) return
+          await replaceUserTours(currentUser.id, savedTours, () => getStoredAuthToken() === authToken)
           if (getStoredAuthToken() !== authToken) return
           const activeTourId = getDraftTourId(currentUser.id, savedTours)
           set({ authToken, currentUser, savedTours, activeTourId, routeIds: savedTours.find((tour) => tour.id === activeTourId)?.placeIds ?? [] })
@@ -474,14 +536,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       const currentUser = await fetchCurrentUser(authToken)
       if (getStoredAuthToken() !== authToken) return
       set({ authToken, currentUser })
-      await cacheCurrentUser(authToken, currentUser)
+      await cacheCurrentUser(currentUser)
       await get().syncTours()
     } catch (error) {
       if (getStoredAuthToken() !== authToken) return
       if (error instanceof BackendApiError && error.status === 401) {
+        const userId = get().currentUser?.id ?? null
         storeAuthToken(null)
+        toursRevision += 1
         set({ authToken: null, currentUser: null, savedTours: [], activeTourId: null, routeIds: [] })
-        await deleteSetting('currentUser')
+        try {
+          await clearCachedUserData(userId)
+        } catch {
+          set({ storageError: 'savingError' })
+        }
       } else set({ storageError: 'backendUnavailable' })
     }
   },

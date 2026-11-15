@@ -12,6 +12,8 @@ export function SavedPage() {
   const places = useAppStore((state) => state.places)
   const removeTour = useAppStore((state) => state.removeTour)
   const currentUser = useAppStore((state) => state.currentUser)
+  const online = useAppStore((state) => state.online)
+  const offline = !online || (typeof navigator !== 'undefined' && !navigator.onLine)
 
   return (
     <div className="subpage">
@@ -21,6 +23,7 @@ export function SavedPage() {
         <h1>{translate(language, 'savedTitle')}</h1>
         <p>{translate(language, 'noSavedText')}</p>
       </div>
+      {currentUser && offline && <p className="saved-offline-note" id="saved-offline-note" role="status">{ui(language, 'svOfflineNote')}</p>}
       {!currentUser ? (
         <section className="empty-state">
           <div className="empty-icon"><Bookmark size={25} /></div>
@@ -52,7 +55,13 @@ export function SavedPage() {
                   <div className="tour-meta"><span><MapPin size={14} />{tour.placeIds.length} {translate(language, 'stopCount')}</span><span><Route size={14} />{tour.distanceKm.toFixed(1)} {translate(language, 'distanceUnit')}</span><span><Clock3 size={14} />{tour.durationMinutes} {translate(language, 'minute')}</span></div>
                   <div className="tour-card-actions">
                     <Link to="/explore" onClick={() => first && useAppStore.getState().setSelectedPlace(first.id)}>{translate(language, 'explore')} <ArrowRight size={14} /></Link>
-                    <button onClick={() => { void removeTour(tour.id) }} aria-label={translate(language, 'delete')}><Trash2 size={15} /> {translate(language, 'delete')}</button>
+                    <button
+                      onClick={() => { void removeTour(tour.id) }}
+                      aria-label={translate(language, 'delete')}
+                      aria-describedby={offline ? 'saved-offline-note' : undefined}
+                      disabled={offline}
+                      title={offline ? ui(language, 'svOfflineNote') : undefined}
+                    ><Trash2 size={15} /> {translate(language, 'delete')}</button>
                   </div>
                 </div>
               </article>

@@ -30,13 +30,23 @@ interface HoiAnDatabase extends DBSchema {
 let database: Promise<IDBPDatabase<HoiAnDatabase>> | undefined
 
 const getDatabase = () => {
-  database ??= openDB<HoiAnDatabase>('cham-hoi-an', 2, {
-    upgrade(db) {
+  database ??= openDB<HoiAnDatabase>('cham-hoi-an', 3, {
+    upgrade(db, oldVersion, _newVersion, transaction) {
       if (!db.objectStoreNames.contains('places')) db.createObjectStore('places', { keyPath: 'id' })
       if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings', { keyPath: 'key' })
       if (!db.objectStoreNames.contains('tours')) {
         const tours = db.createObjectStore('tours', { keyPath: 'id' })
         tours.createIndex('by-created-at', 'createdAt')
+      }
+      if (oldVersion < 3 && db.objectStoreNames.contains('tours')) {
+        void (async () => {
+          let cursor = await transaction.objectStore('tours').openCursor()
+          while (cursor) {
+            const { ownerId, ...tour } = cursor.value as SavedTour & { ownerId?: string }
+            await cursor.update({ ...tour, ...(!tour.userId && ownerId ? { userId: ownerId } : {}) })
+            cursor = await cursor.continue()
+          }
+        })()
       }
       if (!db.objectStoreNames.contains('offlineMaps')) db.createObjectStore('offlineMaps', { keyPath: 'id' })
       if (!db.objectStoreNames.contains('offlinePlacePacks')) {
@@ -100,18 +110,19 @@ export function sortTours(tours: SavedTour[]) {
   return [...tours].sort((a, b) => b.createdAt - a.createdAt || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
 }
 
-export async function replaceUserTours(ownerId: string, tours: SavedTour[], isCurrent = () => true) {
+export async function replaceUserTours(userId: string, tours: SavedTour[], isCurrent = () => true) {
   const tx = (await getDatabase()).transaction('tours', 'readwrite')
   const cachedTours = await tx.store.getAll()
   if (!isCurrent()) {
     await tx.done
     return
   }
-  // Chỉ danh sách đã xác thực từ server mới xác minh được chủ tour cũ trùng ID.
-  // Giữ nguyên tour chưa rõ chủ và tour của tài khoản khác.
+  // Thay danh sách của đúng tài khoản, giữ nguyên hành trình của tài khoản khác.
+  const tourIds = new Set(tours.map((tour) => tour.id))
   await Promise.all([
-    ...cachedTours.filter((tour) => tour.ownerId === ownerId).map((tour) => tx.store.delete(tour.id)),
-    ...tours.map((tour) => tx.store.put({ ...tour, ownerId })),
+    ...cachedTours.filter((tour) => tour.userId === userId && !tourIds.has(tour.id))
+      .map((tour) => tx.store.delete(tour.id)),
+    ...tours.map((tour) => tx.store.put({ ...tour, userId })),
   ])
   await tx.done
 }
@@ -132,8 +143,19 @@ export async function getSavedTours() {
   return sortTours(await (await getDatabase()).getAllFromIndex('tours', 'by-created-at'))
 }
 
-export async function saveTour(tour: SavedTour, ownerId: string) {
-  await (await getDatabase()).put('tours', { ...tour, ownerId })
+export async function getSavedToursByUser(userId: string) {
+  return sortTours((await getSavedTours()).filter((tour) => tour.userId === userId))
+}
+
+export async function clearToursOfUser(userId: string) {
+  const tx = (await getDatabase()).transaction('tours', 'readwrite')
+  const tours = await tx.store.getAll()
+  await Promise.all(tours.filter((tour) => tour.userId === userId).map((tour) => tx.store.delete(tour.id)))
+  await tx.done
+}
+
+export async function saveTour(tour: SavedTour, userId: string) {
+  await (await getDatabase()).put('tours', { ...tour, userId })
 }
 
 export async function deleteTour(id: string) {

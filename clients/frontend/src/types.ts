@@ -32,7 +32,7 @@ export interface Place {
 }
 
 export interface SavedTour {
-  ownerId?: string
+  userId?: string
   id: string
   placeIds: string[]
   createdAt: number

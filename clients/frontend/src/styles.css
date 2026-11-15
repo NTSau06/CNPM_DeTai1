@@ -395,6 +395,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .primary-link { display: inline-flex; align-items: center; gap: 8px; margin-top: 20px; padding: 10px 13px; border-radius: 4px; color: #fffefa; background: #4b604e; font-size: 13px; font-weight: 700; }
 .saved-tour-list { display: grid; gap: 16px; }
 .saved-tour-card { display: grid; grid-template-columns: 235px minmax(0, 1fr); overflow: hidden; border: 1px solid #e7e3d9; border-radius: 8px; background: #fffefa; }
+.saved-offline-note { margin: 0 0 18px; color: #9b7758; font-size: 13px; line-height: 1.5; }
 .tour-cover { position: relative; min-height: 188px; display: flex; flex-direction: column; justify-content: space-between; padding: 14px; overflow: hidden; background-position: center; background-size: cover; }
 .tour-cover:after { z-index: 0; }
 .tour-cover > * { position: relative; z-index: 1; }
