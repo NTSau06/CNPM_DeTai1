@@ -65,12 +65,23 @@ export async function replaceCachedPlaces(places: Place[]) {
   await tx.done
 }
 
-export async function replaceUserTours(ownerId: string, tours: SavedTour[]) {
+export function sortTours(tours: SavedTour[]) {
+  return [...tours].sort((a, b) => b.createdAt - a.createdAt || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
+}
+
+export async function replaceUserTours(ownerId: string, tours: SavedTour[], isCurrent = () => true) {
   const tx = (await getDatabase()).transaction('tours', 'readwrite')
-  for (const tour of await tx.store.getAll()) {
-    if (tour.ownerId === ownerId) await tx.store.delete(tour.id)
+  const cachedTours = await tx.store.getAll()
+  if (!isCurrent()) {
+    await tx.done
+    return
   }
-  await Promise.all(tours.map((tour) => tx.store.put({ ...tour, ownerId })))
+  // Chỉ danh sách đã xác thực từ server mới xác minh được chủ tour cũ trùng ID.
+  // Giữ nguyên tour chưa rõ chủ và tour của tài khoản khác.
+  await Promise.all([
+    ...cachedTours.filter((tour) => tour.ownerId === ownerId).map((tour) => tx.store.delete(tour.id)),
+    ...tours.map((tour) => tx.store.put({ ...tour, ownerId })),
+  ])
   await tx.done
 }
 
@@ -87,7 +98,7 @@ export async function writeSetting(key: string, value: string | boolean) {
 }
 
 export async function getSavedTours() {
-  return (await getDatabase()).getAllFromIndex('tours', 'by-created-at')
+  return sortTours(await (await getDatabase()).getAllFromIndex('tours', 'by-created-at'))
 }
 
 export async function saveTour(tour: SavedTour, ownerId: string) {

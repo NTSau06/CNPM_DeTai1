@@ -14,7 +14,7 @@ import { getVisitorDetails } from '../data/visitorDetails'
 import { categoryKeys, categoryLabels, languages, localizedTitle, places as bundledPlaces } from '../data/places'
 import { translate } from '../i18n'
 import { ui } from '../uiText'
-import { playNarration, stopSpeaking } from '../speech'
+import { getNarrationAudioUrl, playNarration, speechAvailable, stopSpeaking } from '../speech'
 import { optimizeRouteOrder } from '../routeOptimization'
 import { useAppStore } from '../store'
 import type { Category } from '../types'
@@ -128,6 +128,11 @@ export function ExplorePage() {
     if (!autoNarration || !location) return
     const nearby = places.find((place) => distance(point(location), point(place.coordinates), { units: 'meters' }) < AUTO_GUIDE_RADIUS_METERS)
     if (!nearby || spokenPlaces.current.has(nearby.id)) return
+    // Chỉ đánh dấu khi có nguồn phát MP3 hoặc giọng đọc trình duyệt.
+    if (!getNarrationAudioUrl(nearby, language) && !speechAvailable()) {
+      setNarrationMessage(ui(language, 'voiceMissing'))
+      return
+    }
     spokenPlaces.current.add(nearby.id)
     setSelectedPlace(nearby.id)
     void playNarration(nearby, language).then((result) => {

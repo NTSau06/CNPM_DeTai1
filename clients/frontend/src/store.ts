@@ -1,11 +1,23 @@
 ﻿// Quản lý trạng thái chung và khởi tạo/đồng bộ dữ liệu với IndexedDB, backend.
 import { create } from 'zustand'
-import { cachePlaces, replaceCachedPlaces, replaceUserTours, getSavedTours, deleteSetting, deleteOfflineMap, deleteTour, getCachedPlaces, getOfflineMap, readSetting, saveOfflineMap, saveTour, writeSetting } from './db'
+import { cachePlaces, replaceCachedPlaces, replaceUserTours, sortTours, getSavedTours, deleteSetting, deleteOfflineMap, deleteTour, getCachedPlaces, getOfflineMap, readSetting, saveOfflineMap, saveTour, writeSetting } from './db'
 import { BackendApiError, createTour, deleteRemoteTour, fetchCurrentUser, fetchPlaces, fetchTours, generateId, getStoredAuthToken, logoutAccount, mergeRemotePlaces, storeAuthToken, updateProfile } from './api'
 import { languages, places as bundledPlaces } from './data/places'
 import type { Language, OfflineMapPack, Place, SavedTour, UserProfile } from './types'
 
 const placeOrder = new Map(bundledPlaces.map((place, index) => [place.id, index]))
+let toursRevision = 0
+let pendingTourChanges = 0
+
+function beginTourChange() {
+  toursRevision += 1
+  pendingTourChanges += 1
+}
+
+function endTourChange() {
+  toursRevision += 1
+  pendingTourChanges -= 1
+}
 
 function cacheCurrentUser(authToken: string, user: UserProfile) {
   // Gắn hồ sơ với phiên để không khôi phục nhầm tài khoản.
@@ -110,6 +122,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (online) void get().syncTours()
   },
   signIn: async (authToken, currentUser) => {
+    toursRevision += 1
     storeAuthToken(authToken)
     set({ authToken, currentUser, savedTours: [], routeIds: [], activeTourId: null, suggestedRouteIds: [], storageError: null })
     await cacheCurrentUser(authToken, currentUser)
@@ -118,15 +131,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   syncTours: async () => {
     const { authToken, currentUser } = get()
-    if (!authToken || !currentUser || !navigator.onLine) return
+    if (!authToken || !currentUser || !navigator.onLine || pendingTourChanges) return
+    const revision = ++toursRevision
+    const isCurrent = () => revision === toursRevision && get().authToken === authToken
+      && getStoredAuthToken() === authToken && get().currentUser?.id === currentUser.id
     try {
-      const savedTours = (await fetchTours(authToken)).map((tour) => ({ ...tour, ownerId: currentUser.id }))
-      if (get().authToken !== authToken) return
+      const savedTours = sortTours((await fetchTours(authToken)).map((tour) => ({ ...tour, ownerId: currentUser.id })))
+      if (!isCurrent()) return
+      await replaceUserTours(currentUser.id, savedTours, isCurrent)
+      if (!isCurrent()) return
       const activeTourId = getDraftTourId(currentUser.id, savedTours)
       set({ savedTours, activeTourId, routeIds: savedTours.find((tour) => tour.id === activeTourId)?.placeIds ?? [] })
-      await replaceUserTours(currentUser.id, savedTours)
     } catch (error) {
-      if (get().authToken !== authToken) return
+      if (!isCurrent()) return
       if (error instanceof BackendApiError && error.status === 401) {
         storeAuthToken(null)
         set({ authToken: null, currentUser: null, savedTours: [], activeTourId: null, routeIds: [] })
@@ -143,12 +160,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     await cacheCurrentUser(authToken, currentUser)
   },
   replaceSession: (authToken) => {
+    toursRevision += 1
     storeAuthToken(authToken)
     set({ authToken })
     const { currentUser } = get()
     if (currentUser) void cacheCurrentUser(authToken, currentUser).catch(() => set({ storageError: 'savingError' }))
   },
   signOut: async () => {
+    toursRevision += 1
     const { authToken } = get()
     storeAuthToken(null)
     set({ currentUser: null, authToken: null, savedTours: [], routeIds: [], activeTourId: null, suggestedRouteIds: [] })
@@ -172,6 +191,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ isSavingRoute: false, storageError: 'routeOffline' })
       return false
     }
+    beginTourChange()
     try {
       if (nextRouteIds.length === 0) {
         if (activeTourId) {
@@ -214,7 +234,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((state) => ({
         routeIds: nextRouteIds,
         activeTourId: remoteTour.id,
-        savedTours: [remoteTour, ...state.savedTours.filter((item) => item.id !== remoteTour.id)],
+        savedTours: sortTours([remoteTour, ...state.savedTours.filter((item) => item.id !== remoteTour.id)]),
         storageError: null,
       }))
       localStorage.setItem(draftTourStorageKey(currentUser.id), remoteTour.id)
@@ -229,6 +249,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ storageError: routeFailure(error) })
       return false
     } finally {
+      endTourChange()
       set({ isSavingRoute: false })
     }
   },
@@ -250,6 +271,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ isSavingRoute: false, storageError: 'routeOffline' })
       return false
     }
+    beginTourChange()
     try {
       const { length, lineString } = await import('@turf/turf')
       const coordinates = placeIds
@@ -270,7 +292,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((state) => ({
         routeIds: placeIds,
         activeTourId: remoteTour.id,
-        savedTours: [remoteTour, ...state.savedTours.filter((item) => item.id !== remoteTour.id)],
+        savedTours: sortTours([remoteTour, ...state.savedTours.filter((item) => item.id !== remoteTour.id)]),
         storageError: null,
       }))
       localStorage.setItem(draftTourStorageKey(currentUser.id), remoteTour.id)
@@ -285,6 +307,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ storageError: routeFailure(error) })
       return false
     } finally {
+      endTourChange()
       set({ isSavingRoute: false })
     }
   },
@@ -293,6 +316,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { suggestedRouteIds: placeIds, places, currentUser, authToken, activeTourId, isSavingRoute, online } = get()
     if (!currentUser || !authToken || isSavingRoute || !placeIds.length) return false
     if (!online || !navigator.onLine) { set({ storageError: 'routeOffline' }); return false }
+    beginTourChange()
     set({ isSavingRoute: true })
     try {
       const { length, lineString } = await import('@turf/turf')
@@ -304,7 +328,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         durationMinutes: placeIds.reduce((sum, id) => sum + (places.find((place) => place.id === id)?.duration ?? 0), 0) }
       const saved = { ...await createTour(tour, authToken), ownerId: currentUser.id }
       if (get().authToken !== authToken) return false
-      set((state) => ({ savedTours: [saved, ...state.savedTours.filter((item) => item.id !== saved.id)],
+      set((state) => ({ savedTours: sortTours([saved, ...state.savedTours.filter((item) => item.id !== saved.id)]),
         activeTourId: saved.id, routeIds: saved.placeIds, suggestedRouteIds: [], storageError: null }))
       localStorage.setItem(draftTourStorageKey(currentUser.id), saved.id)
       await saveTour(saved, currentUser.id)
@@ -313,13 +337,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (get().authToken === authToken) set({ storageError: routeFailure(error) })
       return false
     }
-    finally { set({ isSavingRoute: false }) }
+    finally { endTourChange(); set({ isSavingRoute: false }) }
   },
   removeTour: async (id) => {
     const { authToken, activeTourId, currentUser } = get()
+    if (!authToken) return
+    if (!get().online || !navigator.onLine) { set({ storageError: 'routeOffline' }); return }
+    beginTourChange()
     try {
-      if (!authToken) return
-      if (!get().online || !navigator.onLine) { set({ storageError: 'routeOffline' }); return }
       await deleteRemoteTour(id, authToken)
       if (get().authToken !== authToken) return
       set((state) => ({
@@ -337,6 +362,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     } catch (error) {
       if (get().authToken === authToken) set({ storageError: routeFailure(error) })
+    } finally {
+      endTourChange()
     }
   },
   setAutoNarration: (autoNarration) => set({ autoNarration }),
@@ -403,7 +430,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           ? JSON.parse(cached.value) as { authToken?: string; user?: UserProfile } : null
         const currentUser = session?.authToken === authToken ? session.user : null
         if (currentUser) {
-          const savedTours = (await getSavedTours()).filter((tour) => tour.ownerId === currentUser.id)
+          const savedTours = sortTours((await getSavedTours()).filter((tour) => tour.ownerId === currentUser.id))
           if (getStoredAuthToken() !== authToken) return
           const activeTourId = getDraftTourId(currentUser.id, savedTours)
           set({ authToken, currentUser, savedTours, activeTourId, routeIds: savedTours.find((tour) => tour.id === activeTourId)?.placeIds ?? [] })
