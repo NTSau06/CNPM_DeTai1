@@ -1,5 +1,5 @@
 // Trang khám phá: tìm/lọc địa điểm, xem bản đồ, GPS, hành trình và thuyết minh.
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, BookmarkPlus, CalendarDays, Camera, ChefHat, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Clock3, Compass, Globe2, Headphones, Heart, Home, Landmark, Leaf, Lightbulb, LoaderCircle, LocateFixed, MapPin, Play, Search, Sparkles, Volume2 } from 'lucide-react'
 import { distance, point } from '@turf/turf'
 import { NavLink } from 'react-router-dom'
@@ -71,6 +71,17 @@ export function ExplorePage() {
   const placeDetailsRef = useRef<HTMLDetailsElement>(null)
   const selectedPlace = places.find((place) => place.id === selectedPlaceId) ?? places[0] ?? bundledPlaces[0]
   const visitorDetails = getVisitorDetails(selectedPlace.id, language)
+  const stopWalk = useCallback((message?: string) => {
+    if (watchId.current !== null) {
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchId.current)
+      }
+      watchId.current = null
+    }
+    stopSpeaking()
+    setAutoNarration(false)
+    if (message !== undefined) setGpsMessage(message)
+  }, [setAutoNarration])
 
   useEffect(() => {
     let active = true
@@ -128,8 +139,14 @@ export function ExplorePage() {
 
   useEffect(() => {
     if (!autoNarration || !location) return
-    const nearby = places.find((place) => distance(point(location), point(place.coordinates), { units: 'meters' }) < AUTO_GUIDE_RADIUS_METERS)
-    if (!nearby || spokenPlaces.current.has(nearby.id)) return
+    const nearby = places
+      .map((place) => ({
+        place,
+        meters: distance(point(location), point(place.coordinates), { units: 'meters' }),
+      }))
+      .filter(({ place, meters }) => meters < AUTO_GUIDE_RADIUS_METERS && !spokenPlaces.current.has(place.id))
+      .sort((a, b) => a.meters - b.meters)[0]?.place
+    if (!nearby) return
     // Chỉ đánh dấu khi có nguồn phát MP3 hoặc giọng đọc trình duyệt.
     if (!getNarrationAudioUrl(nearby, language) && !speechAvailable()) {
       setNarrationMessage(ui(language, 'voiceMissing'))
@@ -152,17 +169,7 @@ export function ExplorePage() {
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [])
 
-  useEffect(() => {
-    if (!autoNarration && watchId.current !== null && navigator.geolocation) {
-      navigator.geolocation.clearWatch(watchId.current)
-      watchId.current = null
-    }
-  }, [autoNarration])
-
-  useEffect(() => () => {
-    if (watchId.current !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId.current)
-    useAppStore.getState().setAutoNarration(false)
-  }, [])
+  useEffect(() => () => stopWalk(), [stopWalk])
 
   const startWalk = () => {
     if (!window.confirm(ui(language, 'gpsConsent'))) return
@@ -207,22 +214,17 @@ export function ExplorePage() {
         }
       },
       (error) => {
-        if (error.code === error.PERMISSION_DENIED) {
-          if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current)
-          watchId.current = null
-          setAutoNarration(false)
-          stopSpeaking()
-          setGpsMessage(ui(language, 'gpsDenied'))
-        } else setGpsMessage(translate(language, 'gpsError'))
+        const message = error.code === error.PERMISSION_DENIED
+          ? ui(language, 'gpsDenied')
+          : error.code === error.POSITION_UNAVAILABLE
+            ? translate(language, 'gpsUnavailable')
+            : error.code === error.TIMEOUT
+              ? translate(language, 'gpsTimeout')
+              : translate(language, 'gpsError')
+        stopWalk(message)
       },
       { enableHighAccuracy: true, maximumAge: 15000 },
     )
-  }
-
-  const stopWalk = () => {
-    stopSpeaking()
-    setAutoNarration(false)
-    setGpsMessage('')
   }
 
   const showPlaceDetails = () => {
@@ -648,7 +650,7 @@ export function ExplorePage() {
             <aside className="place-detail-sidebar pd-side">
               <section className="place-detail-side-card pd-audio" id="place-detail-audio">
                 <h2><span className="place-detail-side-icon"><Headphones size={12} /></span>{ui(language, 'audioGuide')}</h2>
-                <NarrationCard place={selectedPlace} language={language} distanceMeters={distanceMeters} onStartWalk={startWalk} onStopWalk={stopWalk} />
+                <NarrationCard place={selectedPlace} language={language} distanceMeters={distanceMeters} onStartWalk={startWalk} onStopWalk={() => stopWalk('')} />
               </section>
               <TicketPurchasePanel placeId={selectedPlace.id} />
               <PlaceRatingPanel placeId={selectedPlace.id} />
@@ -683,7 +685,7 @@ export function ExplorePage() {
         </article>
       </details>
 
-      <button className={`walk-fab${autoNarration ? ' is-active' : ''}`} onClick={autoNarration ? stopWalk : startWalk}>
+      <button className={`walk-fab${autoNarration ? ' is-active' : ''}`} onClick={autoNarration ? () => stopWalk('') : startWalk}>
         {autoNarration ? <Volume2 size={17} /> : <Compass size={17} />}
         {translate(language, autoNarration ? 'autoOn' : 'startWalk')}
       </button>
