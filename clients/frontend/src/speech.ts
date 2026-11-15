@@ -4,6 +4,7 @@ import type { Language, Place } from './types'
 import bundledScripts from './data/narrationScripts.json'
 import bundledAudio from './data/narrationAudio.json'
 
+let playbackGeneration = 0
 let activeAudio: HTMLAudioElement | null = null
 
 const narrationScripts: Record<string, Partial<Record<Language, { originalNarration: string; text: string }>>> = bundledScripts
@@ -65,10 +66,9 @@ export function speakFrom(
   utterance.onend = callbacks.onEnd
   utterance.onerror = callbacks.onError
   const voices = window.speechSynthesis.getVoices()
-  const prefix = utterance.lang.toLowerCase().split('-')[0]
-  const voice = voices.find((item) => item.lang.toLowerCase() === utterance.lang.toLowerCase())
-    ?? voices.find((item) => item.lang.toLowerCase().startsWith(prefix))
-  if (voice) utterance.voice = voice
+  const voice = pickVoice(voices, utterance.lang)
+  if (!voice) return false
+  utterance.voice = voice
   window.speechSynthesis.speak(utterance)
   return true
 }
@@ -113,6 +113,68 @@ function stopAudioPlayback() {
 }
 
 export function stopSpeaking() {
+  playbackGeneration += 1
   stopAudioPlayback()
   if (speechAvailable()) window.speechSynthesis.cancel()
+}
+
+
+export function pickVoice<T extends { lang: string }>(voices: T[], speechLang: string): T | undefined {
+  const normalized = speechLang.toLowerCase().replace(/_/g, '-')
+  const prefix = normalized.split('-')[0]
+  return voices.find((voice) => voice.lang.toLowerCase().replace(/_/g, '-') === normalized)
+    ?? voices.find((voice) => voice.lang.toLowerCase().replace(/_/g, '-').split('-')[0] === prefix)
+}
+
+export async function ensureVoicesLoaded(): Promise<SpeechSynthesisVoice[]> {
+  if (!speechAvailable()) return []
+  const synth = window.speechSynthesis
+  if (synth.getVoices().length) return synth.getVoices()
+  return new Promise((resolve) => {
+    const finish = () => {
+      if (!synth.getVoices().length) return
+      cleanup()
+      resolve(synth.getVoices())
+    }
+    const cleanup = () => { clearTimeout(timer); synth.removeEventListener('voiceschanged', finish) }
+    const timer = setTimeout(() => { cleanup(); resolve(synth.getVoices()) }, 1000)
+    synth.addEventListener('voiceschanged', finish)
+    finish()
+  })
+}
+
+export type NarrationResult = { ok: true; usedLanguage: Language; fallback: boolean }
+  | { ok: false; reason: 'unsupported' | 'no-voice' }
+
+export async function prepareSpeech(language: Language, text: string, vietnameseText: string) {
+  const voices = await ensureVoicesLoaded()
+  if (pickVoice(voices, languages.find((item) => item.code === language)?.speech ?? language)) {
+    return { text, language, fallback: false }
+  }
+  if (pickVoice(voices, 'vi-VN')) return { text: vietnameseText, language: 'vi' as Language, fallback: language !== 'vi' }
+  return undefined
+}
+
+export async function playNarration(place: Place, language: Language): Promise<NarrationResult> {
+  stopSpeaking()
+  const generation = playbackGeneration
+  const audioUrl = getNarrationAudioUrl(place, language)
+  if (audioUrl && typeof Audio !== 'undefined') {
+    const audio = new Audio(audioUrl)
+    activeAudio = audio
+    const started = await new Promise<boolean>((resolve) => {
+      audio.onerror = () => resolve(false)
+      audio.onplaying = () => resolve(true)
+      void audio.play().catch(() => resolve(false))
+    })
+    if (generation !== playbackGeneration) return { ok: false, reason: 'unsupported' }
+    if (started) return { ok: true, usedLanguage: language, fallback: false }
+    stopAudioPlayback()
+  }
+  if (!speechAvailable()) return { ok: false, reason: 'unsupported' }
+  const prepared = await prepareSpeech(language, getNarrationText(place, language), getNarrationText(place, 'vi'))
+  if (!prepared) return { ok: false, reason: 'no-voice' }
+  if (generation !== playbackGeneration) return { ok: false, reason: 'unsupported' }
+  const ok = speak(prepared.text, prepared.language)
+  return ok ? { ok: true, usedLanguage: prepared.language, fallback: prepared.fallback } : { ok: false, reason: 'no-voice' }
 }

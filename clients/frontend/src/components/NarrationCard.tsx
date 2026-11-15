@@ -94,6 +94,7 @@ export function NarrationCard({ place, language, distanceMeters, onStartWalk, on
         <AudioPlayer
           key={`${place.id}:${audioLanguage}`}
           text={audioText}
+          vietnameseText={getNarrationText(place, 'vi')}
           language={language}
           speechLanguage={audioLanguage}
           audioSrc={audioSrc}

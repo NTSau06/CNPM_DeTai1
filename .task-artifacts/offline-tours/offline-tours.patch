@@ -1,0 +1,223 @@
+--- a/clients/frontend/src/store.ts
++++ b/clients/frontend/src/store.ts
+@@ -6,6 +6,16 @@
+ import type { Language, OfflineMapPack, Place, SavedTour, UserProfile } from './types'
+ 
+ const placeOrder = new Map(bundledPlaces.map((place, index) => [place.id, index]))
++
++function cacheCurrentUser(authToken: string, user: UserProfile) {
++  // Gắn hồ sơ với phiên để không khôi phục nhầm tài khoản.
++  return writeSetting('currentUser', JSON.stringify({ authToken, user }))
++}
++
++function routeFailure(error: unknown): AppErrorKey {
++  return !navigator.onLine || (error instanceof BackendApiError && error.status === 0)
++    ? 'routeOffline' : 'backendUnavailable'
++}
+ 
+ function draftTourStorageKey(userId: string) {
+   return `quang-tri:draft-tour:${userId}`
+@@ -102,12 +112,13 @@
+   signIn: async (authToken, currentUser) => {
+     storeAuthToken(authToken)
+     set({ authToken, currentUser, savedTours: [], routeIds: [], activeTourId: null, suggestedRouteIds: [], storageError: null })
+-    await writeSetting('currentUser', JSON.stringify(currentUser))
++    await cacheCurrentUser(authToken, currentUser)
++    if (get().authToken !== authToken) return
+     await get().syncTours()
+   },
+   syncTours: async () => {
+     const { authToken, currentUser } = get()
+-    if (!authToken || !currentUser) return
++    if (!authToken || !currentUser || !navigator.onLine) return
+     try {
+       const savedTours = (await fetchTours(authToken)).map((tour) => ({ ...tour, ownerId: currentUser.id }))
+       if (get().authToken !== authToken) return
+@@ -127,19 +138,21 @@
+     const { authToken } = get()
+     if (!authToken) return
+     const currentUser = await updateProfile(authToken, user)
++    if (get().authToken !== authToken) return
+     set({ currentUser })
+-    await writeSetting('currentUser', JSON.stringify(currentUser))
++    await cacheCurrentUser(authToken, currentUser)
+   },
+   replaceSession: (authToken) => {
+     storeAuthToken(authToken)
+     set({ authToken })
++    const { currentUser } = get()
++    if (currentUser) void cacheCurrentUser(authToken, currentUser).catch(() => set({ storageError: 'savingError' }))
+   },
+   signOut: async () => {
+     const { authToken } = get()
+     storeAuthToken(null)
+-    set({ currentUser: null, authToken: null, savedTours: [], routeIds: [], activeTourId: null })
++    set({ currentUser: null, authToken: null, savedTours: [], routeIds: [], activeTourId: null, suggestedRouteIds: [] })
+     await deleteSetting('currentUser')
+-    set({ suggestedRouteIds: [] })
+     if (!authToken) return
+     try {
+       await logoutAccount(authToken)
+@@ -163,7 +176,9 @@
+       if (nextRouteIds.length === 0) {
+         if (activeTourId) {
+           await deleteRemoteTour(activeTourId, authToken)
++          if (get().authToken !== authToken) return false
+           await deleteTour(activeTourId)
++          if (get().authToken !== authToken) return false
+           set((state) => ({
+             routeIds: [],
+             activeTourId: null,
+@@ -204,13 +219,14 @@
+       }))
+       localStorage.setItem(draftTourStorageKey(currentUser.id), remoteTour.id)
+       try {
+-        await saveTour(remoteTour)
++        await saveTour(remoteTour, currentUser.id)
+       } catch {
+         set({ storageError: 'savingError' })
+       }
+       return true
+-    } catch {
+-      set({ storageError: 'backendUnavailable' })
++    } catch (error) {
++      if (get().authToken !== authToken) return false
++      set({ storageError: routeFailure(error) })
+       return false
+     } finally {
+       set({ isSavingRoute: false })
+@@ -259,13 +275,14 @@
+       }))
+       localStorage.setItem(draftTourStorageKey(currentUser.id), remoteTour.id)
+       try {
+-        await saveTour(remoteTour)
++        await saveTour(remoteTour, currentUser.id)
+       } catch {
+         set({ storageError: 'savingError' })
+       }
+       return true
+-    } catch {
+-      set({ storageError: 'backendUnavailable' })
++    } catch (error) {
++      if (get().authToken !== authToken) return false
++      set({ storageError: routeFailure(error) })
+       return false
+     } finally {
+       set({ isSavingRoute: false })
+@@ -290,17 +307,21 @@
+       set((state) => ({ savedTours: [saved, ...state.savedTours.filter((item) => item.id !== saved.id)],
+         activeTourId: saved.id, routeIds: saved.placeIds, suggestedRouteIds: [], storageError: null }))
+       localStorage.setItem(draftTourStorageKey(currentUser.id), saved.id)
+-      await saveTour(saved)
++      await saveTour(saved, currentUser.id)
+       return true
+-    } catch { set({ storageError: 'backendUnavailable' }); return false }
++    } catch (error) {
++      if (get().authToken === authToken) set({ storageError: routeFailure(error) })
++      return false
++    }
+     finally { set({ isSavingRoute: false }) }
+   },
+   removeTour: async (id) => {
+-    try {
+-      const { authToken, activeTourId, currentUser } = get()
++    const { authToken, activeTourId, currentUser } = get()
++    try {
+       if (!authToken) return
+       if (!get().online || !navigator.onLine) { set({ storageError: 'routeOffline' }); return }
+       await deleteRemoteTour(id, authToken)
++      if (get().authToken !== authToken) return
+       set((state) => ({
+         savedTours: state.savedTours.filter((tour) => tour.id !== id),
+         ...(activeTourId === id ? { activeTourId: null, routeIds: [] } : {}),
+@@ -314,8 +335,8 @@
+       } catch {
+         set({ storageError: 'savingError' })
+       }
+-    } catch {
+-      set({ storageError: 'backendUnavailable' })
++    } catch (error) {
++      if (get().authToken === authToken) set({ storageError: routeFailure(error) })
+     }
+   },
+   setAutoNarration: (autoNarration) => set({ autoNarration }),
+@@ -372,16 +393,18 @@
+       })
+     } catch {
+       set({ storageError: 'savingError', bootstrapped: true })
+-      return
+     }
+ 
+     const authToken = getStoredAuthToken()
+     if (authToken) {
+       try {
+         const cached = await readSetting('currentUser')
+-        const currentUser = typeof cached?.value === 'string' ? JSON.parse(cached.value) as UserProfile : null
++        const session = typeof cached?.value === 'string'
++          ? JSON.parse(cached.value) as { authToken?: string; user?: UserProfile } : null
++        const currentUser = session?.authToken === authToken ? session.user : null
+         if (currentUser) {
+           const savedTours = (await getSavedTours()).filter((tour) => tour.ownerId === currentUser.id)
++          if (getStoredAuthToken() !== authToken) return
+           const activeTourId = getDraftTourId(currentUser.id, savedTours)
+           set({ authToken, currentUser, savedTours, activeTourId, routeIds: savedTours.find((tour) => tour.id === activeTourId)?.placeIds ?? [] })
+         }
+@@ -399,7 +422,7 @@
+       const currentUser = await fetchCurrentUser(authToken)
+       if (getStoredAuthToken() !== authToken) return
+       set({ authToken, currentUser })
+-      await writeSetting('currentUser', JSON.stringify(currentUser))
++      await cacheCurrentUser(authToken, currentUser)
+       await get().syncTours()
+     } catch (error) {
+       if (getStoredAuthToken() !== authToken) return
+--- a/clients/frontend/src/db.ts
++++ b/clients/frontend/src/db.ts
+@@ -90,8 +90,8 @@
+   return (await getDatabase()).getAllFromIndex('tours', 'by-created-at')
+ }
+ 
+-export async function saveTour(tour: SavedTour) {
+-  await (await getDatabase()).put('tours', tour)
++export async function saveTour(tour: SavedTour, ownerId: string) {
++  await (await getDatabase()).put('tours', { ...tour, ownerId })
+ }
+ 
+ export async function deleteTour(id: string) {
+--- a/clients/frontend/src/sw.ts
++++ b/clients/frontend/src/sw.ts
+@@ -2,8 +2,8 @@
+ // Cache tài nguyên, tile bản đồ và API để ứng dụng tiếp tục hoạt động ngoại tuyến.
+ import { clientsClaim } from 'workbox-core'
+ import { ExpirationPlugin } from 'workbox-expiration'
+-import { cleanupOutdatedCaches, precacheAndRoute, type PrecacheEntry } from 'workbox-precaching'
+-import { registerRoute } from 'workbox-routing'
++import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute, type PrecacheEntry } from 'workbox-precaching'
++import { NavigationRoute, registerRoute } from 'workbox-routing'
+ import { CacheFirst, NetworkFirst } from 'workbox-strategies'
+ 
+ declare let self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Array<PrecacheEntry | string> }
+@@ -15,6 +15,11 @@
+   ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^v$/],
+ })
+ 
++// Mở lại đường dẫn như /saved bằng giao diện đã lưu khi mất mạng.
++registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), {
++  denylist: [/^\/api\//, /^\/static\//],
++}))
++
+ registerRoute(
+   ({ url }) => url.origin === 'https://tile.openstreetmap.de',
+   new CacheFirst({
+@@ -24,7 +29,10 @@
+ )
+ 
+ registerRoute(
+-  ({ url }) => url.pathname.startsWith('/api/'),
++  // Dữ liệu riêng tư dùng cache IndexedDB theo tài khoản, tránh lẫn phản hồi API.
++  ({ url, request }) => url.pathname.startsWith('/api/')
++    && !request.headers.has('Authorization')
++    && !/^\/api\/v1\/(auth|tours|admin|pairing)(\/|$)/.test(url.pathname),
+   new NetworkFirst({
+     cacheName: 'quang-tri-api-v1',
+     networkTimeoutSeconds: 4,

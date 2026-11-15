@@ -1,8 +1,10 @@
 // Phát lời thuyết minh qua giọng đọc trình duyệt, hỗ trợ tua và đổi tốc độ.
 import { useEffect, useRef, useState } from 'react'
 import { Pause, Play, Square } from 'lucide-react'
+import { ui } from '../uiText'
+import { languages } from '../data/places'
 import { translate } from '../i18n'
-import { speakFrom, speechAvailable, stopSpeaking } from '../speech'
+import { prepareSpeech, speakFrom, speechAvailable, stopSpeaking } from '../speech'
 import type { Language } from '../types'
 import type { CSSProperties } from 'react'
 
@@ -10,6 +12,7 @@ const playbackRates = [0.75, 1, 1.25, 1.5]
 
 interface AudioPlayerProps {
   text: string
+  vietnameseText: string
   language: Language
   speechLanguage: Language
   audioSrc?: string
@@ -17,7 +20,11 @@ interface AudioPlayerProps {
   onPlayingChange: (playing: boolean) => void
 }
 
-export function AudioPlayer({ text, language, speechLanguage, audioSrc, estimatedDurationSeconds, onPlayingChange }: AudioPlayerProps) {
+export function AudioPlayer({ text: originalText, vietnameseText, language, speechLanguage, audioSrc, estimatedDurationSeconds, onPlayingChange }: AudioPlayerProps) {
+  const [preparedSpeech, setPreparedSpeech] = useState<{ text: string; language: Language; fallback: boolean } | null>(null)
+  const [voiceMessage, setVoiceMessage] = useState('')
+  const text = preparedSpeech?.text ?? originalText
+  const resolvedSpeech = useRef<{ text: string; language: Language; fallback: boolean } | null>(null)
   const estimatedCharactersPerSecond = estimatedDurationSeconds ? text.length / estimatedDurationSeconds : 14
   const [mediaDuration, setMediaDuration] = useState<number | null>(null)
   const [playing, setPlaying] = useState(false)
@@ -41,8 +48,18 @@ export function AudioPlayer({ text, language, speechLanguage, audioSrc, estimate
     setCharacterIndex(next)
   }
 
-  const startAt = (offset: number) => {
+  const startAt = async (offset: number) => {
     const token = ++generation.current
+    const prepared = resolvedSpeech.current ?? await prepareSpeech(speechLanguage, originalText, vietnameseText)
+    if (generation.current !== token) return
+    if (!prepared) { setVoiceMessage(ui(language, 'voiceMissing')); return }
+    if (!resolvedSpeech.current) {
+      resolvedSpeech.current = prepared
+      setPreparedSpeech(prepared)
+      setVoiceMessage(prepared.fallback ? ui(language, 'voiceFallback', { name: languages.find((item) => item.code === speechLanguage)?.label ?? speechLanguage }) : '')
+      if (prepared.fallback) offset = 0
+    }
+    const text = prepared.text
     const start = Math.max(0, Math.min(text.length, offset))
     baseCharacter.current = start
     segmentStartedAt.current = performance.now()
@@ -52,7 +69,7 @@ export function AudioPlayer({ text, language, speechLanguage, audioSrc, estimate
     playingRef.current = true
     setPlaying(true)
 
-    const success = speakFrom(text, speechLanguage, rateRef.current, start, {
+    const success = speakFrom(text, prepared.language, rateRef.current, start, {
       onBoundary: (index) => {
         if (generation.current !== token) return
         baseCharacter.current = index
@@ -77,6 +94,7 @@ export function AudioPlayer({ text, language, speechLanguage, audioSrc, estimate
     })
 
     if (!success) {
+      setVoiceMessage(ui(language, 'voiceMissing'))
       utteranceActive.current = false
       playingRef.current = false
       setPlaying(false)
@@ -303,6 +321,7 @@ export function AudioPlayer({ text, language, speechLanguage, audioSrc, estimate
         onKeyUp={() => { if (seekDraft !== null) seekTo(seekDraft) }}
         onBlur={() => { if (seekDraft !== null) seekTo(seekDraft) }}
       />
+      {voiceMessage && <p className="inline-warning" role="status">{voiceMessage}</p>}
       {!useAudioFile && !speechAvailable() && <p className="inline-warning">{translate(language, 'speechUnsupported')}</p>}
     </div>
   )

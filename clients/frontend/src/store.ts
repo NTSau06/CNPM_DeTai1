@@ -1,11 +1,21 @@
 ﻿// Quản lý trạng thái chung và khởi tạo/đồng bộ dữ liệu với IndexedDB, backend.
 import { create } from 'zustand'
-import { cachePlaces, deleteOfflineMap, deleteTour, getCachedPlaces, getOfflineMap, readSetting, saveOfflineMap, saveTour, writeSetting } from './db'
+import { cachePlaces, replaceCachedPlaces, replaceUserTours, getSavedTours, deleteSetting, deleteOfflineMap, deleteTour, getCachedPlaces, getOfflineMap, readSetting, saveOfflineMap, saveTour, writeSetting } from './db'
 import { BackendApiError, createTour, deleteRemoteTour, fetchCurrentUser, fetchPlaces, fetchTours, generateId, getStoredAuthToken, logoutAccount, mergeRemotePlaces, storeAuthToken, updateProfile } from './api'
 import { languages, places as bundledPlaces } from './data/places'
 import type { Language, OfflineMapPack, Place, SavedTour, UserProfile } from './types'
 
 const placeOrder = new Map(bundledPlaces.map((place, index) => [place.id, index]))
+
+function cacheCurrentUser(authToken: string, user: UserProfile) {
+  // Gắn hồ sơ với phiên để không khôi phục nhầm tài khoản.
+  return writeSetting('currentUser', JSON.stringify({ authToken, user }))
+}
+
+function routeFailure(error: unknown): AppErrorKey {
+  return !navigator.onLine || (error instanceof BackendApiError && error.status === 0)
+    ? 'routeOffline' : 'backendUnavailable'
+}
 
 function draftTourStorageKey(userId: string) {
   return `quang-tri:draft-tour:${userId}`
@@ -16,7 +26,7 @@ function getDraftTourId(userId: string, tours: SavedTour[]) {
   return storedId && tours.some((tour) => tour.id === storedId) ? storedId : null
 }
 
-export type AppErrorKey = 'savingError' | 'offlinePackError' | 'backendUnavailable'
+export type AppErrorKey = 'savingError' | 'offlinePackError' | 'backendUnavailable' | 'routeOffline'
 
 interface AppState {
   language: Language
@@ -49,6 +59,8 @@ interface AppState {
   setRoutePlace: (id: string) => Promise<boolean>
   setRouteOrder: (placeIds: string[]) => Promise<boolean>
   setSuggestedRoute: (placeIds: string[]) => void
+  syncTours: () => Promise<void>
+  applySuggestedRoute: (mode: "replace" | "new") => Promise<boolean>
   removeTour: (id: string) => Promise<void>
   setAutoNarration: (enabled: boolean) => void
   setUseOfflineMap: (enabled: boolean) => void
@@ -90,41 +102,57 @@ export const useAppStore = create<AppState>((set, get) => ({
         ? state.selectedPlaceId
         : places[0]?.id ?? state.selectedPlaceId,
     }))
-    void cachePlaces(places).catch(() => set({ storageError: 'savingError' }))
+    void replaceCachedPlaces(places).catch(() => set({ storageError: 'savingError' }))
   },
   setLocation: (location) => set({ location }),
-  setOnline: (online) => set({ online }),
+  setOnline: (online) => {
+    set({ online })
+    if (online) void get().syncTours()
+  },
   signIn: async (authToken, currentUser) => {
     storeAuthToken(authToken)
-    set({ authToken, currentUser, savedTours: [], routeIds: [], storageError: null })
+    set({ authToken, currentUser, savedTours: [], routeIds: [], activeTourId: null, suggestedRouteIds: [], storageError: null })
+    await cacheCurrentUser(authToken, currentUser)
+    if (get().authToken !== authToken) return
+    await get().syncTours()
+  },
+  syncTours: async () => {
+    const { authToken, currentUser } = get()
+    if (!authToken || !currentUser || !navigator.onLine) return
     try {
-      const savedTours = await fetchTours(authToken)
+      const savedTours = (await fetchTours(authToken)).map((tour) => ({ ...tour, ownerId: currentUser.id }))
+      if (get().authToken !== authToken) return
       const activeTourId = getDraftTourId(currentUser.id, savedTours)
-      const activeTour = savedTours.find((tour) => tour.id === activeTourId)
-      set({
-        savedTours,
-        activeTourId,
-        routeIds: activeTour?.placeIds ?? [],
-      })
-      await Promise.all(savedTours.map((tour) => saveTour(tour)))
-    } catch {
-      set({ storageError: 'backendUnavailable' })
+      set({ savedTours, activeTourId, routeIds: savedTours.find((tour) => tour.id === activeTourId)?.placeIds ?? [] })
+      await replaceUserTours(currentUser.id, savedTours)
+    } catch (error) {
+      if (get().authToken !== authToken) return
+      if (error instanceof BackendApiError && error.status === 401) {
+        storeAuthToken(null)
+        set({ authToken: null, currentUser: null, savedTours: [], activeTourId: null, routeIds: [] })
+        await deleteSetting('currentUser')
+      } else set({ storageError: 'backendUnavailable' })
     }
   },
   updateCurrentUser: async (user) => {
     const { authToken } = get()
     if (!authToken) return
     const currentUser = await updateProfile(authToken, user)
+    if (get().authToken !== authToken) return
     set({ currentUser })
+    await cacheCurrentUser(authToken, currentUser)
   },
   replaceSession: (authToken) => {
     storeAuthToken(authToken)
     set({ authToken })
+    const { currentUser } = get()
+    if (currentUser) void cacheCurrentUser(authToken, currentUser).catch(() => set({ storageError: 'savingError' }))
   },
   signOut: async () => {
     const { authToken } = get()
     storeAuthToken(null)
-    set({ currentUser: null, authToken: null, savedTours: [], routeIds: [], activeTourId: null })
+    set({ currentUser: null, authToken: null, savedTours: [], routeIds: [], activeTourId: null, suggestedRouteIds: [] })
+    await deleteSetting('currentUser')
     if (!authToken) return
     try {
       await logoutAccount(authToken)
@@ -141,14 +169,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ suggestedRouteIds: [] })
     set({ isSavingRoute: true })
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      set({ isSavingRoute: false, storageError: 'backendUnavailable' })
+      set({ isSavingRoute: false, storageError: 'routeOffline' })
       return false
     }
     try {
       if (nextRouteIds.length === 0) {
         if (activeTourId) {
           await deleteRemoteTour(activeTourId, authToken)
+          if (get().authToken !== authToken) return false
           await deleteTour(activeTourId)
+          if (get().authToken !== authToken) return false
           set((state) => ({
             routeIds: [],
             activeTourId: null,
@@ -179,7 +209,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           0,
         ),
       }
-      const remoteTour = await createTour(tour, authToken)
+      const remoteTour = { ...await createTour(tour, authToken), ownerId: currentUser.id }
+      if (get().authToken !== authToken) return false
       set((state) => ({
         routeIds: nextRouteIds,
         activeTourId: remoteTour.id,
@@ -188,13 +219,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       }))
       localStorage.setItem(draftTourStorageKey(currentUser.id), remoteTour.id)
       try {
-        await saveTour(remoteTour)
+        await saveTour(remoteTour, currentUser.id)
       } catch {
         set({ storageError: 'savingError' })
       }
       return true
-    } catch {
-      set({ storageError: 'backendUnavailable' })
+    } catch (error) {
+      if (get().authToken !== authToken) return false
+      set({ storageError: routeFailure(error) })
       return false
     } finally {
       set({ isSavingRoute: false })
@@ -215,7 +247,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ suggestedRouteIds: [] })
     set({ isSavingRoute: true })
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      set({ isSavingRoute: false, storageError: 'backendUnavailable' })
+      set({ isSavingRoute: false, storageError: 'routeOffline' })
       return false
     }
     try {
@@ -233,7 +265,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           0,
         ),
       }
-      const remoteTour = await createTour(tour, authToken)
+      const remoteTour = { ...await createTour(tour, authToken), ownerId: currentUser.id }
+      if (get().authToken !== authToken) return false
       set((state) => ({
         routeIds: placeIds,
         activeTourId: remoteTour.id,
@@ -242,24 +275,53 @@ export const useAppStore = create<AppState>((set, get) => ({
       }))
       localStorage.setItem(draftTourStorageKey(currentUser.id), remoteTour.id)
       try {
-        await saveTour(remoteTour)
+        await saveTour(remoteTour, currentUser.id)
       } catch {
         set({ storageError: 'savingError' })
       }
       return true
-    } catch {
-      set({ storageError: 'backendUnavailable' })
+    } catch (error) {
+      if (get().authToken !== authToken) return false
+      set({ storageError: routeFailure(error) })
       return false
     } finally {
       set({ isSavingRoute: false })
     }
   },
   setSuggestedRoute: (suggestedRouteIds) => set({ suggestedRouteIds }),
-  removeTour: async (id) => {
+  applySuggestedRoute: async (mode) => {
+    const { suggestedRouteIds: placeIds, places, currentUser, authToken, activeTourId, isSavingRoute, online } = get()
+    if (!currentUser || !authToken || isSavingRoute || !placeIds.length) return false
+    if (!online || !navigator.onLine) { set({ storageError: 'routeOffline' }); return false }
+    set({ isSavingRoute: true })
     try {
-      const { authToken, activeTourId, currentUser } = get()
+      const { length, lineString } = await import('@turf/turf')
+      const coordinates = placeIds.map((id) => places.find((place) => place.id === id)?.coordinates)
+        .filter((item): item is [number, number] => Boolean(item))
+      const id = mode === 'replace' ? activeTourId ?? generateId() : generateId()
+      const tour = { id, placeIds, createdAt: get().savedTours.find((item) => item.id === id)?.createdAt ?? Date.now(),
+        distanceKm: coordinates.length > 1 ? length(lineString(coordinates), { units: 'kilometers' }) : 0,
+        durationMinutes: placeIds.reduce((sum, id) => sum + (places.find((place) => place.id === id)?.duration ?? 0), 0) }
+      const saved = { ...await createTour(tour, authToken), ownerId: currentUser.id }
+      if (get().authToken !== authToken) return false
+      set((state) => ({ savedTours: [saved, ...state.savedTours.filter((item) => item.id !== saved.id)],
+        activeTourId: saved.id, routeIds: saved.placeIds, suggestedRouteIds: [], storageError: null }))
+      localStorage.setItem(draftTourStorageKey(currentUser.id), saved.id)
+      await saveTour(saved, currentUser.id)
+      return true
+    } catch (error) {
+      if (get().authToken === authToken) set({ storageError: routeFailure(error) })
+      return false
+    }
+    finally { set({ isSavingRoute: false }) }
+  },
+  removeTour: async (id) => {
+    const { authToken, activeTourId, currentUser } = get()
+    try {
       if (!authToken) return
+      if (!get().online || !navigator.onLine) { set({ storageError: 'routeOffline' }); return }
       await deleteRemoteTour(id, authToken)
+      if (get().authToken !== authToken) return
       set((state) => ({
         savedTours: state.savedTours.filter((tour) => tour.id !== id),
         ...(activeTourId === id ? { activeTourId: null, routeIds: [] } : {}),
@@ -273,8 +335,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       } catch {
         set({ storageError: 'savingError' })
       }
-    } catch {
-      set({ storageError: 'backendUnavailable' })
+    } catch (error) {
+      if (get().authToken === authToken) set({ storageError: routeFailure(error) })
     }
   },
   setAutoNarration: (autoNarration) => set({ autoNarration }),
@@ -311,17 +373,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   bootstrapInner: async () => {
     try {
-      await cachePlaces(bundledPlaces)
-      const [cachedPlaces, offlineMap, language, offlineMode] = await Promise.all([
-        getCachedPlaces(),
-        getOfflineMap(),
-        readSetting('language'),
-        readSetting('useOfflineMap'),
+      const [cachedPlaces, offlineMap, language, offlineMode, catalogSynced] = await Promise.all([
+        getCachedPlaces(), getOfflineMap(), readSetting('language'), readSetting('useOfflineMap'), readSetting('catalogSynced'),
       ])
+      // Sau l?n ??ng b? ??u, kh?ng h?i sinh ??a ?i?m m? qu?n tr? vi?n ?? x?a.
+      const missing = catalogSynced?.value ? [] : bundledPlaces.filter((place) => !cachedPlaces.some((cached) => cached.id === place.id))
+      if (missing.length) await cachePlaces(missing)
       const selectedLanguage = language?.value
-      const localPlaces = cachedPlaces.some((place) => placeOrder.has(place.id))
-          ? cachedPlaces.filter((place) => placeOrder.has(place.id)).sort((first, second) => (placeOrder.get(first.id) ?? Number.MAX_SAFE_INTEGER) - (placeOrder.get(second.id) ?? Number.MAX_SAFE_INTEGER))
-          : bundledPlaces
+      const localPlaces = [...cachedPlaces, ...missing].filter((place) => place.id !== 'truong-son-cemetery')
+        .sort((a, b) => (placeOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (placeOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+          || a.copy.vi.title.localeCompare(b.copy.vi.title, 'vi'))
       set({
         places: localPlaces,
         savedTours: [],
@@ -332,52 +393,44 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
     } catch {
       set({ storageError: 'savingError', bootstrapped: true })
-      return
-    }
-
-    if (typeof navigator === 'undefined' || !navigator.onLine) return
-
-    try {
-      const remotePlaces = await fetchPlaces()
-      const places = mergeRemotePlaces(get().places, remotePlaces)
-      set({ places })
-      await cachePlaces(places)
-    } catch (error) {
-      set({ storageError: error instanceof BackendApiError ? 'backendUnavailable' : 'savingError' })
-      return
     }
 
     const authToken = getStoredAuthToken()
-    if (!authToken) return
-    let currentUser: UserProfile
-    try {
-      currentUser = await fetchCurrentUser(authToken)
-      storeAuthToken(authToken)
-      set({ authToken, currentUser })
-    } catch (error) {
-      storeAuthToken(null)
-      set({
-        authToken: null,
-        currentUser: null,
-        savedTours: [],
-        storageError: error instanceof BackendApiError ? 'backendUnavailable' : 'savingError',
-      })
-      return
+    if (authToken) {
+      try {
+        const cached = await readSetting('currentUser')
+        const session = typeof cached?.value === 'string'
+          ? JSON.parse(cached.value) as { authToken?: string; user?: UserProfile } : null
+        const currentUser = session?.authToken === authToken ? session.user : null
+        if (currentUser) {
+          const savedTours = (await getSavedTours()).filter((tour) => tour.ownerId === currentUser.id)
+          if (getStoredAuthToken() !== authToken) return
+          const activeTourId = getDraftTourId(currentUser.id, savedTours)
+          set({ authToken, currentUser, savedTours, activeTourId, routeIds: savedTours.find((tour) => tour.id === activeTourId)?.placeIds ?? [] })
+        }
+      } catch { set({ storageError: 'savingError' }) }
     }
+    if (typeof navigator === 'undefined' || !navigator.onLine) return
     try {
-      const remoteTours = await fetchTours(authToken)
-      const activeTourId = getDraftTourId(currentUser.id, remoteTours)
-      const activeTour = remoteTours.find((tour) => tour.id === activeTourId)
-      set({
-        savedTours: remoteTours,
-        activeTourId,
-        routeIds: activeTour?.placeIds ?? [],
-      })
-      await Promise.all(remoteTours.map((tour) => saveTour(tour)))
+      const places = mergeRemotePlaces(get().places, await fetchPlaces())
+      set({ places })
+      await replaceCachedPlaces(places)
+      await writeSetting('catalogSynced', true)
+    } catch { set({ storageError: 'backendUnavailable' }) }
+    if (!authToken) return
+    try {
+      const currentUser = await fetchCurrentUser(authToken)
+      if (getStoredAuthToken() !== authToken) return
+      set({ authToken, currentUser })
+      await cacheCurrentUser(authToken, currentUser)
+      await get().syncTours()
     } catch (error) {
-      set({
-        storageError: error instanceof BackendApiError ? 'backendUnavailable' : 'savingError',
-      })
+      if (getStoredAuthToken() !== authToken) return
+      if (error instanceof BackendApiError && error.status === 401) {
+        storeAuthToken(null)
+        set({ authToken: null, currentUser: null, savedTours: [], activeTourId: null, routeIds: [] })
+        await deleteSetting('currentUser')
+      } else set({ storageError: 'backendUnavailable' })
     }
   },
   clearStorageError: () => set({ storageError: null }),

@@ -58,6 +58,26 @@ export async function getCachedPlaces() {
   return (await getDatabase()).getAll('places')
 }
 
+export async function replaceCachedPlaces(places: Place[]) {
+  const tx = (await getDatabase()).transaction('places', 'readwrite')
+  await tx.store.clear()
+  await Promise.all(places.map((place) => tx.store.put(place)))
+  await tx.done
+}
+
+export async function replaceUserTours(ownerId: string, tours: SavedTour[]) {
+  const tx = (await getDatabase()).transaction('tours', 'readwrite')
+  for (const tour of await tx.store.getAll()) {
+    if (tour.ownerId === ownerId) await tx.store.delete(tour.id)
+  }
+  await Promise.all(tours.map((tour) => tx.store.put({ ...tour, ownerId })))
+  await tx.done
+}
+
+export async function deleteSetting(key: string) {
+  await (await getDatabase()).delete('settings', key)
+}
+
 export async function readSetting(key: string) {
   return (await getDatabase()).get('settings', key)
 }
@@ -70,8 +90,8 @@ export async function getSavedTours() {
   return (await getDatabase()).getAllFromIndex('tours', 'by-created-at')
 }
 
-export async function saveTour(tour: SavedTour) {
-  await (await getDatabase()).put('tours', tour)
+export async function saveTour(tour: SavedTour, ownerId: string) {
+  await (await getDatabase()).put('tours', { ...tour, ownerId })
 }
 
 export async function deleteTour(id: string) {

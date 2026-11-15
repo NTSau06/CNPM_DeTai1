@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Crypto from 'expo-crypto'
 import * as Location from 'expo-location'
 import * as Speech from 'expo-speech'
+import { api } from './src/api'
 import { StatusBar } from 'expo-status-bar'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -43,7 +44,6 @@ type Tour = {
 }
 type Collection<T> = { items: T[]; total: number }
 
-const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 const PLACES_KEY = 'quang-tri:places:v1'
 const AUTH_KEY = 'quang-tri:auth-token:v1'
 const PRESENCE_KEY = 'quang-tri:presence-id:v1'
@@ -77,29 +77,6 @@ const words: Record<Language, Record<string, string>> = {
   'zh-CN': { kicker: '慢慢走，听土地讲故事', intro: '一段穿越遗产与海岸的悠闲旅程。', search: '搜索古迹或洞穴…', places: '附近景点', listen: '听景点介绍', stop: '停止播放', add: '加入行程', added: '已加入', walk: '开启自动讲解', walking: '自动讲解已开启', save: '保存行程', saved: '行程已保存', empty: '选择几个地点，开始规划行程。', offline: '正在使用保存在设备上的地点。', loading: '正在加载景点…', error: '无法连接服务器，正在显示已保存的景点。' },
   'ko-KR': { kicker: '천천히 걸으며 이야기를 들어요', intro: '유산과 푸른 바다를 만나는 작은 여행.', search: '유적지와 동굴 찾기…', places: '들러 볼 장소', listen: '이야기 듣기', stop: '재생 중지', add: '산책에 추가', added: '추가됨', walk: '자동 안내 시작', walking: '자동 안내 중', save: '산책 저장', saved: '산책을 저장했습니다', empty: '장소를 골라 여행을 시작해 보세요.', offline: '기기에 저장된 장소를 사용하고 있습니다.', loading: '장소 불러오는 중…', error: '서버에 연결할 수 없어 저장된 장소를 표시합니다.' },
   es: { kicker: 'CAMINA DESPACIO Y ESCUCHA', intro: 'Un viaje tranquilo entre patrimonio y costa.', search: 'Busca un monumento o una cueva…', places: 'Lugares para descubrir', listen: 'Escuchar la historia', stop: 'Detener', add: 'Añadir a mi ruta', added: 'Añadido', walk: 'Activar guía automática', walking: 'Guía automática activada', save: 'Guardar este paseo', saved: 'Paseo guardado', empty: 'Elige algunas paradas para empezar.', offline: 'Usando los lugares guardados en este dispositivo.', loading: 'Cargando lugares…', error: 'Sin conexión; se muestran los lugares guardados.' },
-}
-
-async function api<T>(path: string, init?: RequestInit, token?: string): Promise<T> {
-  let response: Response
-  try {
-    response = await fetch(`${API_BASE}${path}`, {
-      ...init,
-      headers: {
-        Accept: 'application/json',
-        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...init?.headers,
-      },
-    })
-  } catch (error) {
-    throw new Error(error instanceof Error ? error.message : 'Backend connection failed.')
-  }
-  if (!response.ok) {
-    const detail = await response.text()
-    throw new Error(`Request failed (${response.status}): ${detail}`)
-  }
-  if (response.status === 204) return undefined as T
-  return response.json() as Promise<T>
 }
 
 function tourStorageKey(userId: string) {

@@ -2,8 +2,8 @@
 // Cache tài nguyên, tile bản đồ và API để ứng dụng tiếp tục hoạt động ngoại tuyến.
 import { clientsClaim } from 'workbox-core'
 import { ExpirationPlugin } from 'workbox-expiration'
-import { cleanupOutdatedCaches, precacheAndRoute, type PrecacheEntry } from 'workbox-precaching'
-import { registerRoute } from 'workbox-routing'
+import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute, type PrecacheEntry } from 'workbox-precaching'
+import { NavigationRoute, registerRoute } from 'workbox-routing'
 import { CacheFirst, NetworkFirst } from 'workbox-strategies'
 
 declare let self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Array<PrecacheEntry | string> }
@@ -15,6 +15,11 @@ precacheAndRoute(self.__WB_MANIFEST, {
   ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^v$/],
 })
 
+// Mở lại đường dẫn như /saved bằng giao diện đã lưu khi mất mạng.
+registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), {
+  denylist: [/^\/api\//, /^\/static\//],
+}))
+
 registerRoute(
   ({ url }) => url.origin === 'https://tile.openstreetmap.de',
   new CacheFirst({
@@ -24,7 +29,10 @@ registerRoute(
 )
 
 registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/'),
+  // Dữ liệu riêng tư dùng cache IndexedDB theo tài khoản, tránh lẫn phản hồi API.
+  ({ url, request }) => url.pathname.startsWith('/api/')
+    && !request.headers.has('Authorization')
+    && !/^\/api\/v1\/(auth|tours|admin|pairing)(\/|$)/.test(url.pathname),
   new NetworkFirst({
     cacheName: 'quang-tri-api-v1',
     networkTimeoutSeconds: 4,

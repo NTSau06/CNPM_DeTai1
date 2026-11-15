@@ -302,7 +302,7 @@ export default function App() {
       <main className={`main-content${location.pathname === '/explore' ? ' explore-main-content' : ''}`}>
         {storageError && (
           <button className="storage-alert" onClick={clearStorageError} role="alert">
-            {translate(language, storageError)} <span aria-hidden="true">×</span>
+            {storageError === 'routeOffline' ? ui(language, 'routeOffline') : translate(language, storageError)} <span aria-hidden="true">×</span>
           </button>
         )}
         <Suspense fallback={<div className="page-loading" aria-label={translate(language, 'loading')}><span className="skeleton page-skeleton-title" /><span className="skeleton page-skeleton-line" /><span className="skeleton page-skeleton-block" /></div>}>

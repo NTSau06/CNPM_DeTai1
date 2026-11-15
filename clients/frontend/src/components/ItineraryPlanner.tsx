@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { LoaderCircle, MapPinned, Sparkles } from 'lucide-react'
 import { fetchTicketPrices } from '../api'
 import { categoryKeys, categoryLabels } from '../data/places'
@@ -37,6 +38,19 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
   const location = useAppStore((state) => state.location)
   const setSelectedPlace = useAppStore((state) => state.setSelectedPlace)
   const setSuggestedRoute = useAppStore((state) => state.setSuggestedRoute)
+  const currentUser = useAppStore((state) => state.currentUser)
+  const routeIds = useAppStore((state) => state.routeIds)
+  const suggestedRouteIds = useAppStore((state) => state.suggestedRouteIds)
+  const applySuggestedRoute = useAppStore((state) => state.applySuggestedRoute)
+  const online = useAppStore((state) => state.online)
+  const saving = useAppStore((state) => state.isSavingRoute)
+  const [saveChoice, setSaveChoice] = useState(false)
+  const [saveMessage, setSaveMessage] = useState('')
+  const savePlan = async (mode: 'replace' | 'new') => {
+    const ok = await applySuggestedRoute(mode)
+    setSaveMessage(ui(language, ok ? 'suggestionSaved' : 'suggestionFailed'))
+    if (ok) setSaveChoice(false)
+  }
   const [days, setDays] = useState(2)
   const [budget, setBudget] = useState('1000000')
   const [interests, setInterests] = useState<Category[]>(categoryKeys)
@@ -76,6 +90,8 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
       return
     }
 
+    setSaveMessage('')
+    setSaveChoice(false)
     setLoading(true)
     setError('')
     try {
@@ -166,6 +182,17 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
       {error && <p className="itinerary-message is-error" role="alert">{error}</p>}
       {plan && (
         <div className="itinerary-result" aria-live="polite">
+          {saveMessage && <p role="status">{saveMessage}</p>}
+          {!currentUser ? <Link to="/login">{ui(language, 'signIn')}</Link> : suggestedRouteIds.length > 0 && <>
+            <button type="button" disabled={!online || saving} onClick={() => routeIds.length ? setSaveChoice(true) : void savePlan('new')}>
+              {ui(language, 'saveSuggestion')}{saving && <LoaderCircle className="loading-spinner" size={15} />}
+            </button>
+            {!online && <p>{ui(language, 'routeOffline')}</p>}
+            {saveChoice && <div role="group" aria-label={ui(language, 'saveSuggestion')}>
+              <button type="button" disabled={!online || saving} onClick={() => void savePlan('replace')}>{ui(language, 'replaceRoute')}</button>
+              <button type="button" disabled={!online || saving} onClick={() => void savePlan('new')}>{ui(language, 'newRoute')}</button>
+            </div>}
+          </>}
           <p className="itinerary-budget">
             {ui(language, 'itTicketTotal')} <strong>{plan.ticketTotal.toLocaleString(localeOf(language))} VND</strong>
             {plan.unpricedCount > 0 && ` · ${ui(language, 'itUnpriced', { n: plan.unpricedCount })}`}

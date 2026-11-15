@@ -14,7 +14,7 @@ import { getVisitorDetails } from '../data/visitorDetails'
 import { categoryKeys, categoryLabels, languages, localizedTitle, places as bundledPlaces } from '../data/places'
 import { translate } from '../i18n'
 import { ui } from '../uiText'
-import { getNarrationAudioUrl, getNarrationText, speakWithAudio, speechAvailable, stopSpeaking } from '../speech'
+import { playNarration, stopSpeaking } from '../speech'
 import { optimizeRouteOrder } from '../routeOptimization'
 import { useAppStore } from '../store'
 import type { Category } from '../types'
@@ -22,6 +22,7 @@ import './explore-home.css'
 import './place-detail.css'
 
 const DISCOVER_PREVIEW_COUNT = 6
+const AUTO_GUIDE_RADIUS_METERS = 85
 
 // Tìm kiếm không phân biệt hoa/thường và dấu tiếng Việt ("dong" khớp "Động").
 const normalizeSearch = (value: string) => value
@@ -56,6 +57,7 @@ export function ExplorePage() {
   const [category, setCategory] = useState<Category | 'all'>('all')
   const [placesExpanded, setPlacesExpanded] = useState(false)
   const [mapFocusRequest, setMapFocusRequest] = useState(0)
+  const [narrationMessage, setNarrationMessage] = useState('')
   const [gpsMessage, setGpsMessage] = useState('')
   const [offlineImageUrl, setOfflineImageUrl] = useState<string | null>(null)
   const [optimizingRoute, setOptimizingRoute] = useState(false)
@@ -124,11 +126,13 @@ export function ExplorePage() {
 
   useEffect(() => {
     if (!autoNarration || !location) return
-    const nearby = places.find((place) => distance(point(location), point(place.coordinates), { units: 'meters' }) < 85)
+    const nearby = places.find((place) => distance(point(location), point(place.coordinates), { units: 'meters' }) < AUTO_GUIDE_RADIUS_METERS)
     if (!nearby || spokenPlaces.current.has(nearby.id)) return
     spokenPlaces.current.add(nearby.id)
     setSelectedPlace(nearby.id)
-    if (speechAvailable()) speakWithAudio(getNarrationText(nearby, language), language, getNarrationAudioUrl(nearby, language))
+    void playNarration(nearby, language).then((result) => {
+      setNarrationMessage(!result.ok ? ui(language, 'voiceMissing') : result.fallback ? ui(language, 'voiceFallback', { name: languages.find((item) => item.code === language)?.label ?? language }) : '')
+    })
   }, [location, autoNarration, places, language, setSelectedPlace])
 
   useEffect(() => () => stopSpeaking(), [])
@@ -160,18 +164,18 @@ export function ExplorePage() {
       return
     }
     if (watchId.current !== null) return
-    setGpsMessage('')
+    setGpsMessage(ui(language, 'gpsLocating'))
+    setLocation(null)
     spokenPlaces.current.clear()
-    spokenPlaces.current.add(selectedPlace.id)
     setAutoNarration(true)
-    if (speechAvailable()) speakWithAudio(getNarrationText(selectedPlace, language), language, getNarrationAudioUrl(selectedPlace, language))
     watchId.current = navigator.geolocation.watchPosition(
       (position) => {
         const coordinates: [number, number] = [position.coords.longitude, position.coords.latitude]
+        setGpsMessage('')
         setLocation(coordinates)
         const day = new Date().toISOString().slice(0, 10)
         for (const place of places) {
-          if (distance(point(coordinates), point(place.coordinates), { units: 'meters' }) > 85) continue
+          if (distance(point(coordinates), point(place.coordinates), { units: 'meters' }) >= AUTO_GUIDE_RADIUS_METERS) continue
           const visitKey = `${place.id}:${day}`
           if (submittedVisits.current.has(visitKey)) continue
           try {
@@ -195,7 +199,15 @@ export function ExplorePage() {
             })
         }
       },
-      () => setGpsMessage(translate(language, 'gpsError')),
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current)
+          watchId.current = null
+          setAutoNarration(false)
+          stopSpeaking()
+          setGpsMessage(ui(language, 'gpsDenied'))
+        } else setGpsMessage(translate(language, 'gpsError'))
+      },
       { enableHighAccuracy: true, maximumAge: 15000 },
     )
   }
@@ -203,6 +215,7 @@ export function ExplorePage() {
   const stopWalk = () => {
     stopSpeaking()
     setAutoNarration(false)
+    setGpsMessage('')
   }
 
   const showPlaceDetails = () => {
@@ -291,6 +304,7 @@ export function ExplorePage() {
 
   return (
     <div className="explore-page">
+      {narrationMessage && <p role="status">{narrationMessage}</p>}
       <section className="explore-hero" id="explore-home">
         <div className="explore-hero-inner">
           <div className="hero-copy">

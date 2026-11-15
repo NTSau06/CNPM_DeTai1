@@ -10,6 +10,17 @@ const t = (vi: string, en: string, ja: string, fr: string, zh: string, ko: strin
 })
 
 export const uiText = {
+  routeOffline: t('Cần kết nối mạng để thay đổi hành trình', 'Connect to the internet to change your itinerary', '旅程を変更するにはインターネットに接続してください', 'Connectez-vous pour modifier votre parcours', '请连接网络以修改行程', '여정을 변경하려면 인터넷에 연결하세요', 'Conéctate para modificar tu itinerario'),
+  gpsLocating: t('Đang xác định vị trí…', 'Finding your location…', '現在地を取得中…', 'Localisation en cours…', '正在定位…', '현재 위치 확인 중…', 'Buscando tu ubicación…'),
+  gpsDenied: t('Bạn đã từ chối quyền vị trí, chế độ hướng dẫn tự động đã tắt', 'Location permission denied; automatic guidance is off', '位置情報へのアクセスが拒否されたため、自動ガイドはオフになっています', 'Position refusée ; le guidage automatique est désactivé', '位置权限被拒绝，自动导览已关闭', '위치 권한이 거부되어 자동 안내가 꺼졌습니다', 'Permiso de ubicación denegado; guía automática desactivada'),
+  voiceFallback: t('Thiết bị chưa có giọng {name}, đang đọc bằng tiếng Việt.', 'No {name} voice installed; reading in Vietnamese.', '{name}の音声がないため、ベトナム語で読み上げます。', 'Voix {name} absente ; lecture en vietnamien.', '未安装{name}语音，将使用越南语朗读。', '{name} 음성이 설치되어 있지 않아 베트남어로 읽습니다.', 'No hay voz de {name}; se leerá en vietnamita.'),
+  voiceMissing: t('Thiết bị chưa có giọng đọc phù hợp. Hãy cài giọng đọc trong cài đặt hệ thống.', 'No suitable voice. Install a voice in system settings.', '対応する音声がありません。システム設定で音声をインストールしてください。', 'Aucune voix adaptée. Installez une voix dans les paramètres système.', '没有合适的语音。请在系统设置中安装语音。', '적합한 음성이 없습니다. 시스템 설정에서 음성을 설치하세요.', 'No hay voz compatible. Instala una en los ajustes del sistema.'),
+  saveSuggestion: t('Lưu lịch trình này vào hành trình', 'Save this suggested itinerary', '提案された旅程を保存', 'Enregistrer ce parcours suggéré', '保存此推荐行程', '추천 일정 저장', 'Guardar este itinerario sugerido'),
+  replaceRoute: t('Thay thế hành trình hiện tại', 'Replace current itinerary', '現在の旅程を置き換える', 'Remplacer le parcours actuel', '替换当前行程', '현재 여정 바꾸기', 'Reemplazar itinerario actual'),
+  newRoute: t('Lưu thành hành trình mới', 'Save as a new itinerary', '新しい旅程として保存', 'Enregistrer un nouveau parcours', '另存为新行程', '새 여정으로 저장', 'Guardar como nuevo itinerario'),
+  suggestionSaved: t('Đã lưu lịch trình.', 'Itinerary saved.', '旅程を保存しました。', 'Parcours enregistré.', '行程已保存。', '일정이 저장되었습니다.', 'Itinerario guardado.'),
+  suggestionFailed: t('Không lưu được lịch trình. Vui lòng thử lại.', 'Could not save. Please retry.', '保存できませんでした。もう一度お試しください。', 'Enregistrement impossible. Réessayez.', '无法保存，请重试。', '저장하지 못했습니다. 다시 시도하세요.', 'No se pudo guardar. Inténtalo de nuevo.'),
+
   // Thanh đầu trang
   navHome: t('Trang chủ', 'Home', 'ホーム', 'Accueil', '首页', '홈', 'Inicio'),
   navExplore: t('Khám phá Quảng Trị', 'Explore Quang Tri', 'クアンチを探索', 'Explorer Quang Tri', '探索广治', '꽝찌 탐방', 'Explorar Quang Tri'),
