@@ -6,6 +6,8 @@ import bundledAudio from './data/narrationAudio.json'
 
 let playbackGeneration = 0
 let activeAudio: HTMLAudioElement | null = null
+let cancelPendingAudio: (() => void) | null = null
+let onPlaybackStopped: (() => void) | undefined
 
 const narrationScripts: Record<string, Partial<Record<Language, { originalNarration: string; text: string }>>> = bundledScripts
 const narrationAudio: Record<string, Partial<Record<Language, { durationSeconds: number; audioSha256: string }>>> = bundledAudio
@@ -69,6 +71,7 @@ export function speakFrom(
   const voice = pickVoice(voices, utterance.lang)
   if (!voice) return false
   utterance.voice = voice
+  if (window.speechSynthesis.paused) window.speechSynthesis.resume()
   window.speechSynthesis.speak(utterance)
   return true
 }
@@ -104,9 +107,12 @@ export function speakWithAudio(text: string, language: Language, audioUrl?: stri
 }
 
 function stopAudioPlayback() {
+  cancelPendingAudio?.()
+  cancelPendingAudio = null
   if (!activeAudio) return
   activeAudio.onerror = null
   activeAudio.onended = null
+  activeAudio.onplaying = null
   activeAudio.pause()
   activeAudio.currentTime = 0
   activeAudio = null
@@ -114,10 +120,28 @@ function stopAudioPlayback() {
 
 export function stopSpeaking() {
   playbackGeneration += 1
+  const onStop = onPlaybackStopped
+  onPlaybackStopped = undefined
+  onStop?.()
   stopAudioPlayback()
   if (speechAvailable()) window.speechSynthesis.cancel()
 }
 
+export function beginPlayback(onStop?: () => void) {
+  stopSpeaking()
+  onPlaybackStopped = onStop
+  return playbackGeneration
+}
+
+export function isPlaybackCurrent(generation: number | null) {
+  return generation !== null && generation === playbackGeneration
+}
+
+export function claimAudioPlayback(audio: HTMLAudioElement, onStop?: () => void) {
+  const generation = beginPlayback(onStop)
+  activeAudio = audio
+  return generation
+}
 
 export function pickVoice<T extends { lang: string }>(voices: T[], speechLang: string): T | undefined {
   const normalized = speechLang.toLowerCase().replace(/_/g, '-')
@@ -155,26 +179,55 @@ export async function prepareSpeech(language: Language, text: string, vietnamese
   return undefined
 }
 
-export async function playNarration(place: Place, language: Language): Promise<NarrationResult> {
-  stopSpeaking()
-  const generation = playbackGeneration
+export async function playNarration(place: Place, language: Language, onResult?: (result: NarrationResult) => void): Promise<NarrationResult> {
+  const generation = beginPlayback()
+  const report = (result: NarrationResult) => {
+    if (isPlaybackCurrent(generation)) onResult?.(result)
+    return result
+  }
+  const fallbackToSpeech = async (): Promise<NarrationResult> => {
+    if (!isPlaybackCurrent(generation) || !speechAvailable()) return report({ ok: false, reason: 'unsupported' })
+    const prepared = await prepareSpeech(language, getNarrationText(place, language), getNarrationText(place, 'vi'))
+    if (!isPlaybackCurrent(generation)) return { ok: false, reason: 'unsupported' }
+    if (!prepared) return report({ ok: false, reason: 'no-voice' })
+    const ok = speakFrom(prepared.text, prepared.language, 0.92, 0, {
+      onBoundary: () => {},
+      onEnd: () => {},
+      onError: () => { report({ ok: false, reason: 'no-voice' }) },
+    })
+    return report(ok ? { ok: true, usedLanguage: prepared.language, fallback: prepared.fallback } : { ok: false, reason: 'no-voice' })
+  }
   const audioUrl = getNarrationAudioUrl(place, language)
   if (audioUrl && typeof Audio !== 'undefined') {
     const audio = new Audio(audioUrl)
     activeAudio = audio
     const started = await new Promise<boolean>((resolve) => {
-      audio.onerror = () => resolve(false)
-      audio.onplaying = () => resolve(true)
-      void audio.play().catch(() => resolve(false))
+      let settled = false
+      const finish = (started: boolean) => {
+        if (settled) return
+        settled = true
+        cancelPendingAudio = null
+        audio.onerror = null
+        audio.onplaying = null
+        resolve(started)
+      }
+      // Dừng trước khi MP3 sẵn sàng cũng phải kết thúc lần chờ.
+      cancelPendingAudio = () => finish(false)
+      audio.onerror = () => finish(false)
+      audio.onplaying = () => finish(true)
+      void audio.play().catch(() => finish(false))
     })
     if (generation !== playbackGeneration) return { ok: false, reason: 'unsupported' }
-    if (started) return { ok: true, usedLanguage: language, fallback: false }
+    if (started) {
+      audio.onerror = () => {
+        if (!isPlaybackCurrent(generation) || activeAudio !== audio) return
+        stopAudioPlayback()
+        void fallbackToSpeech()
+      }
+      audio.onended = () => { if (activeAudio === audio) activeAudio = null }
+      return report({ ok: true, usedLanguage: language, fallback: false })
+    }
     stopAudioPlayback()
   }
-  if (!speechAvailable()) return { ok: false, reason: 'unsupported' }
-  const prepared = await prepareSpeech(language, getNarrationText(place, language), getNarrationText(place, 'vi'))
-  if (!prepared) return { ok: false, reason: 'no-voice' }
-  if (generation !== playbackGeneration) return { ok: false, reason: 'unsupported' }
-  const ok = speak(prepared.text, prepared.language)
-  return ok ? { ok: true, usedLanguage: prepared.language, fallback: prepared.fallback } : { ok: false, reason: 'no-voice' }
+  return fallbackToSpeech()
 }

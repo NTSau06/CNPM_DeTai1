@@ -69,6 +69,13 @@ const speechLocales: Record<Language, string> = {
   'ko-KR': 'ko-KR',
   es: 'es-ES',
 }
+
+function pickMobileVoice(voices: Speech.Voice[], locale: string) {
+  const normalize = (value: string) => value.toLowerCase().replace(/_/g, '-')
+  const target = normalize(locale)
+  return voices.find((voice) => normalize(voice.language) === target)
+    ?? voices.find((voice) => normalize(voice.language).split('-')[0] === target.split('-')[0])
+}
 const words: Record<Language, Record<string, string>> = {
   vi: { kicker: 'ĐI CHẬM, NGHE MIỀN ĐẤT KỂ', intro: 'Một hành trình nhỏ qua miền di sản và biển xanh.', search: 'Tìm danh lam, hang động…', places: 'Điểm dừng chân', listen: 'Nghe câu chuyện', stop: 'Dừng nghe', add: 'Thêm vào hành trình', added: 'Đã thêm', walk: 'Bắt đầu thuyết minh tự động', walking: 'Đang tự động kể chuyện', save: 'Lưu hành trình', saved: 'Hành trình đã lưu', empty: 'Chọn một vài điểm để bắt đầu chuyến đi.', offline: 'Đang dùng dữ liệu đã lưu trên thiết bị.', loading: 'Đang tải điểm đến…', error: 'Không kết nối được máy chủ; đang thử dùng nội dung đã lưu.' },
   en: { kicker: 'SLOW DOWN AND LISTEN', intro: 'A quiet journey through heritage and open shores.', search: 'Find a landmark or cave…', places: 'Places to pause', listen: 'Listen to the story', stop: 'Stop listening', add: 'Add to my walk', added: 'Added', walk: 'Start automatic guide', walking: 'Automatic guide is on', save: 'Save this walk', saved: 'Walk saved', empty: 'Choose a few stops to begin your walk.', offline: 'Using places saved on this device.', loading: 'Loading places…', error: 'Could not connect; showing saved places.' },
@@ -132,6 +139,7 @@ export default function App() {
   const recordedVisits = useRef(new Set<string>())
   const languageRef = useRef(language)
   const playPlaceRef = useRef<((place: Place) => Promise<void>) | null>(null)
+  const narrationGeneration = useRef(0)
   languageRef.current = language
   const currentLanguage = words[language]
 
@@ -145,6 +153,9 @@ export default function App() {
   }, [])
 
   const chooseLanguage = (next: Language) => {
+    narrationGeneration.current += 1
+    void Speech.stop()
+    setPlaying(false)
     setLanguage(next)
     void AsyncStorage.setItem(LANGUAGE_KEY, next).catch(() => {})
   }
@@ -268,16 +279,34 @@ export default function App() {
     return () => {
       active = false
       watcher.current?.remove()
+      narrationGeneration.current += 1
       Speech.stop()
     }
   }, [refreshPlaces])
 
   const playPlace = useCallback(async (place: Place) => {
-    const fallback = place.copy[language] ?? place.copy.vi
-    let text = fallback.narration
-    let voice = speechLocales[language]
+    const request = ++narrationGeneration.current
+    setPlaying(false)
+    let usedLanguage = language
+    let voice: Speech.Voice | undefined
     try {
-      const offlineGuide = await AsyncStorage.getItem(`quang-tri:offline-guide:${place.id}:${language}`)
+      await Speech.stop()
+      const voices = await Speech.getAvailableVoicesAsync()
+      voice = pickMobileVoice(voices, speechLocales[language])
+      if (!voice) {
+        voice = pickMobileVoice(voices, speechLocales.vi)
+        usedLanguage = 'vi'
+      }
+    } catch {
+      // Không dùng giọng mặc định khi không xác minh được ngôn ngữ.
+    }
+    if (request !== narrationGeneration.current) return
+    if (!voice) { setMessage(mt(language, 'voiceMissing')); return }
+    let text = (place.copy[usedLanguage] ?? place.copy.vi).narration
+    let playbackMessage = usedLanguage !== language
+      ? mt(language, 'voiceFallback', { name: languages.find((item) => item.code === language)?.label ?? language }) : ''
+    try {
+      const offlineGuide = await AsyncStorage.getItem(`quang-tri:offline-guide:${place.id}:${usedLanguage}`)
       if (offlineGuide) {
         const cached = JSON.parse(offlineGuide) as { narration?: unknown }
         if (typeof cached.narration !== 'string' || !cached.narration.trim()) {
@@ -286,31 +315,39 @@ export default function App() {
         text = cached.narration
       } else {
         const narration = await api<{ text: string; speechLocale: string }>(
-          `/narrations/${encodeURIComponent(place.id)}?locale=${encodeURIComponent(language)}`,
+          `/narrations/${encodeURIComponent(place.id)}?locale=${encodeURIComponent(usedLanguage)}`,
         )
         text = narration.text
-        voice = narration.speechLocale
       }
     } catch {
-      setMessage(currentLanguage.offline)
+      if (!playbackMessage) playbackMessage = currentLanguage.offline
     }
-    Speech.stop()
-    Speech.speak(text, {
-      language: voice,
-      rate: 0.92,
-      onDone: () => setPlaying(false),
-      onStopped: () => setPlaying(false),
-      onError: () => {
-        setPlaying(false)
-        setMessage(currentLanguage.error)
-      },
-    })
+    if (request !== narrationGeneration.current) return
+    setMessage(playbackMessage)
     setSelectedId(place.id)
     setPlaying(true)
-  }, [currentLanguage.error, currentLanguage.offline, language])
+    try {
+      Speech.speak(text, {
+        language: voice.language,
+        voice: voice.identifier,
+        rate: 0.92,
+        onDone: () => { if (request === narrationGeneration.current) setPlaying(false) },
+        onStopped: () => { if (request === narrationGeneration.current) setPlaying(false) },
+        onError: () => {
+          if (request !== narrationGeneration.current) return
+          setPlaying(false)
+          setMessage(mt(language, 'voiceMissing'))
+        },
+      })
+    } catch {
+      setPlaying(false)
+      setMessage(mt(language, 'voiceMissing'))
+    }
+  }, [currentLanguage.offline, language])
   playPlaceRef.current = playPlace
 
   const stopWalk = useCallback(() => {
+    narrationGeneration.current += 1
     watcher.current?.remove()
     watcher.current = null
     spokenPlaces.current.clear()
@@ -653,7 +690,7 @@ export default function App() {
                 <Text style={styles.placeSubtitle}>{copy.subtitle}</Text>
                 <Text style={styles.placeMeta}>{mt(language, 'minutes', { n: place.duration })} · {categoryLabels[language][place.category].toLocaleUpperCase(language)}</Text>
                 <View style={styles.actions}>
-                  <Pressable accessibilityRole="button" onPress={() => playing && active ? (Speech.stop(), setPlaying(false)) : void playPlace(place)} style={styles.listenButton}>
+                  <Pressable accessibilityRole="button" onPress={() => playing && active ? (++narrationGeneration.current, Speech.stop(), setPlaying(false)) : void playPlace(place)} style={styles.listenButton}>
                     <Text style={styles.listenButtonText}>{playing && active ? `■ ${currentLanguage.stop}` : `▶ ${currentLanguage.listen}`}</Text>
                   </Pressable>
                   <Pressable accessibilityRole="button" disabled={routeSaving} onPress={() => toggleRoute(place.id)} style={styles.addButton}>

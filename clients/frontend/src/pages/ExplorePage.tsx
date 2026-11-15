@@ -124,6 +124,8 @@ export function ExplorePage() {
     ? distance(point(location), point(selectedPlace.coordinates), { units: 'meters' })
     : null
 
+  useEffect(() => { stopSpeaking() }, [language])
+
   useEffect(() => {
     if (!autoNarration || !location) return
     const nearby = places.find((place) => distance(point(location), point(place.coordinates), { units: 'meters' }) < AUTO_GUIDE_RADIUS_METERS)
@@ -135,7 +137,7 @@ export function ExplorePage() {
     }
     spokenPlaces.current.add(nearby.id)
     setSelectedPlace(nearby.id)
-    void playNarration(nearby, language).then((result) => {
+    void playNarration(nearby, language, (result) => {
       setNarrationMessage(!result.ok ? ui(language, 'voiceMissing') : result.fallback ? ui(language, 'voiceFallback', { name: languages.find((item) => item.code === language)?.label ?? language }) : '')
     })
   }, [location, autoNarration, places, language, setSelectedPlace])

@@ -4,7 +4,7 @@ import { Pause, Play, Square } from 'lucide-react'
 import { ui } from '../uiText'
 import { languages } from '../data/places'
 import { translate } from '../i18n'
-import { prepareSpeech, speakFrom, speechAvailable, stopSpeaking } from '../speech'
+import { beginPlayback, claimAudioPlayback, isPlaybackCurrent, prepareSpeech, speakFrom, speechAvailable, stopSpeaking } from '../speech'
 import type { Language } from '../types'
 import type { CSSProperties } from 'react'
 
@@ -35,6 +35,8 @@ export function AudioPlayer({ text: originalText, vietnameseText, language, spee
   const characterIndexRef = useRef(0)
   const audioRef = useRef<HTMLAudioElement>(null)
   const generation = useRef(0)
+  const playbackToken = useRef<number | null>(null)
+  const audioFailed = useRef(false)
   const utteranceActive = useRef(false)
   const baseCharacter = useRef(0)
   const segmentStartedAt = useRef(0)
@@ -43,15 +45,24 @@ export function AudioPlayer({ text: originalText, vietnameseText, language, spee
   const useAudioFile = Boolean(audioSrc && !audioFileFailed)
 
   const updateCharacterIndex = (value: number) => {
-    const next = Math.max(0, Math.min(text.length, value))
+    const next = Math.max(0, Math.min(resolvedSpeech.current?.text.length ?? text.length, value))
     characterIndexRef.current = next
     setCharacterIndex(next)
   }
 
+  const onPlaybackStopped = () => {
+    utteranceActive.current = false
+    playingRef.current = false
+    setPlaying(false)
+    onPlayingChange(false)
+  }
+
   const startAt = async (offset: number) => {
     const token = ++generation.current
+    const playback = beginPlayback(onPlaybackStopped)
+    playbackToken.current = playback
     const prepared = resolvedSpeech.current ?? await prepareSpeech(speechLanguage, originalText, vietnameseText)
-    if (generation.current !== token) return
+    if (generation.current !== token || !isPlaybackCurrent(playback)) return
     if (!prepared) { setVoiceMessage(ui(language, 'voiceMissing')); return }
     if (!resolvedSpeech.current) {
       resolvedSpeech.current = prepared
@@ -71,13 +82,13 @@ export function AudioPlayer({ text: originalText, vietnameseText, language, spee
 
     const success = speakFrom(text, prepared.language, rateRef.current, start, {
       onBoundary: (index) => {
-        if (generation.current !== token) return
+        if (generation.current !== token || !isPlaybackCurrent(playback)) return
         baseCharacter.current = index
         segmentStartedAt.current = performance.now()
         updateCharacterIndex(index)
       },
       onEnd: () => {
-        if (generation.current !== token) return
+        if (generation.current !== token || !isPlaybackCurrent(playback)) return
         utteranceActive.current = false
         updateCharacterIndex(text.length)
         playingRef.current = false
@@ -85,7 +96,8 @@ export function AudioPlayer({ text: originalText, vietnameseText, language, spee
         onPlayingChange(false)
       },
       onError: () => {
-        if (generation.current !== token) return
+        if (generation.current !== token || !isPlaybackCurrent(playback)) return
+        setVoiceMessage(ui(language, 'voiceMissing'))
         utteranceActive.current = false
         playingRef.current = false
         setPlaying(false)
@@ -105,11 +117,21 @@ export function AudioPlayer({ text: originalText, vietnameseText, language, spee
   const playAudioFile = () => {
     const audio = audioRef.current
     if (!audio) return
-    if (audio.ended) audio.currentTime = 0
+    if (audioFailed.current) { void startAt(characterIndexRef.current); return }
+    const token = ++generation.current
+    const position = audio.ended ? 0 : audio.currentTime
+    const playback = claimAudioPlayback(audio, onPlaybackStopped)
+    playbackToken.current = playback
+    audio.currentTime = position
     audio.playbackRate = rateRef.current
+    playingRef.current = true
+    setPlaying(true)
+    onPlayingChange(true)
     void audio.play().catch(() => {
+      if (generation.current !== token || !isPlaybackCurrent(playback) || audioFailed.current) return
+      audioFailed.current = true
       setAudioFileFailed(true)
-      startAt(characterIndexRef.current)
+      void startAt(characterIndexRef.current)
     })
   }
 
@@ -118,7 +140,7 @@ export function AudioPlayer({ text: originalText, vietnameseText, language, spee
       playAudioFile()
       return
     }
-    if (utteranceActive.current && window.speechSynthesis.paused) {
+    if (utteranceActive.current && isPlaybackCurrent(playbackToken.current) && window.speechSynthesis.paused) {
       baseCharacter.current = characterIndexRef.current
       segmentStartedAt.current = performance.now()
       window.speechSynthesis.resume()
@@ -132,8 +154,18 @@ export function AudioPlayer({ text: originalText, vietnameseText, language, spee
 
   const pause = () => {
     if (!playingRef.current) return
+    if (!isPlaybackCurrent(playbackToken.current)) {
+      playingRef.current = false
+      setPlaying(false)
+      onPlayingChange(false)
+      return
+    }
     if (useAudioFile) {
+      generation.current += 1
       audioRef.current?.pause()
+      playingRef.current = false
+      setPlaying(false)
+      onPlayingChange(false)
       return
     }
     const elapsedSeconds = (performance.now() - segmentStartedAt.current) / 1000
@@ -146,7 +178,7 @@ export function AudioPlayer({ text: originalText, vietnameseText, language, spee
 
   const stop = () => {
     generation.current += 1
-    stopSpeaking()
+    if (isPlaybackCurrent(playbackToken.current)) stopSpeaking()
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current.currentTime = 0
@@ -176,7 +208,7 @@ export function AudioPlayer({ text: originalText, vietnameseText, language, spee
     }
     const resumeAfterSeek = playingRef.current
     generation.current += 1
-    stopSpeaking()
+    if (isPlaybackCurrent(playbackToken.current)) stopSpeaking()
     utteranceActive.current = false
     playingRef.current = false
     setPlaying(false)
@@ -198,7 +230,7 @@ export function AudioPlayer({ text: originalText, vietnameseText, language, spee
     const currentIndex = characterIndexRef.current
     const resumeAfterChange = playingRef.current
     generation.current += 1
-    stopSpeaking()
+    if (isPlaybackCurrent(playbackToken.current)) stopSpeaking()
     utteranceActive.current = false
     playingRef.current = false
     setPlaying(false)
@@ -229,9 +261,10 @@ export function AudioPlayer({ text: originalText, vietnameseText, language, spee
   }
 
   const handleAudioError = () => {
-    if (!audioSrc || audioFileFailed) return
+    if (!audioSrc || audioFailed.current) return
+    audioFailed.current = true
     setAudioFileFailed(true)
-    if (playingRef.current) startAt(characterIndexRef.current)
+    if (playingRef.current && isPlaybackCurrent(playbackToken.current)) void startAt(characterIndexRef.current)
   }
 
   const handleAudioEnded = () => {
@@ -244,7 +277,8 @@ export function AudioPlayer({ text: originalText, vietnameseText, language, spee
   useEffect(() => () => {
     generation.current += 1
     utteranceActive.current = false
-    stopSpeaking()
+    if (isPlaybackCurrent(playbackToken.current)) stopSpeaking()
+    audioRef.current?.pause()
     onPlayingChange(false)
   }, [onPlayingChange])
 
@@ -271,11 +305,13 @@ export function AudioPlayer({ text: originalText, vietnameseText, language, spee
             if (duration && Number.isFinite(duration)) setMediaDuration(duration)
           }}
           onPlay={() => {
+            if (audioFailed.current || !isPlaybackCurrent(playbackToken.current)) { audioRef.current?.pause(); return }
             playingRef.current = true
             setPlaying(true)
             onPlayingChange(true)
           }}
           onPause={() => {
+            if (audioFailed.current) return
             playingRef.current = false
             setPlaying(false)
             onPlayingChange(false)
