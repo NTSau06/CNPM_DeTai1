@@ -377,7 +377,7 @@ export function ExplorePage() {
                     <span className="dest-card-index">{String(index + 1).padStart(2, '0')}</span>
                   </button>
                   <div className="dest-card-body">
-                    <h3>{localizedTitle(place, language)}</h3>
+                    <h3><button type="button" className="dest-card-title" onClick={() => openPlace(place.id)}>{localizedTitle(place, language)}</button></h3>
                     <p>{place.copy[language].subtitle}</p>
                     <span className="dest-card-meta"><Clock3 size={13} /> {place.duration} {translate(language, 'minute')}<i /><Headphones size={13} /> {ui(language, 'hasAudioGuide')}</span>
                     <div className="dest-card-actions">
