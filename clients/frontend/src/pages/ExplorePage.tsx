@@ -69,6 +69,7 @@ export function ExplorePage() {
   const submittedVisits = useRef(new Set<string>())
   const watchId = useRef<number | null>(null)
   const placeDetailsRef = useRef<HTMLDetailsElement>(null)
+  const homeSearchInputRef = useRef<HTMLInputElement>(null)
   const selectedPlace = places.find((place) => place.id === selectedPlaceId) ?? places[0] ?? bundledPlaces[0]
   const visitorDetails = getVisitorDetails(selectedPlace.id, language)
   const stopWalk = useCallback((message?: string) => {
@@ -106,12 +107,9 @@ export function ExplorePage() {
     const query = normalizeSearch(search)
     return places.filter((place) => {
       const haystack = normalizeSearch([
-        localizedTitle(place, language),
-        place.copy.vi.title,
-        place.copy.en.title,
-        place.copy[language].subtitle,
-        place.copy.vi.subtitle,
-        categoryLabels[language][place.category],
+        place.id,
+        ...Object.values(place.copy).flatMap(({ title, subtitle }) => [title, subtitle]),
+        ...Object.values(categoryLabels).map((labels) => labels[place.category]),
       ].join(' '))
       const matchesSearch = !query || query.split(' ').every((word) => haystack.includes(word))
       return matchesSearch && (category === 'all' || place.category === category)
@@ -340,13 +338,21 @@ export function ExplorePage() {
       <div className="explore-content">
         <form className="home-search" role="search" onSubmit={(event) => {
           event.preventDefault()
+          if (!search.trim()) {
+            homeSearchInputRef.current?.focus()
+            return
+          }
+          setCategory('all')
           setPlacesExpanded(true)
           scrollToSection('explore-featured')
         }}>
           <span className="home-search-icon"><MapPin size={23} /></span>
           <label htmlFor="home-destination-search">
             <span>{ui(language, 'searchPrompt')}</span>
-            <input id="home-destination-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={translate(language, 'search')} />
+            <input ref={homeSearchInputRef} id="home-destination-search" type="search" value={search} onChange={(event) => {
+              setSearch(event.target.value)
+              setCategory('all')
+            }} placeholder={translate(language, 'search')} />
           </label>
           <button type="submit"><Search size={18} /><span>{ui(language, 'findDestinations')}</span></button>
         </form>
