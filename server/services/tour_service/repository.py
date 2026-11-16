@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 
 from services.common.database import Database
+from services.common.relationships import apply_relationships
 from services.common.schemas import Tour
 
 
@@ -31,6 +32,8 @@ class TourRepository:
                 ALTER TABLE dbo.tours ADD owner_id NVARCHAR(64) NULL
                 """
             )
+
+        apply_relationships(self.database)
 
     def save(self, tour: Tour, owner_id: str | None = None) -> Tour:
         tour_json = tour.model_dump_json(by_alias=True)

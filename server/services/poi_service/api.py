@@ -1,5 +1,6 @@
 """Cung cấp API nội bộ để liệt kê, lấy và kiểm tra địa điểm."""
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
+import pyodbc
 
 from services.common.schemas import (
     Place,
@@ -72,7 +73,16 @@ def update_place(place_id: str, payload: Place, request: Request) -> Place:
 )
 def delete_place(place_id: str, request: Request) -> Response:
     place_catalog = catalog(request)
-    if not place_catalog.repository.delete(place_id):
+    try:
+        deleted = place_catalog.repository.delete(place_id)
+    except pyodbc.IntegrityError as exc:
+        if "547" not in str(exc):
+            raise
+        raise HTTPException(
+            status_code=409,
+            detail="This place has ticket orders, visits or ratings and cannot be deleted.",
+        ) from exc
+    if not deleted:
         if place_catalog.get_place(place_id) is not None:
             raise HTTPException(status_code=409, detail="The last place cannot be deleted.")
         raise HTTPException(status_code=404, detail="Place not found.")

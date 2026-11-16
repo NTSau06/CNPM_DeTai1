@@ -1,5 +1,6 @@
 ﻿"""Cung cấp API công khai và điều phối yêu cầu giữa các backend service."""
 import math
+import pyodbc
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
@@ -557,12 +558,19 @@ def create_pairing(
         user = request.app.state.auth_repository.authenticate(authorization[7:])
         if user is not None:
             user_id = user["id"]
-    code, expires_at = request.app.state.pairing_repository.create(
-        user_id,
-        payload.language,
-        payload.place_id,
-        payload.path,
-    )
+    try:
+        code, expires_at = request.app.state.pairing_repository.create(
+            user_id,
+            payload.language,
+            payload.place_id,
+            payload.path,
+        )
+    except pyodbc.IntegrityError as exc:
+        if "547" not in str(exc):
+            raise
+        raise HTTPException(
+            status_code=409, detail="The account or place no longer exists. Refresh and retry."
+        ) from exc
     return {
         "code": code,
         "expiresAt": expires_at,

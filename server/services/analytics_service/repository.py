@@ -20,6 +20,7 @@ from services.analytics_service.schemas import (
     VisitCreate,
 )
 from services.common.database import Database
+from services.common.relationships import apply_relationships
 
 
 # Thiết bị không gửi heartbeat quá thời gian này sẽ bị coi là đã rời trang.
@@ -66,6 +67,8 @@ class AnalyticsRepository:
                 )
                 """
             )
+
+        apply_relationships(self.database)
 
     def heartbeat(self, presence: PresenceHeartbeat) -> None:
         last_seen_at = int(time.time())

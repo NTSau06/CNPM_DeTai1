@@ -46,6 +46,7 @@ venv.bak/
 dist/
 build/
 .pytest_cache/
+pytest-cache-files-*/
 .coverage
 
 # ==========================================

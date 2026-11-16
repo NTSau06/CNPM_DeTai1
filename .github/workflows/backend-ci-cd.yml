@@ -72,7 +72,7 @@ jobs:
         env:
           PYTHONPATH: server
           SQLSERVER_CONNECTION_STRING: DRIVER={ODBC Driver 18 for SQL Server};SERVER=127.0.0.1,1433;DATABASE=QuangTriDB;UID=sa;PWD=QuangTri@2026!;TrustServerCertificate=yes;
-        run: python -m pytest server/tests/test_services.py -q
+        run: python -m pytest server/tests -q
 
       - name: Start the complete service stack
         run: docker compose -f server/compose.yml up --build --wait --wait-timeout 120 -d

@@ -66,6 +66,49 @@ start with the same 14 places and seven reviewed locale copies.
 
 ## Three-layer and service boundaries
 
+### Shared database relationships
+
+The ten application tables have nine foreign keys. The original three connect
+`auth_sessions.user_id`, `ticket_orders.user_id`, and `device_pairings.user_id`
+to `users.id`. Six additional relationships are installed by repository
+initializers as soon as both participating tables exist:
+
+| Child column | Parent key | On parent deletion |
+| --- | --- | --- |
+| `tours.owner_id` | `users.id` | Delete owned tours, matching account deletion |
+| `ticket_orders.place_id` | `places.id` | Reject deletion; preserve orders |
+| `ticket_prices.place_id` | `places.id` | Delete the current price |
+| `visits.place_id` | `places.id` | Reject deletion; preserve visit history |
+| `ratings.place_id` | `places.id` | Reject deletion; preserve ratings |
+| `device_pairings.place_id` | `places.id` | Set the optional place to NULL |
+
+Deleting a place with orders, visits or ratings returns HTTP 409. Restarting the
+gateway does not recreate ticket prices for deleted places. Anonymous visitors
+remain independent of user accounts; the expiring `visitor_presence` table is
+not a parent for historical data. Tour stop IDs remain in `tour_json`; this
+migration does not introduce a `tour_places` table.
+
+For an existing database, run from the repository root using the same
+`SQLSERVER_CONNECTION_STRING` as the application (default: `QuangTriDB`):
+
+```powershell
+.\venvs\.venv\Scripts\python.exe scripts/migrate_relationships.py --check
+.\venvs\.venv\Scripts\python.exe scripts/migrate_relationships.py
+```
+
+The check is read-only. The migration validates existing rows with `WITH CHECK`,
+uses a transaction and an application lock, and can be repeated. Missing parent
+records abort the upgrade with table/row-count diagnostics; it never deletes
+old data or bypasses validation with `NOCHECK`. Repair reported references before
+retrying. Services can start in either order in the shared database; a standalone
+service whose parent tables are absent defers those relationships until the
+parent service initializes. The migration command requires all related tables.
+
+After upgrading, restart backend processes to load the updated API error handling
+and reopen the SSMS database diagram to display the additional relationships.
+
+### Service responsibilities
+
 - **Presentation:** gateway routes in `api_gateway/api.py` and service routers
   in `services/*/api.py` handle HTTP, DTO validation and status codes.
 - **Business/application:** `PlaceCatalog`, `TourPlanner` and

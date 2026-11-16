@@ -6,6 +6,7 @@ import secrets
 import time
 
 from services.common.database import Database
+from services.common.relationships import apply_relationships
 
 PAIRING_TTL_SECONDS = 3 * 60
 # Giữ phiên đã quét thêm một lúc để máy tính kịp đọc trạng thái "claimed".
@@ -35,6 +36,8 @@ class PairingRepository:
                 )
                 """
             )
+
+        apply_relationships(self.database)
 
     def create(
         self,

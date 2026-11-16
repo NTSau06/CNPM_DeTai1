@@ -8,6 +8,7 @@ import time
 import pyodbc
 
 from services.common.database import Database
+from services.common.relationships import apply_relationships
 
 
 class AuthRepository:
@@ -67,6 +68,8 @@ class AuthRepository:
                     ADD {column} NVARCHAR({size}) NOT NULL DEFAULT ''
                     """
                 )
+
+        apply_relationships(self.database)
 
     def register(self, full_name: str, email: str, phone: str, password: str) -> tuple[str, dict]:
         salt = secrets.token_bytes(16)

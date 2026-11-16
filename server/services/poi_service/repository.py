@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from services.common.database import Database
+from services.common.relationships import apply_relationships
 from services.common.schemas import Place
 
 
@@ -40,6 +41,8 @@ class PlaceRepository:
                         for item in seed
                     ],
                 )
+
+        apply_relationships(self.database)
 
     def list(self, category: str | None = None, query: str | None = None) -> list[Place]:
         sql = "SELECT content_json FROM places"

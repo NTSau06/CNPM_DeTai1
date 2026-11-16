@@ -5,6 +5,7 @@ import secrets
 from datetime import datetime, timezone
 
 from services.common.database import Database
+from services.common.relationships import apply_relationships
 
 DEFAULT_TICKET_PRICES_VND = {
     "phong-nha-cave": 150_000,
@@ -54,7 +55,13 @@ class TicketRepository:
                 )
                 """
             )
+            # Do not recreate prices for places removed by an administrator.
+            place_ids = None
+            if connection.execute("SELECT OBJECT_ID(N'dbo.places', N'U')").fetchone()[0]:
+                place_ids = {row[0] for row in connection.execute("SELECT id FROM dbo.places")}
             for place_id, price_vnd in DEFAULT_TICKET_PRICES_VND.items():
+                if place_ids is not None and place_id not in place_ids:
+                    continue
                 connection.execute(
                     """
                     IF NOT EXISTS (SELECT 1 FROM dbo.ticket_prices WHERE place_id = ?)
@@ -64,6 +71,8 @@ class TicketRepository:
                     place_id,
                     price_vnd,
                 )
+
+        apply_relationships(self.database)
 
     def set_price(self, place_id: str, price_vnd: int | None) -> None:
         with self.database.connect() as connection:
