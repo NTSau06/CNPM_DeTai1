@@ -1,7 +1,6 @@
 // Trình bày nội dung thuyết minh và điều khiển hướng dẫn đi bộ tại địa điểm.
 import { useEffect, useState } from 'react'
-import { Headphones, Plus, Radio } from 'lucide-react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Headphones } from 'lucide-react'
 import { languages } from '../data/places'
 import { translate } from '../i18n'
 import { ui } from '../uiText'
@@ -20,17 +19,10 @@ interface NarrationCardProps {
 }
 
 export function NarrationCard({ place, language, distanceMeters, onStartWalk, onStopWalk }: NarrationCardProps) {
-  const navigate = useNavigate()
-  const location = useLocation()
   const [playing, setPlaying] = useState(false)
   const [audioLanguage, setAudioLanguage] = useState(() => getNarrationAudioLanguage(place, language))
   const [savedNarration, setSavedNarration] = useState<string | null>(null)
   const autoNarration = useAppStore((state) => state.autoNarration)
-  const currentUser = useAppStore((state) => state.currentUser)
-  const routeIds = useAppStore((state) => state.routeIds)
-  const isSavingRoute = useAppStore((state) => state.isSavingRoute)
-  const setRoutePlace = useAppStore((state) => state.setRoutePlace)
-  const isInRoute = routeIds.includes(place.id)
   const audioCopy = place.copy[audioLanguage] ?? place.copy.vi
   const localNarration = getNarrationText(place, audioLanguage)
   const audioSrc = getNarrationAudioUrl(place, audioLanguage)
@@ -43,19 +35,6 @@ export function NarrationCard({ place, language, distanceMeters, onStartWalk, on
   useEffect(() => {
     setAudioLanguage(getNarrationAudioLanguage(place, language))
   }, [place, language])
-
-  const changeRoute = () => {
-    if (!currentUser) {
-      navigate('/login', {
-        state: {
-          returnTo: `${location.pathname}${location.search}`,
-          pendingPlaceId: place.id,
-        },
-      })
-      return
-    }
-    void setRoutePlace(place.id)
-  }
 
   useEffect(() => {
     let active = true
@@ -101,10 +80,6 @@ export function NarrationCard({ place, language, distanceMeters, onStartWalk, on
           estimatedDurationSeconds={durationSeconds}
           onPlayingChange={setPlaying}
         />
-        <button className={`route-button${isInRoute ? ' in-route' : ''}`} onClick={changeRoute} disabled={isSavingRoute}>
-          {isInRoute ? <Radio size={15} /> : <Plus size={16} />}
-          {translate(language, isInRoute ? 'removeRoute' : 'addRoute')}
-        </button>
       </div>
       {autoNarration && <span className="auto-status"><span className="pulse-dot" /> {translate(language, 'autoOn')}</span>}
       <button
