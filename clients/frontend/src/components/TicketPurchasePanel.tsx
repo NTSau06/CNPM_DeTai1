@@ -111,7 +111,11 @@ export function TicketPurchasePanel({ placeId }: { placeId: string }) {
       )}
       <small className="ticket-purchase-note">{ui(language, 'tkNote')}</small>
       {error && <p className="ticket-purchase-feedback error" role="alert">{error}</p>}
-      {message && <p className="ticket-purchase-feedback" role="status">{message}</p>}
+      {message && (
+        <p className="ticket-purchase-feedback" role="status">
+          {message} <Link to="/tickets">{ui(language, 'tkViewHistory')}</Link>
+        </p>
+      )}
     </section>
   )
 }

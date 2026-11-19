@@ -74,6 +74,7 @@
 .pd-btn-primary:hover { background: #f7e2b9; }
 .pd-btn-ghost { border: 1px solid #ffffff6b; color: #fff; background: #ffffff1a; backdrop-filter: blur(4px); }
 .pd-btn-ghost:hover { border-color: #fff; background: #ffffff2e; }
+.pd-btn:disabled { cursor: wait; opacity: .7; }
 .pd-hero-index { position: absolute; right: 32px; bottom: 26px; font-family: var(--serif); font-size: 52px; line-height: 1; opacity: .9; }
 .pd-hero-index small { margin-left: 4px; font-size: 18px; opacity: .75; }
 

@@ -18,6 +18,35 @@ interface LodgingArea {
   coordinates: [number, number]
 }
 
+interface CurrencyInputProps {
+  label: string
+  unit: string
+  value: string
+  onChange: (value: string) => void
+}
+
+function CurrencyInput({ label, unit, value, onChange }: CurrencyInputProps) {
+  const [focused, setFocused] = useState(false)
+  const displayValue = focused || !value ? value : Number(value).toLocaleString('vi-VN')
+
+  return (
+    <label className="itinerary-number-field">
+      {label}
+      <span className="itinerary-currency-input">
+        <input
+          type="text"
+          inputMode="numeric"
+          value={displayValue}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onChange={(event) => onChange(event.target.value.replace(/\D/g, ''))}
+        />
+        <span>{unit}</span>
+      </span>
+    </label>
+  )
+}
+
 const lodgingAreas: LodgingArea[] = [
   { name: 'Phong Nha – Sơn Trạch', coordinates: [106.283, 17.61] },
   { name: 'Đồng Hới', coordinates: [106.616, 17.467] },
@@ -35,6 +64,7 @@ function nearestLodgingArea(place: Place): LodgingArea {
 
 export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
   const language = useAppStore((state) => state.language)
+  const currencyUnit = ui(language, 'itCurrencyUnit')
   const location = useAppStore((state) => state.location)
   const setSelectedPlace = useAppStore((state) => state.setSelectedPlace)
   const setSuggestedRoute = useAppStore((state) => state.setSuggestedRoute)
@@ -62,11 +92,18 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
     }
   }
   const [days, setDays] = useState(2)
-  const [budget, setBudget] = useState('1000000')
+  const [budget, setBudget] = useState('2500000')
+  const [foodEstimate, setFoodEstimate] = useState('300000')
+  const [transportEstimate, setTransportEstimate] = useState('200000')
+  const [lodgingEstimate, setLodgingEstimate] = useState('500000')
   const [interests, setInterests] = useState<Category[]>(categoryKeys)
   const [plan, setPlan] = useState<{
     days: { places: Place[]; lodging: LodgingArea | null }[]
     ticketTotal: number
+    foodTotal: number
+    transportTotal: number
+    lodgingTotal: number
+    estimatedTotal: number
     unpricedCount: number
   } | null>(null)
   const [loading, setLoading] = useState(false)
@@ -81,11 +118,15 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
   const createPlan = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const budgetVnd = Number(budget)
+    const foodPerDayVnd = Number(foodEstimate)
+    const transportPerDayVnd = Number(transportEstimate)
+    const lodgingPerNightVnd = Number(lodgingEstimate)
     if (!Number.isInteger(days) || days < 1 || days > 7) {
       setError(ui(language, 'itDaysRange'))
       return
     }
-    if (!Number.isFinite(budgetVnd) || budgetVnd < 0) {
+    if (![budgetVnd, foodPerDayVnd, transportPerDayVnd, lodgingPerNightVnd]
+      .every((amount) => Number.isInteger(amount) && amount >= 0)) {
       setError(ui(language, 'itBudgetInvalid'))
       return
     }
@@ -107,6 +148,10 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
     try {
       const ticketPrices = await fetchTicketPrices()
       const pricesByPlace = new Map(ticketPrices.map((item) => [item.placeId, item.priceVnd]))
+      const foodTotal = days * foodPerDayVnd
+      const transportTotal = days * transportPerDayVnd
+      const lodgingTotal = Math.max(0, days - 1) * lodgingPerNightVnd
+      const estimatedExpenses = foodTotal + transportTotal + lodgingTotal
       const selected: Place[] = []
       let ticketTotal = 0
       let unpricedCount = 0
@@ -115,7 +160,7 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
         if (selected.length >= days * 2) break
         const price = pricesByPlace.get(place.id)
         const knownPrice = typeof price === 'number' ? price : 0
-        if (ticketTotal + knownPrice > budgetVnd) continue
+        if (ticketTotal + knownPrice + estimatedExpenses > budgetVnd) continue
         selected.push(place)
         ticketTotal += knownPrice
         if (typeof price !== 'number') unpricedCount += 1
@@ -147,6 +192,10 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
           lodging: index < nonEmptyDays.length - 1 ? nearestLodgingArea(day[day.length - 1]) : null,
         })),
         ticketTotal,
+        foodTotal,
+        transportTotal,
+        lodgingTotal,
+        estimatedTotal: ticketTotal + estimatedExpenses,
         unpricedCount,
       })
       setPlanSaved(false)
@@ -171,10 +220,10 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
           {ui(language, 'itDays')}
           <input type="number" min="1" max="7" step="1" value={days} onChange={(event) => setDays(Number(event.target.value))} />
         </label>
-        <label className="itinerary-number-field">
-          {ui(language, 'itBudget')}
-          <input type="number" min="0" step="10000" value={budget} onChange={(event) => setBudget(event.target.value)} />
-        </label>
+        <CurrencyInput label={ui(language, 'itBudget')} unit={currencyUnit} value={budget} onChange={setBudget} />
+        <CurrencyInput label={ui(language, 'itFoodEstimate')} unit={currencyUnit} value={foodEstimate} onChange={setFoodEstimate} />
+        <CurrencyInput label={ui(language, 'itTransportEstimate')} unit={currencyUnit} value={transportEstimate} onChange={setTransportEstimate} />
+        <CurrencyInput label={ui(language, 'itLodgingEstimate')} unit={currencyUnit} value={lodgingEstimate} onChange={setLodgingEstimate} />
         <fieldset className="itinerary-interests">
           <legend>{ui(language, 'itInterests')}</legend>
           {categoryKeys.map((interest) => (
@@ -205,7 +254,13 @@ export function ItineraryPlanner({ places }: ItineraryPlannerProps) {
             </div>}
           </>}
           <p className="itinerary-budget">
-            {ui(language, 'itTicketTotal')} <strong>{plan.ticketTotal.toLocaleString(localeOf(language))} VND</strong>
+            {ui(language, 'itEstimatedTotal')} <strong>{plan.estimatedTotal.toLocaleString(localeOf(language))} VND</strong>
+          </p>
+          <p className="itinerary-costs">
+            {ui(language, 'itTicketTotal')} {plan.ticketTotal.toLocaleString(localeOf(language))} VND
+            {' · '}{ui(language, 'itFoodTotal')} {plan.foodTotal.toLocaleString(localeOf(language))} VND
+            {' · '}{ui(language, 'itTransportTotal')} {plan.transportTotal.toLocaleString(localeOf(language))} VND
+            {' · '}{ui(language, 'itLodgingTotal')} {plan.lodgingTotal.toLocaleString(localeOf(language))} VND
             {plan.unpricedCount > 0 && ` · ${ui(language, 'itUnpriced', { n: plan.unpricedCount })}`}
           </p>
           <p className="itinerary-note">{ui(language, 'itBudgetNote')}</p>

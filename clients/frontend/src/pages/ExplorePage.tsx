@@ -1,8 +1,8 @@
 // Trang khám phá: tìm/lọc địa điểm, xem bản đồ, GPS, hành trình và thuyết minh.
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, BookmarkPlus, CalendarDays, Camera, ChefHat, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Clock3, Compass, Globe2, Headphones, Heart, Home, Landmark, Leaf, Lightbulb, LoaderCircle, LocateFixed, MapPin, Play, Search, Sparkles, Volume2 } from 'lucide-react'
+import { ArrowRight, BookmarkPlus, CalendarDays, Camera, ChefHat, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Clock3, Compass, Globe2, Headphones, Heart, Home, Landmark, Leaf, Lightbulb, LoaderCircle, LocateFixed, MapPin, Play, Plus, Search, Sparkles, Volume2 } from 'lucide-react'
 import { distance, point } from '@turf/turf'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { getVisitorId, recordVisit } from '../api'
 import { NarrationCard } from '../components/NarrationCard'
 import { PlaceRatingPanel } from '../components/PlaceRatingPanel'
@@ -40,11 +40,15 @@ const scrollToSection = (id: string) => {
 const MapView = lazy(() => import('../components/MapView').then((module) => ({ default: module.MapView })))
 
 export function ExplorePage() {
+  const navigate = useNavigate()
+  const routerLocation = useLocation()
   const language = useAppStore((state) => state.language)
   const places = useAppStore((state) => state.places)
   const selectedPlaceId = useAppStore((state) => state.selectedPlaceId)
   const setSelectedPlace = useAppStore((state) => state.setSelectedPlace)
   const routeIds = useAppStore((state) => state.routeIds)
+  const currentUser = useAppStore((state) => state.currentUser)
+  const setRoutePlace = useAppStore((state) => state.setRoutePlace)
   const setRouteOrder = useAppStore((state) => state.setRouteOrder)
   const isSavingRoute = useAppStore((state) => state.isSavingRoute)
   const savedTours = useAppStore((state) => state.savedTours)
@@ -71,6 +75,7 @@ export function ExplorePage() {
   const placeDetailsRef = useRef<HTMLDetailsElement>(null)
   const homeSearchInputRef = useRef<HTMLInputElement>(null)
   const selectedPlace = places.find((place) => place.id === selectedPlaceId) ?? places[0] ?? bundledPlaces[0]
+  const isSelectedPlaceInRoute = routeIds.includes(selectedPlace.id)
   const visitorDetails = getVisitorDetails(selectedPlace.id, language)
   const stopWalk = useCallback((message?: string) => {
     if (watchId.current !== null) {
@@ -259,6 +264,19 @@ export function ExplorePage() {
   const viewSelectedPlaceOnMap = () => {
     closePlaceDetails()
     selectFeaturedPlace(selectedPlace.id)
+  }
+
+  const toggleSelectedPlaceInRoute = () => {
+    if (!currentUser) {
+      navigate('/login', {
+        state: {
+          returnTo: `${routerLocation.pathname}${routerLocation.search}`,
+          pendingPlaceId: selectedPlace.id,
+        },
+      })
+      return
+    }
+    void setRoutePlace(selectedPlace.id)
   }
 
   // Gợi ý: ưu tiên điểm cùng loại hình, sau đó tới các điểm khác.
@@ -576,6 +594,18 @@ export function ExplorePage() {
                 <li><MapPin size={14} />{ui(language, 'regionName')}</li>
               </ul>
               <div className="pd-hero-actions">
+                <button
+                  type="button"
+                  className={`pd-btn ${isSelectedPlaceInRoute ? 'pd-btn-ghost is-in-route' : 'pd-btn-primary'}`}
+                  disabled={isSavingRoute}
+                  aria-pressed={isSelectedPlaceInRoute}
+                  onClick={toggleSelectedPlaceInRoute}
+                >
+                  {isSavingRoute
+                    ? <LoaderCircle className="loading-spinner" size={15} />
+                    : isSelectedPlaceInRoute ? <CircleCheck size={15} /> : <Plus size={15} />}
+                  {translate(language, isSelectedPlaceInRoute ? 'removeRoute' : 'addRoute')}
+                </button>
                 <button type="button" className="pd-btn pd-btn-primary" onClick={scrollToPlaceAudio}><Play size={13} fill="currentColor" />{ui(language, 'listenNow')}</button>
                 <button type="button" className="pd-btn pd-btn-ghost" onClick={viewSelectedPlaceOnMap}><MapPin size={15} />{ui(language, 'viewOnMap')}</button>
               </div>

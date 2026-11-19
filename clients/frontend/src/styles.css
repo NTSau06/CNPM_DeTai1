@@ -352,6 +352,9 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .itinerary-form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-top: 16px; }
 .itinerary-number-field { display: grid; gap: 6px; color: #657166; font-size: 14px; font-weight: 600; }
 .itinerary-number-field input { width: 150px; min-height: 36px; padding: 0 9px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: #303c32; }
+.itinerary-currency-input { display: flex; align-items: center; width: 176px; min-height: 36px; border: 1px solid var(--line); border-radius: 5px; background: #fff; }
+.itinerary-currency-input input { flex: 1; width: 0; min-width: 0; padding: 0 9px; border: 0; background: transparent; }
+.itinerary-currency-input > span { padding-right: 9px; color: var(--muted); font-size: 13px; font-weight: 500; }
 .itinerary-interests { display: flex; flex: 1; flex-wrap: wrap; gap: 8px 13px; min-width: 240px; margin: 0; padding: 0; border: 0; }
 .itinerary-interests legend { margin-bottom: 7px; color: #657166; font-size: 14px; font-weight: 600; }
 .itinerary-interests label { display: inline-flex; align-items: center; gap: 5px; color: #71796f; font-size: 13px; white-space: nowrap; }
@@ -361,6 +364,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .itinerary-message { margin: 12px 0 0; color: #8d563f; font-size: 14px; }
 .itinerary-budget { margin: 14px 0 3px; color: #536253; font-size: 14px; }
 .itinerary-budget strong { color: var(--forest-dark); }
+.itinerary-costs { margin: 0 0 5px; color: #657166; font-size: 13px; }
 .itinerary-note { margin: 0; color: var(--muted); font-size: 13px; }
 .itinerary-days { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 13px; }
 .itinerary-day { padding: 11px; border: 1px solid var(--line); border-radius: 6px; background: #fbfaf7; }
@@ -774,6 +778,18 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .ticket-purchase-note { color: #59675b; font-size: 13px; line-height: 1.5; }
 .ticket-purchase-feedback { margin: 0; color: #536b56; font-size: 13px; line-height: 1.5; }
 .ticket-purchase-feedback.error { color: #a4513f; }
+.ticket-purchase-feedback a { margin-left: 4px; color: #435f48; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.ticket-history-list { display: grid; gap: 12px; }
+.ticket-history-card { padding: 18px 20px; border: 1px solid #e7e3d9; border-radius: 8px; background: #fffefa; }
+.ticket-history-card-heading { display: flex; align-items: center; gap: 11px; }
+.ticket-history-icon { width: 36px; height: 36px; display: grid; flex: 0 0 auto; place-items: center; border-radius: 7px; color: #547286; background: #edf2f4; }
+.ticket-history-card-heading h2 { margin: 0 0 5px; color: #435644; font-family: var(--serif); font-size: 18px; font-weight: 500; }
+.ticket-history-card-heading p { display: flex; align-items: center; gap: 5px; margin: 0; color: #7b8478; font-size: 13px; }
+.ticket-history-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin: 16px 0 0; padding-top: 13px; border-top: 1px solid #ece9e1; }
+.ticket-history-details dt { color: #7b8478; font-size: 12px; }
+.ticket-history-details dd { margin: 4px 0 0; color: #435644; font-size: 14px; font-weight: 700; }
+.ticket-history-status, .ticket-history-error { padding: 14px 16px; border-radius: 6px; background: #fffefa; color: #59675b; font-size: 14px; }
+.ticket-history-error { color: #a4513f; }
 .device-entry-content { width: min(760px, 100%); flex: 1; display: flex; flex-direction: column; justify-content: center; align-self: center; padding: 48px 0 24px; }
 .device-entry-actions { display: flex; justify-content: flex-end; margin-bottom: 22px; }
 .device-entry-home { display: inline-flex; align-items: center; gap: 7px; padding: 9px 12px; border: 1px solid #e4e1d8; border-radius: 6px; color: #526255; background: #fffefa; font-size: 14px; font-weight: 600; }
