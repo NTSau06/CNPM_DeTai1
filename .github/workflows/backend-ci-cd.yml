@@ -6,11 +6,13 @@ on:
     branches: [main]
     paths:
       - 'server/**'
+      - 'scripts/migrate_relationships.py'
       - '.github/workflows/backend-ci-cd.yml'
   push:
     branches: [main]
     paths:
       - 'server/**'
+      - 'scripts/migrate_relationships.py'
       - '.github/workflows/backend-ci-cd.yml'
   workflow_dispatch:
 
@@ -76,6 +78,9 @@ jobs:
 
       - name: Start the complete service stack
         run: docker compose -f server/compose.yml up --build --wait --wait-timeout 120 -d
+
+      - name: Verify the relationship migration command
+        run: docker compose -f server/compose.yml run --rm --no-deps -v "$PWD/scripts:/app/scripts:ro" api-gateway python /app/scripts/migrate_relationships.py
 
       - name: Exercise gateway, per-place analytics, narration and tours
         env:
