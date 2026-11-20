@@ -69,6 +69,8 @@ class AdminPlaceAnalytics(BaseModel):
 class AdminReview(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
+    # Mã băm của người đánh giá, dùng làm khóa để admin xóa đánh giá vi phạm.
+    id: str
     place_id: str = Field(alias="placeId")
     rating: int
     review: str
@@ -78,8 +80,23 @@ class AdminReview(BaseModel):
 class AdminAnalyticsSummary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
+    period_days: int = Field(default=30, alias="periodDays")
+    # Giữ tên trường cũ để client hiện tại không bị lỗi; giá trị theo period_days.
     visits_last_30_days: int = Field(alias="visitsLast30Days")
     total_ratings: int = Field(alias="totalRatings")
     average_rating: float | None = Field(alias="averageRating")
     places: list[AdminPlaceAnalytics]
     latest_reviews: list[AdminReview] = Field(alias="latestReviews")
+
+
+class AdminReviewCollection(BaseModel):
+    items: list[AdminReview]
+    total: int
+
+
+class OwnRating(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    place_id: str = Field(alias="placeId")
+    rating: int | None
+    review: str

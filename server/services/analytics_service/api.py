@@ -1,11 +1,15 @@
 """Định nghĩa API nội bộ để ghi lượt ghé và quản lý thống kê."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from uuid import UUID
+
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from services.analytics_service.repository import AnalyticsRepository
 from services.analytics_service.schemas import (
     AdminAnalyticsSummary,
+    AdminReviewCollection,
+    OwnRating,
     OnlineVisitorCount,
     PresenceHeartbeat,
     PlaceAnalytics,
@@ -64,6 +68,30 @@ def get_rating(place_id: str, request: Request) -> RatingSummary:
 
 
 @router.get(
+    "/internal/v1/analytics/ratings/{place_id}/visitors/{visitor_id}",
+    response_model=OwnRating,
+)
+def get_own_rating(place_id: str, visitor_id: UUID, request: Request) -> OwnRating:
+    return repository(request).own_rating(place_id, visitor_id)
+
+
+@router.delete("/internal/v1/analytics/ratings/{place_id}/{rating_id}", status_code=204)
+def delete_rating(place_id: str, rating_id: str, request: Request) -> Response:
+    if not repository(request).delete_rating(place_id, rating_id):
+        raise HTTPException(status_code=404, detail="Rating not found.")
+    return Response(status_code=204)
+
+
+@router.get("/internal/v1/analytics/admin/reviews", response_model=AdminReviewCollection)
+def list_reviews(
+    request: Request,
+    place_id: str | None = Query(default=None, alias="placeId", max_length=120),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> AdminReviewCollection:
+    return repository(request).list_reviews(place_id, limit)
+
+
+@router.get(
     "/internal/v1/analytics/places/{place_id}", response_model=PlaceAnalytics
 )
 def get_place_analytics(place_id: str, request: Request) -> PlaceAnalytics:
@@ -74,5 +102,8 @@ def get_place_analytics(place_id: str, request: Request) -> PlaceAnalytics:
     "/internal/v1/analytics/admin/summary",
     response_model=AdminAnalyticsSummary,
 )
-def get_admin_summary(request: Request) -> AdminAnalyticsSummary:
-    return repository(request).admin_summary()
+def get_admin_summary(
+    request: Request,
+    days: int = Query(default=30, ge=1, le=365),
+) -> AdminAnalyticsSummary:
+    return repository(request).admin_summary(days)

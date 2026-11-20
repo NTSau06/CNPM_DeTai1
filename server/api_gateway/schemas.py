@@ -56,7 +56,35 @@ class TicketOrderCreate(BaseModel):
 class TicketPriceUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    price_vnd: Annotated[int | None, Field(alias="priceVnd", ge=70_000, le=150_000)]
+    # Giá vé do admin tự đặt; giới hạn rộng để tránh nhập nhầm số quá lớn.
+    price_vnd: Annotated[int | None, Field(alias="priceVnd", ge=1_000, le=10_000_000)]
+
+
+class RatingSubmission(BaseModel):
+    """Đánh giá gửi từ client; danh tính lấy từ phiên đăng nhập, không lấy từ client."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    place_id: Annotated[str, Field(alias="placeId", min_length=1, max_length=120)]
+    rating: Annotated[int, Field(ge=1, le=5)]
+    review: Annotated[str, Field(max_length=500)] = ""
+
+
+class PaymentStart(BaseModel):
+    method: Literal["mock", "vnpay"]
+    locale: Annotated[str, Field(max_length=10)] = "vi"
+
+
+class MockPaymentResult(BaseModel):
+    success: bool
+
+
+class AccountDeletion(BaseModel):
+    password: Annotated[str, Field(min_length=8, max_length=128)]
+
+
+class UserLockUpdate(BaseModel):
+    locked: bool
 
 class ProfileUpdate(BaseModel):
     full_name: Annotated[str, Field(alias="fullName", min_length=1, max_length=80)]

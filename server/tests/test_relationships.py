@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api_gateway.auth import AuthRepository
+from api_gateway.favorites import FavoriteRepository
 from api_gateway.main import create_app as create_gateway_app
 from api_gateway.pairing import PairingRepository
 from api_gateway.tickets import TicketRepository
@@ -24,11 +25,12 @@ def initialize(database, *, parents_last=False):
         AuthRepository(database), PlaceRepository(database, SEED),
         TourRepository(database), TicketRepository(database),
         AnalyticsRepository(database), PairingRepository(database),
+        FavoriteRepository(database),
     ]
     if parents_last:
         # Gateway tables still require users, but places and tours' owner table
         # can appear after their independently started child services.
-        repositories = [repositories[i] for i in (2, 4, 0, 3, 5, 1)]
+        repositories = [repositories[i] for i in (2, 4, 0, 3, 5, 6, 1)]
     for repository in repositories:
         repository.initialize()
 
@@ -46,7 +48,7 @@ def shared_database(database):
 
 
 @pytest.mark.parametrize("parents_last", [False, True])
-def test_startup_installs_nine_trusted_foreign_keys_and_can_repeat(database, parents_last):
+def test_startup_installs_all_trusted_foreign_keys_and_can_repeat(database, parents_last):
     initialize(database, parents_last=parents_last)
     initialize(database, parents_last=not parents_last)
     apply_relationships(database, require_all=True)
@@ -55,14 +57,17 @@ def test_startup_installs_nine_trusted_foreign_keys_and_can_repeat(database, par
         rows = connection.execute(
             "SELECT is_disabled, is_not_trusted FROM sys.foreign_keys"
         ).fetchall()
-        assert len(rows) == 9
+        # 7 quan hệ trong RELATIONSHIPS + 4 khóa ngoại tới users khai báo khi tạo bảng.
+        assert len(rows) == 11
         assert all(tuple(row) == (False, False) for row in rows)
 
 
 @pytest.mark.parametrize("sql", [
     "INSERT INTO tours VALUES ('bad-tour', 0, 'missing-user', '{}')",
     "INSERT INTO ticket_prices VALUES ('missing-place', 100)",
-    "INSERT INTO ticket_orders VALUES ('bad-order', ?, 'missing-place', 1, 100, 100, '2026-01-01')",
+    "INSERT INTO ticket_orders (id, user_id, place_id, quantity, unit_price_vnd, total_price_vnd, created_at) "
+    "VALUES ('bad-order', ?, 'missing-place', 1, 100, 100, '2026-01-01')",
+    "INSERT INTO user_favorites (user_id, place_id, created_at) VALUES (?, 'missing-place', '2026-01-01')",
     "INSERT INTO visits VALUES ('visitor', 'missing-place', '2026-01-01')",
     "INSERT INTO ratings VALUES ('visitor', 'missing-place', 5, '', '2026-01-01')",
     "INSERT INTO device_pairings (code_hash, language, place_id, path, created_at, expires_at) "
@@ -84,13 +89,13 @@ def test_upgrade_refuses_orphans_without_partial_changes(shared_database):
     with pytest.raises(RuntimeError, match="orphan"):
         apply_relationships(shared_database, require_all=True)
     with shared_database.connect() as connection:
-        assert connection.execute("SELECT COUNT(*) FROM sys.foreign_keys").fetchone()[0] == 3
+        assert connection.execute("SELECT COUNT(*) FROM sys.foreign_keys").fetchone()[0] == 4
         assert connection.execute("SELECT owner_id FROM tours").fetchone()[0] == "missing-user"
         connection.execute("UPDATE tours SET owner_id = NULL")
     apply_relationships(shared_database, require_all=True)
     with shared_database.connect() as connection:
         assert connection.execute("SELECT COUNT(*) FROM tours").fetchone()[0] == 1
-        assert connection.execute("SELECT COUNT(*) FROM sys.foreign_keys").fetchone()[0] == 9
+        assert connection.execute("SELECT COUNT(*) FROM sys.foreign_keys").fetchone()[0] == 11
 
 
 @pytest.mark.parametrize("history", ["orders", "visits", "ratings"])
@@ -99,7 +104,9 @@ def test_delete_place_with_history_returns_conflict_and_keeps_data(shared_databa
     with shared_database.connect() as connection:
         if history == "orders":
             connection.execute(
-                "INSERT INTO ticket_orders VALUES ('order', ?, ?, 1, 100, 100, '2026-01-01')",
+                "INSERT INTO ticket_orders "
+                "(id, user_id, place_id, quantity, unit_price_vnd, total_price_vnd, created_at) "
+                "VALUES ('order', ?, ?, 1, 100, 100, '2026-01-01')",
                 user_id, PLACE,
             )
         elif history == "visits":

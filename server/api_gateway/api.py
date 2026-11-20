@@ -1,23 +1,36 @@
 ﻿"""Cung cấp API công khai và điều phối yêu cầu giữa các backend service."""
 import math
-import pyodbc
+import secrets
+import urllib.parse
+import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
+import pyodbc
 
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
+from fastapi.responses import RedirectResponse
+
+from api_gateway.auth import AccountLockedError
 from api_gateway.pairing import PAIRING_TTL_SECONDS
+from api_gateway.payments import build_vnpay_url, verify_vnpay_params, vnpay_succeeded
 from api_gateway.proxy import request_service
+from api_gateway.tickets import PaymentError
 from api_gateway.schemas import (
+    AccountDeletion,
     LoginRequest,
+    MockPaymentResult,
     PairingCreate,
     PasswordChange,
+    PaymentStart,
     ProfileUpdate,
+    RatingSubmission,
     RegisterRequest,
     TicketOrderCreate,
     TicketPriceUpdate,
+    UserLockUpdate,
     VisitSubmission,
 )
-from services.analytics_service.schemas import PresenceHeartbeat, RatingCreate
+from services.analytics_service.schemas import PresenceHeartbeat
 from services.common.schemas import Locale, Place, TourCreate
 
 router = APIRouter(prefix="/api/v1")
@@ -48,6 +61,47 @@ def admin_user(request: Request, authorization: str | None) -> dict:
 
 administrator = admin_user
 
+# Không gian tên cố định để quy đổi tài khoản thành mã người đánh giá ổn định.
+RATING_NAMESPACE = uuid.UUID("5f0c3c2e-8f2d-4a53-9a51-2f4d1c7d9b10")
+ALLOWED_PERIODS = {7, 30, 90, 365}
+
+
+def rating_visitor_id(user_id: str) -> uuid.UUID:
+    """Mỗi tài khoản chỉ có một đánh giá cho mỗi địa điểm."""
+    return uuid.uuid5(RATING_NAMESPACE, f"user:{user_id}")
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _check_login_limit(request: Request, key: str) -> None:
+    retry_after = request.app.state.login_limiter.retry_after(key)
+    if retry_after:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Too many failed sign-in attempts. "
+                f"Try again in {max(1, retry_after // 60)} minute(s)."
+            ),
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+def _attempt_login(request: Request, payload: LoginRequest, scope: str) -> tuple[str, dict] | None:
+    email = payload.email.strip().lower()
+    key = f"{scope}:{_client_ip(request)}:{email}"
+    _check_login_limit(request, key)
+    try:
+        result = request.app.state.auth_repository.login(email, payload.password)
+    except AccountLockedError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
+    if result is None:
+        request.app.state.login_limiter.record_failure(key)
+        return None
+    request.app.state.login_limiter.reset(key)
+    return result
+
 
 @router.post("/auth/register", status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, request: Request) -> dict:
@@ -71,10 +125,7 @@ def register(payload: RegisterRequest, request: Request) -> dict:
 
 @router.post("/auth/login")
 def login(payload: LoginRequest, request: Request) -> dict:
-    result = request.app.state.auth_repository.login(
-        payload.email.strip().lower(),
-        payload.password,
-    )
+    result = _attempt_login(request, payload, "user")
     if result is None:
         raise HTTPException(status_code=401, detail="Email or password is incorrect.")
     token, user = result
@@ -83,10 +134,7 @@ def login(payload: LoginRequest, request: Request) -> dict:
 
 @router.post("/admin/login")
 def admin_login(payload: LoginRequest, request: Request) -> dict:
-    result = request.app.state.auth_repository.login(
-        payload.email.strip().lower(),
-        payload.password,
-    )
+    result = _attempt_login(request, payload, "admin")
     if result is None or not result[1]["isAdmin"]:
         if result is not None:
             request.app.state.auth_repository.revoke(result[0])
@@ -156,6 +204,8 @@ def change_password(
     authorization: str | None = Header(default=None),
 ) -> dict:
     user = authenticated_user(request, authorization)
+    limit_key = f"password:{user['id']}"
+    _check_login_limit(request, limit_key)
     if payload.current_password == payload.new_password:
         raise HTTPException(
             status_code=422, detail="The new password must differ from the current one."
@@ -164,8 +214,38 @@ def change_password(
         user["id"], payload.current_password, payload.new_password
     )
     if token is None:
+        request.app.state.login_limiter.record_failure(limit_key)
         raise HTTPException(status_code=403, detail="Current password is incorrect.")
+    request.app.state.login_limiter.reset(limit_key)
     return {"token": token, "user": user}
+
+
+@router.delete("/auth/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_current_user(
+    payload: AccountDeletion,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Người dùng tự xóa tài khoản; cần nhập lại mật khẩu để xác nhận."""
+    user = authenticated_user(request, authorization)
+    if user["isAdmin"]:
+        raise HTTPException(
+            status_code=422, detail="Administrator accounts cannot be deleted here."
+        )
+    limit_key = f"password:{user['id']}"
+    _check_login_limit(request, limit_key)
+    if not request.app.state.auth_repository.verify_password(user["id"], payload.password):
+        request.app.state.login_limiter.record_failure(limit_key)
+        raise HTTPException(status_code=403, detail="Password is incorrect.")
+    await request_service(
+        service_url(request, "tour"),
+        "DELETE",
+        f"/internal/v1/admin/tours/owner/{user['id']}",
+    )
+    if not request.app.state.auth_repository.delete_user(user["id"]):
+        raise HTTPException(status_code=404, detail="User not found.")
+    request.app.state.login_limiter.reset(limit_key)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -184,8 +264,11 @@ def logout(
 async def admin_overview(
     request: Request,
     authorization: str | None = Header(default=None),
+    days: int = Query(default=30),
 ) -> dict:
     administrator(request, authorization)
+    if days not in ALLOWED_PERIODS:
+        raise HTTPException(status_code=422, detail="days must be one of 7, 30, 90, 365.")
     if authorization is None or not request.app.state.auth_repository.heartbeat(
         authorization[7:]
     ):
@@ -194,6 +277,7 @@ async def admin_overview(
         service_url(request, "analytics"),
         "GET",
         "/internal/v1/analytics/admin/summary",
+        params={"days": str(days)},
     )
     places = await request_service(
         service_url(request, "poi"),
@@ -204,7 +288,8 @@ async def admin_overview(
     return {
         **request.app.state.auth_repository.account_metrics(),
         "analytics": analytics,
-        "tickets": request.app.state.ticket_repository.sales_summary(),
+        "tickets": request.app.state.ticket_repository.sales_summary(days),
+        "periodDays": days,
         "onlineVisitors": online["onlineVisitors"],
         "placeCount": places["total"],
         "visits": analytics["visitsLast30Days"],
@@ -245,7 +330,225 @@ def get_ticket_orders(
 ) -> dict:
     user = authenticated_user(request, authorization)
     items = request.app.state.ticket_repository.user_orders(user["id"])
-    return {"items": items, "total": sum(item["quantity"] for item in items)}
+    return {
+        "items": items,
+        "total": sum(item["quantity"] for item in items if item["status"] == "paid"),
+    }
+
+
+@router.get("/tickets/orders/{order_id}")
+def get_ticket_order(
+    order_id: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    user = authenticated_user(request, authorization)
+    order = request.app.state.ticket_repository.get_order(order_id, user["id"])
+    if order is None:
+        raise HTTPException(status_code=404, detail="Ticket order not found.")
+    return order
+
+
+PAYMENT_ERROR_STATUS = {
+    "not_found": 404,
+    "invalid_method": 422,
+    "invalid_amount": 422,
+    "already_paid": 409,
+    "not_pending": 409,
+}
+
+
+def _payment_http_error(error: PaymentError) -> HTTPException:
+    return HTTPException(status_code=PAYMENT_ERROR_STATUS.get(error.code, 409), detail=str(error))
+
+
+@router.get("/payments/methods")
+def get_payment_methods(request: Request) -> dict:
+    return {"methods": request.app.state.payment_settings.methods()}
+
+
+@router.post("/tickets/orders/{order_id}/pay")
+def start_ticket_payment(
+    order_id: str,
+    payload: PaymentStart,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    """Bắt đầu thanh toán; trả về địa chỉ chuyển hướng tới cổng thanh toán."""
+    user = authenticated_user(request, authorization)
+    settings = request.app.state.payment_settings
+    if payload.method not in settings.methods():
+        raise HTTPException(status_code=422, detail="This payment method is not enabled.")
+    try:
+        order = request.app.state.ticket_repository.start_payment(
+            user["id"], order_id, payload.method
+        )
+    except PaymentError as error:
+        raise _payment_http_error(error) from error
+    if payload.method == "mock":
+        return {
+            "order": order,
+            "redirectUrl": f"/payment/mock/{urllib.parse.quote(order_id)}",
+            "external": False,
+        }
+    return {
+        "order": order,
+        "redirectUrl": build_vnpay_url(
+            settings,
+            order_id=order_id,
+            amount_vnd=order["totalPriceVnd"],
+            client_ip=_client_ip(request),
+            order_info=f"Thanh toan ve {order['ticketCode']}",
+            locale=payload.locale,
+        ),
+        "external": True,
+    }
+
+
+@router.post("/tickets/orders/{order_id}/mock-payment")
+def complete_mock_payment(
+    order_id: str,
+    payload: MockPaymentResult,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    """Cổng thanh toán mô phỏng: người dùng bấm xác nhận hoặc hủy giao dịch."""
+    user = authenticated_user(request, authorization)
+    if not request.app.state.payment_settings.mock_enabled:
+        raise HTTPException(status_code=404, detail="Mock payment is disabled.")
+    repository = request.app.state.ticket_repository
+    if not payload.success:
+        order = repository.get_order(order_id, user["id"])
+        if order is None:
+            raise HTTPException(status_code=404, detail="Ticket order not found.")
+        return order
+    order = repository.get_order(order_id, user["id"])
+    if order is None:
+        raise HTTPException(status_code=404, detail="Ticket order not found.")
+    if order["status"] != "pending":
+        raise HTTPException(status_code=409, detail="This ticket order is not awaiting payment.")
+    try:
+        return repository.mark_paid(
+            order_id,
+            method="mock",
+            reference=f"MOCK-{secrets.token_hex(6).upper()}",
+            user_id=user["id"],
+        )
+    except PaymentError as error:
+        raise _payment_http_error(error) from error
+
+
+def _vnpay_amount(query: dict[str, str]) -> int | None:
+    try:
+        return int(query.get("vnp_Amount", "")) // 100
+    except ValueError:
+        return None
+
+
+@router.get("/payments/vnpay/return", include_in_schema=False)
+def vnpay_return(request: Request) -> RedirectResponse:
+    """VNPay chuyển trình duyệt về đây; xác minh chữ ký rồi chuyển sang trang web."""
+    settings = request.app.state.payment_settings
+    query = dict(request.query_params)
+    order_id = query.get("vnp_TxnRef", "")
+    result = "invalid"
+    if verify_vnpay_params(settings, query):
+        result = "failed"
+        if vnpay_succeeded(query):
+            try:
+                request.app.state.ticket_repository.mark_paid(
+                    order_id,
+                    method="vnpay",
+                    reference=query.get("vnp_TransactionNo", ""),
+                    amount_vnd=_vnpay_amount(query),
+                )
+                result = "success"
+            except PaymentError as error:
+                result = "success" if error.code == "already_paid" else "failed"
+    target = urllib.parse.urlencode({"payment": result, "order": order_id})
+    return RedirectResponse(f"{settings.frontend_url}/tickets?{target}", status_code=302)
+
+
+@router.get("/payments/vnpay/ipn", include_in_schema=False)
+def vnpay_ipn(request: Request) -> dict:
+    """VNPay gọi máy chủ-máy chủ để xác nhận kết quả (theo mã phản hồi chuẩn VNPay)."""
+    settings = request.app.state.payment_settings
+    query = dict(request.query_params)
+    if not verify_vnpay_params(settings, query):
+        return {"RspCode": "97", "Message": "Invalid signature"}
+    order_id = query.get("vnp_TxnRef", "")
+    order = request.app.state.ticket_repository.get_order(order_id)
+    if order is None:
+        return {"RspCode": "01", "Message": "Order not found"}
+    if _vnpay_amount(query) != order["totalPriceVnd"]:
+        return {"RspCode": "04", "Message": "Invalid amount"}
+    if order["status"] == "paid":
+        return {"RspCode": "02", "Message": "Order already confirmed"}
+    if not vnpay_succeeded(query):
+        return {"RspCode": "00", "Message": "Confirm Success"}
+    try:
+        request.app.state.ticket_repository.mark_paid(
+            order_id,
+            method="vnpay",
+            reference=query.get("vnp_TransactionNo", ""),
+            amount_vnd=_vnpay_amount(query),
+        )
+    except PaymentError as error:
+        if error.code == "already_paid":
+            return {"RspCode": "02", "Message": "Order already confirmed"}
+        return {"RspCode": "99", "Message": str(error)}
+    return {"RspCode": "00", "Message": "Confirm Success"}
+
+
+@router.get("/favorites")
+def list_favorites(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    user = authenticated_user(request, authorization)
+    items = request.app.state.favorite_repository.list(user["id"])
+    return {"items": items, "total": len(items)}
+
+
+@router.put("/favorites/{place_id}")
+async def add_favorite(
+    place_id: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    user = authenticated_user(request, authorization)
+    await request_service(service_url(request, "poi"), "GET", f"/internal/v1/places/{place_id}")
+    try:
+        return request.app.state.favorite_repository.add(user["id"], place_id)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.delete("/favorites/{place_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_favorite(
+    place_id: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    user = authenticated_user(request, authorization)
+    request.app.state.favorite_repository.remove(user["id"], place_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/tickets/orders/{order_id}/cancel")
+def cancel_ticket_order(
+    order_id: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    user = authenticated_user(request, authorization)
+    try:
+        order = request.app.state.ticket_repository.cancel_order(user["id"], order_id)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    if order is None:
+        raise HTTPException(status_code=404, detail="Ticket order not found.")
+    return order
 
 
 @router.put("/admin/tickets/prices/{place_id}")
@@ -269,9 +572,12 @@ async def update_ticket_price(
 def get_ticket_sales(
     request: Request,
     authorization: str | None = Header(default=None),
+    days: int | None = Query(default=None),
 ) -> dict:
     administrator(request, authorization)
-    return request.app.state.ticket_repository.sales_summary()
+    if days is not None and days not in ALLOWED_PERIODS:
+        raise HTTPException(status_code=422, detail="days must be one of 7, 30, 90, 365.")
+    return request.app.state.ticket_repository.sales_summary(days)
 
 
 @router.post("/analytics/visits", status_code=status.HTTP_201_CREATED)
@@ -324,8 +630,30 @@ async def get_ratings(place_id: str, request: Request) -> dict:
     )
 
 
+@router.get("/places/{place_id}/ratings/mine")
+async def get_my_rating(
+    place_id: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    user = authenticated_user(request, authorization)
+    return await request_service(
+        service_url(request, "analytics"),
+        "GET",
+        f"/internal/v1/analytics/ratings/{place_id}/visitors/{rating_visitor_id(user['id'])}",
+    )
+
+
 @router.post("/analytics/ratings", status_code=status.HTTP_201_CREATED)
-async def save_rating(payload: RatingCreate, request: Request) -> dict:
+async def save_rating(
+    payload: RatingSubmission,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    """Chỉ tài khoản đã đăng nhập mới được đánh giá; mỗi tài khoản một đánh giá/điểm."""
+    user = authenticated_user(request, authorization)
+    if user["isAdmin"]:
+        raise HTTPException(status_code=403, detail="Administrators cannot submit ratings.")
     await request_service(
         service_url(request, "poi"),
         "GET",
@@ -335,8 +663,46 @@ async def save_rating(payload: RatingCreate, request: Request) -> dict:
         service_url(request, "analytics"),
         "POST",
         "/internal/v1/analytics/ratings",
-        json=payload.model_dump(mode="json", by_alias=True),
+        json={
+            "placeId": payload.place_id,
+            "visitorId": str(rating_visitor_id(user["id"])),
+            "rating": payload.rating,
+            "review": payload.review,
+        },
     )
+
+
+@router.get("/admin/reviews")
+async def list_admin_reviews(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    place_id: str | None = Query(default=None, alias="placeId", max_length=120),
+) -> dict:
+    admin_user(request, authorization)
+    return await request_service(
+        service_url(request, "analytics"),
+        "GET",
+        "/internal/v1/analytics/admin/reviews",
+        params={"placeId": place_id},
+    )
+
+
+@router.delete(
+    "/admin/reviews/{place_id}/{review_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_admin_review(
+    place_id: str,
+    review_id: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    admin_user(request, authorization)
+    await request_service(
+        service_url(request, "analytics"),
+        "DELETE",
+        f"/internal/v1/analytics/ratings/{place_id}/{review_id}",
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/analytics/presence", status_code=status.HTTP_204_NO_CONTENT)
@@ -387,6 +753,25 @@ def get_admin_users(
     admin_user(request, authorization)
     items = request.app.state.auth_repository.list_users()
     return {"items": items, "total": len(items)}
+
+
+@router.put("/admin/users/{user_id}/lock")
+def lock_admin_user(
+    user_id: str,
+    payload: UserLockUpdate,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    """Khóa hoặc mở khóa tài khoản người dùng thường (không áp dụng cho admin)."""
+    current_admin = admin_user(request, authorization)
+    if user_id == current_admin["id"]:
+        raise HTTPException(status_code=422, detail="You cannot lock your own account.")
+    user = request.app.state.auth_repository.set_locked(user_id, payload.locked)
+    if user is None:
+        raise HTTPException(
+            status_code=404, detail="User not found or is an administrator account."
+        )
+    return user
 
 
 @router.delete("/admin/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

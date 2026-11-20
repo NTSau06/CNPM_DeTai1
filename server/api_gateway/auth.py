@@ -11,6 +11,10 @@ from services.common.database import Database
 from services.common.relationships import apply_relationships
 
 
+class AccountLockedError(Exception):
+    """Tài khoản đúng mật khẩu nhưng đã bị quản trị viên khóa."""
+
+
 class AuthRepository:
     def __init__(self, database: Database) -> None:
         self.database = database
@@ -60,6 +64,12 @@ class AuthRepository:
                 ALTER TABLE dbo.users ADD is_admin INT NOT NULL DEFAULT 0
                 """
             )
+            connection.execute(
+                """
+                IF COL_LENGTH(N'dbo.users', N'is_locked') IS NULL
+                ALTER TABLE dbo.users ADD is_locked INT NOT NULL DEFAULT 0
+                """
+            )
             for column, size in (("birth_date", 10), ("gender", 30), ("address", 500)):
                 connection.execute(
                     f"""
@@ -97,18 +107,23 @@ class AuthRepository:
         return self._create_session(user_id), user
 
     def login(self, email: str, password: str) -> tuple[str, dict] | None:
+        """Trả về None khi sai thông tin; ném AccountLockedError khi tài khoản bị khóa."""
         with self.database.connect() as connection:
             row = connection.execute(
-                "SELECT id, password_salt, password_hash FROM users WHERE email = ?",
+                "SELECT id, password_salt, password_hash, is_locked FROM users WHERE email = ?",
                 email,
             ).fetchone()
         if row is None:
+            # Vẫn băm để thời gian phản hồi không tiết lộ email có tồn tại hay không.
+            _hash_password(password, b"\x00" * 16)
             return None
-        user_id, salt, stored_hash = row
+        user_id, salt, stored_hash, is_locked = row
         if not secrets.compare_digest(
             _hash_password(password, bytes(salt)), bytes(stored_hash)
         ):
             return None
+        if is_locked:
+            raise AccountLockedError("This account has been locked by an administrator.")
         user = self._get_user(user_id)
         if user is None:
             raise RuntimeError("Authenticated account could not be loaded.")
@@ -124,6 +139,7 @@ class AuthRepository:
                 FROM auth_sessions
                 JOIN users ON users.id = auth_sessions.user_id
                 WHERE auth_sessions.token_hash = ? AND auth_sessions.expires_at > ?
+                  AND users.is_locked = 0
                 """,
                 token_hash,
                 now,
@@ -141,7 +157,7 @@ class AuthRepository:
         with self.database.connect() as connection:
             rows = connection.execute(
                 """
-                SELECT id, full_name, email, phone, is_admin
+                SELECT id, full_name, email, phone, is_admin, is_locked
                 FROM users
                 ORDER BY full_name, email
                 """
@@ -153,6 +169,7 @@ class AuthRepository:
                 "email": row[2],
                 "phone": row[3],
                 "isAdmin": bool(row[4]),
+                "isLocked": bool(row[5]),
             }
             for row in rows
         ]
@@ -172,6 +189,30 @@ class AuthRepository:
             connection.execute("DELETE FROM auth_sessions WHERE user_id = ?", user_id)
             cursor = connection.execute("DELETE FROM users WHERE id = ?", user_id)
             return cursor.rowcount > 0
+
+    def verify_password(self, user_id: str, password: str) -> bool:
+        with self.database.connect() as connection:
+            row = connection.execute(
+                "SELECT password_salt, password_hash FROM users WHERE id = ?",
+                user_id,
+            ).fetchone()
+        return row is not None and secrets.compare_digest(
+            _hash_password(password, bytes(row[0])), bytes(row[1])
+        )
+
+    def set_locked(self, user_id: str, locked: bool) -> dict | None:
+        """Khóa/mở khóa tài khoản thường; khóa sẽ thu hồi mọi phiên đang đăng nhập."""
+        with self.database.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE users SET is_locked = ? WHERE id = ? AND is_admin = 0",
+                1 if locked else 0,
+                user_id,
+            )
+            if cursor.rowcount == 0:
+                return None
+            if locked:
+                connection.execute("DELETE FROM auth_sessions WHERE user_id = ?", user_id)
+        return self._get_user(user_id)
 
     def update_profile(
         self,
@@ -310,7 +351,7 @@ class AuthRepository:
     def issue_session(self, user_id: str) -> tuple[str, dict] | None:
         """Cấp một phiên mới, độc lập cho thiết bị khác của cùng tài khoản."""
         user = self._get_user(user_id)
-        if user is None:
+        if user is None or user["isLocked"]:
             return None
         return self._create_session(user_id), user
 
@@ -334,7 +375,8 @@ class AuthRepository:
         with self.database.connect() as connection:
             row = connection.execute(
                 """
-                SELECT id, full_name, email, phone, is_admin, birth_date, gender, address
+                SELECT id, full_name, email, phone, is_admin, birth_date, gender, address,
+                       is_locked
                 FROM users WHERE id = ?
                 """,
                 user_id,
@@ -350,6 +392,7 @@ class AuthRepository:
             "birthDate": row[5],
             "gender": row[6],
             "address": row[7],
+            "isLocked": bool(row[8]),
         }
 
 

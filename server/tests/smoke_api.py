@@ -95,16 +95,10 @@ def main() -> None:
     status, duplicate = request("/analytics/visits", "POST", visit_payload)
     assert status == 201 and duplicate == {"recorded": False}
 
-    status, rating = request(
-        "/analytics/ratings",
-        "POST",
-        {
-            "placeId": place["id"],
-            "visitorId": str(uuid.uuid4()),
-            "rating": 5,
-            "review": "Smoke test review",
-        },
-    )
+    rating_payload = {"placeId": place["id"], "rating": 5, "review": "Smoke test review"}
+    status, _ = request("/analytics/ratings", "POST", rating_payload)
+    assert status == 401
+    status, rating = request("/analytics/ratings", "POST", rating_payload, token)
     assert status == 201 and rating is not None
     assert rating["totalRatings"] == 1 and rating["averageRating"] == 5
 

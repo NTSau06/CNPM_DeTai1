@@ -10,7 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api_gateway.api import router
 from api_gateway.auth import AuthRepository
+from api_gateway.favorites import FavoriteRepository
 from api_gateway.pairing import PairingRepository
+from api_gateway.payments import PaymentSettings
+from api_gateway.rate_limit import LoginRateLimiter
 from api_gateway.tickets import TicketRepository
 from services.common.database import Database
 
@@ -20,6 +23,7 @@ def create_app(
     database: Database | None = None,
     admin_email: str | None = None,
     admin_password: str | None = None,
+    payment_settings: PaymentSettings | None = None,
 ) -> FastAPI:
     urls = service_urls or {
         "poi": os.getenv("POI_SERVICE_URL", "http://localhost:8001"),
@@ -32,6 +36,7 @@ def create_app(
     auth_repository = AuthRepository(shared_database)
     ticket_repository = TicketRepository(shared_database)
     pairing_repository = PairingRepository(shared_database)
+    favorite_repository = FavoriteRepository(shared_database)
     configured_admin_email = admin_email if admin_email is not None else os.getenv("ADMIN_EMAIL", "")
     configured_admin_password = (
         admin_password if admin_password is not None else os.getenv("ADMIN_PASSWORD", "")
@@ -43,6 +48,7 @@ def create_app(
         auth_repository.ensure_admin(configured_admin_email, configured_admin_password)
         ticket_repository.initialize()
         pairing_repository.initialize()
+        favorite_repository.initialize()
         yield
 
     app = FastAPI(
@@ -69,6 +75,12 @@ def create_app(
     app.state.auth_repository = auth_repository
     app.state.ticket_repository = ticket_repository
     app.state.pairing_repository = pairing_repository
+    app.state.favorite_repository = favorite_repository
+    app.state.payment_settings = payment_settings or PaymentSettings.from_env()
+    app.state.login_limiter = LoginRateLimiter(
+        max_failures=int(os.getenv("LOGIN_MAX_FAILURES", "5")),
+        window_seconds=int(os.getenv("LOGIN_LOCK_SECONDS", str(15 * 60))),
+    )
     app.include_router(router)
     return app
 

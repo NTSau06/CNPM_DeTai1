@@ -26,6 +26,7 @@ RELATIONSHIPS = (
     Relationship("visits", "place_id", "places"),
     Relationship("ratings", "place_id", "places"),
     Relationship("device_pairings", "place_id", "places", "SET NULL"),
+    Relationship("user_favorites", "place_id", "places", "CASCADE"),
 )
 
 

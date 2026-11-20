@@ -217,12 +217,12 @@ def test_ticket_orders_require_login_and_admin_controls_price(
         assert client.put(
             "/api/v1/admin/tickets/prices/phong-nha-cave",
             headers=admin_headers,
-            json={"priceVnd": 69999},
+            json={"priceVnd": 999},
         ).status_code == 422
         assert client.put(
             "/api/v1/admin/tickets/prices/phong-nha-cave",
             headers=admin_headers,
-            json={"priceVnd": 150001},
+            json={"priceVnd": 10_000_001},
         ).status_code == 422
         configured = client.put(
             "/api/v1/admin/tickets/prices/phong-nha-cave",
@@ -237,6 +237,21 @@ def test_ticket_orders_require_login_and_admin_controls_price(
         )
         assert order.status_code == 201
         assert order.json()["totalPriceVnd"] == 200000
+        assert order.json()["status"] == "pending"
+        # Đơn chưa thanh toán chưa được tính là vé đã mua.
+        assert client.get("/api/v1/tickets/orders", headers=user_headers).json()["total"] == 0
+        order_id = order.json()["id"]
+        assert client.post(
+            f"/api/v1/tickets/orders/{order_id}/pay",
+            headers=user_headers,
+            json={"method": "mock"},
+        ).json()["redirectUrl"] == f"/payment/mock/{order_id}"
+        paid = client.post(
+            f"/api/v1/tickets/orders/{order_id}/mock-payment",
+            headers=user_headers,
+            json={"success": True},
+        )
+        assert paid.status_code == 200 and paid.json()["status"] == "paid"
         assert client.get("/api/v1/tickets/orders", headers=user_headers).json()["total"] == 2
         assert client.get("/api/v1/tickets/orders", headers=other_headers).json()["total"] == 0
         closed = client.put(

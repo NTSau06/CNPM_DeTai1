@@ -12,6 +12,8 @@ from services.analytics_service.schemas import (
     AdminAnalyticsSummary,
     AdminPlaceAnalytics,
     AdminReview,
+    AdminReviewCollection,
+    OwnRating,
     PresenceHeartbeat,
     PlaceAnalytics,
     RatingCreate,
@@ -204,6 +206,61 @@ class AnalyticsRepository:
             ],
         )
 
+    def own_rating(self, place_id: str, visitor_id: UUID) -> OwnRating:
+        with self.database.connect() as connection:
+            row = connection.execute(
+                "SELECT rating, review FROM ratings WHERE visitor_hash = ? AND place_id = ?",
+                _visitor_hash(visitor_id),
+                place_id,
+            ).fetchone()
+        return OwnRating(
+            placeId=place_id,
+            rating=row[0] if row else None,
+            review=row[1] if row else "",
+        )
+
+    def delete_rating(self, place_id: str, rating_id: str) -> bool:
+        with self.database.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM ratings WHERE visitor_hash = ? AND place_id = ?",
+                rating_id,
+                place_id,
+            )
+            return cursor.rowcount > 0
+
+    def list_reviews(
+        self, place_id: str | None = None, limit: int = 100
+    ) -> AdminReviewCollection:
+        """Danh sách đánh giá cho admin kiểm duyệt, mới nhất trước."""
+        where = "WHERE place_id = ?" if place_id else ""
+        params: list = [place_id] if place_id else []
+        with self.database.connect() as connection:
+            total = connection.execute(
+                f"SELECT COUNT(*) FROM ratings {where}", *params
+            ).fetchone()[0]
+            rows = connection.execute(
+                f"""
+                SELECT TOP {int(limit)} visitor_hash, place_id, rating, review, updated_at
+                FROM ratings
+                {where}
+                ORDER BY updated_at DESC
+                """,
+                *params,
+            ).fetchall()
+        return AdminReviewCollection(
+            items=[
+                AdminReview(
+                    id=row[0],
+                    placeId=row[1],
+                    rating=row[2],
+                    review=row[3],
+                    createdAt=row[4],
+                )
+                for row in rows
+            ],
+            total=total,
+        )
+
     def place_analytics(self, place_id: str, period_days: int = 30) -> PlaceAnalytics:
         today = datetime.now(timezone.utc).date()
         start_date = (today - timedelta(days=period_days - 1)).isoformat()
@@ -261,7 +318,7 @@ class AnalyticsRepository:
             ).fetchall()
             recent_rows = connection.execute(
                 """
-                SELECT TOP 8 place_id, rating, review, updated_at
+                SELECT TOP 8 visitor_hash, place_id, rating, review, updated_at
                 FROM ratings
                 WHERE review <> ''
                 ORDER BY updated_at DESC
@@ -284,16 +341,18 @@ class AnalyticsRepository:
         ]
         places.sort(key=lambda item: (-item.visits, item.place_id))
         return AdminAnalyticsSummary(
+            periodDays=period_days,
             visitsLast30Days=visits_total,
             totalRatings=rating_total,
             averageRating=round(overall_average, 2) if overall_average is not None else None,
             places=places,
             latestReviews=[
                 AdminReview(
-                    placeId=row[0],
-                    rating=row[1],
-                    review=row[2],
-                    createdAt=row[3],
+                    id=row[0],
+                    placeId=row[1],
+                    rating=row[2],
+                    review=row[3],
+                    createdAt=row[4],
                 )
                 for row in recent_rows
             ],
