@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native'
 import {
+  getMyRating,
   getPlaceAnalytics,
   getPlaceRatings,
   submitPlaceRating,
@@ -17,7 +18,19 @@ import {
 } from './analytics'
 import { localeOf, mt, type Language } from './uiText'
 
-export function PlaceInfoCard({ language, placeId, placeTitle }: { language: Language; placeId: string; placeTitle: string }) {
+export function PlaceInfoCard({
+  language,
+  placeId,
+  placeTitle,
+  authToken,
+  onRequestSignIn,
+}: {
+  language: Language
+  placeId: string
+  placeTitle: string
+  authToken: string | null
+  onRequestSignIn: () => void
+}) {
   const languageRef = useRef(language)
   languageRef.current = language
   const [analytics, setAnalytics] = useState<PlaceAnalytics | null>(null)
@@ -26,6 +39,7 @@ export function PlaceInfoCard({ language, placeId, placeTitle }: { language: Lan
   const [review, setReview] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [hasOwnRating, setHasOwnRating] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -41,13 +55,35 @@ export function PlaceInfoCard({ language, placeId, placeTitle }: { language: Lan
     return () => { active = false }
   }, [placeId])
 
+  // Nạp lại đánh giá cũ của tài khoản để sửa thay vì tạo mới.
+  useEffect(() => {
+    let active = true
+    setHasOwnRating(false)
+    setRating(5)
+    setReview('')
+    if (!authToken) return () => { active = false }
+    void getMyRating(placeId, authToken)
+      .then((own) => {
+        if (!active || own.rating === null) return
+        setHasOwnRating(true)
+        setRating(own.rating)
+        setReview(own.review)
+      })
+      .catch(() => undefined)
+    return () => { active = false }
+  }, [placeId, authToken])
+
   const sendRating = async () => {
+    if (!authToken) {
+      onRequestSignIn()
+      return
+    }
     setBusy(true)
     setMessage('')
     try {
-      const updated = await submitPlaceRating(placeId, rating, review)
+      const updated = await submitPlaceRating(placeId, rating, review, authToken)
       setSummary(updated)
-      setReview('')
+      setHasOwnRating(true)
       setMessage(mt(language, 'piThanks'))
     } catch (error) {
       setMessage(language === 'vi' && error instanceof Error ? error.message : mt(language, 'piSendError'))
@@ -74,6 +110,7 @@ export function PlaceInfoCard({ language, placeId, placeTitle }: { language: Lan
       <Text style={styles.help}>{mt(language, 'piVisitsNote')}</Text>
       {summary?.reviews.slice(0, 3).map((item) => <Text key={`${item.createdAt}-${item.review}`} style={styles.reviewLine}>{'★'.repeat(item.rating)} · {item.review}</Text>)}
       <Text style={styles.subheading}>{mt(language, 'piShare')}</Text>
+      {hasOwnRating ? <Text style={styles.help}>{mt(language, 'piEditing')}</Text> : null}
       <View style={styles.stars}>
         {[1, 2, 3, 4, 5].map((value) => (
           <Pressable accessibilityRole="button" accessibilityLabel={mt(language, 'piStars', { n: value })} accessibilityState={{ selected: value === rating }} key={value} onPress={() => setRating(value)}>
@@ -83,7 +120,7 @@ export function PlaceInfoCard({ language, placeId, placeTitle }: { language: Lan
       </View>
       <TextInput maxLength={500} onChangeText={setReview} placeholder={mt(language, 'piReviewPh')} style={styles.input} value={review} />
       <Pressable accessibilityRole="button" disabled={busy} onPress={() => void sendRating()} style={styles.primaryButton}>
-        <Text style={styles.primaryText}>{mt(language, busy ? 'piSending' : 'piSubmit')}</Text>
+        <Text style={styles.primaryText}>{mt(language, !authToken ? 'piSignIn' : busy ? 'piSending' : 'piSubmit')}</Text>
       </Pressable>
       <Text style={styles.help}>{mt(language, 'piPrivacy')}</Text>
       {message ? <Text accessibilityRole="alert" style={styles.feedback}>{message}</Text> : null}

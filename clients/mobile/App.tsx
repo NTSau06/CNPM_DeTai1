@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Crypto from 'expo-crypto'
 import * as Location from 'expo-location'
 import * as Speech from 'expo-speech'
-import { api } from './src/api'
+import { ApiError, api } from './src/api'
 import { StatusBar } from 'expo-status-bar'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -22,7 +22,9 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { AccountModal } from './AccountModal'
 import { PlaceInfoCard } from './PlaceInfo'
+import { TicketCard } from './TicketCard'
 import { recordNearbyVisit } from './analytics'
 import { categoryLabels, mt, type Category, type Language } from './uiText'
 
@@ -117,6 +119,7 @@ export default function App() {
   const [authToken, setAuthToken] = useState<string | null>(null)
   const [account, setAccount] = useState<{ id: string; fullName: string; email: string } | null>(null)
   const [authVisible, setAuthVisible] = useState(false)
+  const [accountVisible, setAccountVisible] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [authName, setAuthName] = useState('')
   const [authEmail, setAuthEmail] = useState('')
@@ -265,7 +268,7 @@ export default function App() {
         await AsyncStorage.setItem(tourStorageKey(user.id), JSON.stringify(result.items))
       } catch (error) {
         if (!active) return
-        if (error instanceof Error && error.message.includes('(401)')) {
+        if (error instanceof ApiError && error.status === 401) {
           await AsyncStorage.removeItem(AUTH_KEY)
           setAuthToken(null)
           setAccount(null)
@@ -540,7 +543,9 @@ export default function App() {
       setAuthConfirmPassword('')
       setMessage('')
     } catch (error) {
-      setAuthError(language === 'vi' && error instanceof Error ? error.message : mt(language, 'authFailed'))
+      if (error instanceof ApiError && error.status === 429) setAuthError(mt(language, 'acTooMany'))
+      else if (error instanceof ApiError && error.status === 403) setAuthError(mt(language, 'acLocked'))
+      else setAuthError(language === 'vi' && error instanceof ApiError && error.status > 0 ? error.message : mt(language, 'authFailed'))
     } finally {
       setAuthBusy(false)
     }
@@ -556,6 +561,32 @@ export default function App() {
     try {
       await AsyncStorage.removeItem(AUTH_KEY)
       if (token) await api<void>('/auth/logout', { method: 'POST' }, token)
+    } catch {
+      setMessage(currentLanguage.error)
+    }
+  }
+
+  const openSignIn = () => {
+    setAuthMode('login')
+    setAuthError('')
+    setAuthVisible(true)
+  }
+
+  // Tài khoản đã bị xóa ở máy chủ: chỉ dọn dữ liệu trên thiết bị, không gọi API đăng xuất.
+  const clearLocalAccount = async () => {
+    const userId = account?.id
+    setAccountVisible(false)
+    setAuthToken(null)
+    setAccount(null)
+    setTours([])
+    setRouteIds([])
+    setActiveRouteTourId(null)
+    try {
+      await AsyncStorage.removeItem(AUTH_KEY)
+      if (userId) {
+        await AsyncStorage.removeItem(tourStorageKey(userId))
+        await AsyncStorage.removeItem(draftTourStorageKey(userId))
+      }
     } catch {
       setMessage(currentLanguage.error)
     }
@@ -613,19 +644,8 @@ export default function App() {
           <Pressable
             accessibilityRole="button"
             onPress={() => {
-              if (account) {
-                Alert.alert(
-                  mt(language, 'account'),
-                  account.fullName,
-                  [
-                    { text: mt(language, 'cancel'), style: 'cancel' },
-                    { text: mt(language, 'signOut'), onPress: () => { void signOut() } },
-                  ],
-                )
-              } else {
-                setAuthMode('login')
-                setAuthVisible(true)
-              }
+              if (account) setAccountVisible(true)
+              else openSignIn()
             }}
             style={styles.accountButton}
           >
@@ -702,7 +722,25 @@ export default function App() {
           )
         })}
 
-        {selectedPlace && <PlaceInfoCard key={selectedPlace.id} language={language} placeId={selectedPlace.id} placeTitle={selectedPlace.copy[language]?.title ?? selectedPlace.copy.vi.title} />}
+        {selectedPlace && (
+          <PlaceInfoCard
+            authToken={authToken}
+            key={selectedPlace.id}
+            language={language}
+            onRequestSignIn={openSignIn}
+            placeId={selectedPlace.id}
+            placeTitle={selectedPlace.copy[language]?.title ?? selectedPlace.copy.vi.title}
+          />
+        )}
+
+        {selectedPlace && (
+          <TicketCard
+            authToken={authToken}
+            language={language}
+            onRequestSignIn={openSignIn}
+            placeId={selectedPlace.id}
+          />
+        )}
 
         {selectedPlace && (
           <View style={styles.experienceCard}>
@@ -751,6 +789,26 @@ export default function App() {
         ))}
         <Text style={styles.footer}>{mt(language, 'region')}{'\n'}{mt(language, 'footer')}</Text>
       </ScrollView>
+      <AccountModal
+        language={language}
+        onAccountDeleted={() => { void clearLocalAccount() }}
+        onClose={() => setAccountVisible(false)}
+        onProfileUpdated={(user) => setAccount(user)}
+        onSessionReplaced={(token) => {
+          setAuthToken(token)
+          void AsyncStorage.setItem(AUTH_KEY, token).catch(() => setMessage(currentLanguage.error))
+        }}
+        onSignOut={() => {
+          setAccountVisible(false)
+          void signOut()
+        }}
+        placeTitle={(placeId) => {
+          const place = places.find((item) => item.id === placeId)
+          return place ? (place.copy[language] ?? place.copy.vi).title : placeId
+        }}
+        token={authToken}
+        visible={accountVisible && Boolean(account)}
+      />
       <Modal
         animationType="slide"
         onRequestClose={() => {

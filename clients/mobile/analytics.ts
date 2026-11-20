@@ -82,14 +82,25 @@ export async function getPlaceRatings(placeId: string): Promise<PlaceRatingSumma
   return request(`/places/${encodeURIComponent(placeId)}/ratings`)
 }
 
+/** Đánh giá gắn với tài khoản đăng nhập: mỗi tài khoản một đánh giá cho mỗi địa điểm. */
 export async function submitPlaceRating(
   placeId: string,
   rating: number,
   review: string,
+  token: string,
 ): Promise<PlaceRatingSummary> {
-  const visitorId = await getVisitorId()
   return request('/analytics/ratings', {
     method: 'POST',
-    body: JSON.stringify({ placeId, visitorId, rating, review }),
+    body: JSON.stringify({ placeId, rating, review }),
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}
+
+export async function getMyRating(
+  placeId: string,
+  token: string,
+): Promise<{ placeId: string; rating: number | null; review: string }> {
+  return request(`/places/${encodeURIComponent(placeId)}/ratings/mine`, {
+    headers: { Authorization: `Bearer ${token}` },
   })
 }
