@@ -1,7 +1,7 @@
 ﻿// Quản lý trạng thái chung và khởi tạo/đồng bộ dữ liệu với IndexedDB, backend.
 import { create } from 'zustand'
 import { cachePlaces, replaceCachedPlaces, replaceUserTours, sortTours, getSavedToursByUser, clearToursOfUser, deleteSetting, deleteOfflineMap, deleteTour, getCachedPlaces, getOfflineMap, readSetting, saveOfflineMap, saveTour, writeSetting } from './db'
-import { BackendApiError, createTour, deleteRemoteTour, fetchCurrentUser, fetchPlaces, fetchTours, generateId, getStoredAuthToken, logoutAccount, mergeRemotePlaces, storeAuthToken, updateProfile } from './api'
+import { BackendApiError, addFavorite, createTour, deleteRemoteTour, fetchCurrentUser, fetchFavorites, fetchPlaces, fetchTours, generateId, removeFavorite, getStoredAuthToken, logoutAccount, mergeRemotePlaces, storeAuthToken, updateProfile } from './api'
 import { languages, places as bundledPlaces } from './data/places'
 import type { Language, OfflineMapPack, Place, SavedTour, UserProfile } from './types'
 
@@ -84,6 +84,9 @@ interface AppState {
   storageError: AppErrorKey | null
   bootstrapped: boolean
   authReady: boolean
+  favoriteIds: string[]
+  syncFavorites: () => Promise<void>
+  toggleFavorite: (placeId: string) => Promise<boolean>
   setLanguage: (language: Language) => void
   beginPlacesSync: () => number
   setPlaces: (places: Place[], revision?: number) => void
@@ -129,6 +132,32 @@ export const useAppStore = create<AppState>((set, get) => ({
   storageError: null,
   bootstrapped: false,
   authReady: false,
+  favoriteIds: [],
+  syncFavorites: async () => {
+    const { authToken } = get()
+    if (!authToken || !navigator.onLine) return
+    try {
+      const items = await fetchFavorites(authToken)
+      if (get().authToken === authToken) set({ favoriteIds: items.map((item) => item.placeId) })
+    } catch {
+      // Danh sách yêu thích không quan trọng bằng hành trình: lỗi mạng thì giữ dữ liệu cũ.
+    }
+  },
+  toggleFavorite: async (placeId) => {
+    const { authToken, favoriteIds } = get()
+    if (!authToken) return false
+    const wasFavorite = favoriteIds.includes(placeId)
+    // Cập nhật lạc quan để giao diện phản hồi ngay, hoàn tác nếu máy chủ báo lỗi.
+    set({ favoriteIds: wasFavorite ? favoriteIds.filter((id) => id !== placeId) : [placeId, ...favoriteIds] })
+    try {
+      if (wasFavorite) await removeFavorite(placeId, authToken)
+      else await addFavorite(placeId, authToken)
+      return true
+    } catch {
+      if (get().authToken === authToken) set({ favoriteIds })
+      return false
+    }
+  },
   setLanguage: (language) => {
     set({ language })
     void writeSetting('language', language).catch(() => set({ storageError: 'savingError' }))
@@ -155,12 +184,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   setLocation: (location) => set({ location }),
   setOnline: (online) => {
     set({ online })
-    if (online) void get().syncTours()
+    if (online) {
+      void get().syncTours()
+      void get().syncFavorites()
+    }
   },
   signIn: async (authToken, currentUser) => {
     toursRevision += 1
     storeAuthToken(authToken)
-    set({ authToken, currentUser, savedTours: [], routeIds: [], activeTourId: null, suggestedRouteIds: [], storageError: null })
+    set({ authToken, currentUser, savedTours: [], routeIds: [], activeTourId: null, suggestedRouteIds: [], favoriteIds: [], storageError: null })
+    void get().syncFavorites()
     await cacheCurrentUser(currentUser)
     if (get().authToken !== authToken) return
     try {
@@ -197,7 +230,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (error instanceof BackendApiError && error.status === 401) {
         storeAuthToken(null)
         toursRevision += 1
-        set({ authToken: null, currentUser: null, savedTours: [], activeTourId: null, routeIds: [] })
+        set({ authToken: null, currentUser: null, savedTours: [], activeTourId: null, routeIds: [], favoriteIds: [] })
         try {
           await clearCachedUserData(currentUser.id)
         } catch {
@@ -225,7 +258,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     toursRevision += 1
     const { authToken, currentUser } = get()
     storeAuthToken(null)
-    set({ currentUser: null, authToken: null, savedTours: [], routeIds: [], activeTourId: null, suggestedRouteIds: [] })
+    set({ currentUser: null, authToken: null, savedTours: [], routeIds: [], activeTourId: null, suggestedRouteIds: [], favoriteIds: [] })
     try {
       await clearCachedUserData(currentUser?.id ?? null)
     } catch {
@@ -537,6 +570,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (getStoredAuthToken() !== authToken) return
       set({ authToken, currentUser })
       await cacheCurrentUser(currentUser)
+      void get().syncFavorites()
       await get().syncTours()
     } catch (error) {
       if (getStoredAuthToken() !== authToken) return
@@ -544,7 +578,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const userId = get().currentUser?.id ?? null
         storeAuthToken(null)
         toursRevision += 1
-        set({ authToken: null, currentUser: null, savedTours: [], activeTourId: null, routeIds: [] })
+        set({ authToken: null, currentUser: null, savedTours: [], activeTourId: null, routeIds: [], favoriteIds: [] })
         try {
           await clearCachedUserData(userId)
         } catch {

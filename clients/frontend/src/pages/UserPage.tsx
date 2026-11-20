@@ -1,8 +1,8 @@
 ﻿// Đăng ký, đăng nhập và quản lý hồ sơ tài khoản.
 import { useState, type FormEvent } from 'react'
 import { Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, KeyRound, LogOut, Mail, MapPin, Phone, UserRound } from 'lucide-react'
-import { changePassword, loginAccount, registerAccount } from '../api'
+import { ArrowLeft, Check, KeyRound, LogOut, Mail, MapPin, Phone, Trash2, UserRound } from 'lucide-react'
+import { changePassword, deleteOwnAccount, loginAccount, registerAccount } from '../api'
 import { translate } from '../i18n'
 import { useAppStore } from '../store'
 import type { Language, UserProfile } from '../types'
@@ -26,6 +26,8 @@ export function UserPage() {
   const [profileError, setProfileError] = useState('')
   const [passwordMessage, setPasswordMessage] = useState<{ ok: boolean; text: string } | null>(null)
   const replaceSession = useAppStore((state) => state.replaceSession)
+  const [deleteMessage, setDeleteMessage] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   if (isProfile && !currentUser) return authReady ? <Navigate to="/login" replace /> : null
   if (!isProfile && currentUser) return <Navigate to="/profile" replace />
@@ -134,6 +136,31 @@ export function UserPage() {
     }
   }
 
+  const onDeleteAccount = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const password = String(new FormData(event.currentTarget).get('deletePassword') ?? '')
+    const token = useAppStore.getState().authToken
+    if (!token || !window.confirm(ui(language, 'usDeleteConfirm'))) return
+    setDeleting(true)
+    setDeleteMessage('')
+    try {
+      await deleteOwnAccount(token, password)
+      // Phiên đã bị xóa ở máy chủ: chỉ dọn dữ liệu cục bộ, không gọi API đăng xuất.
+      useAppStore.setState({ authToken: null })
+      await signOut()
+      navigate('/explore', { replace: true })
+    } catch (error) {
+      const status = typeof error === 'object' && error !== null && 'status' in error ? error.status : undefined
+      setDeleteMessage(
+        status === 403 ? ui(language, 'usPwWrong')
+          : status === 429 ? ui(language, 'usErr429')
+          : ui(language, 'usDeleteFailed'),
+      )
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (isProfile && currentUser) {
     return (
       <section className="user-page">
@@ -197,6 +224,21 @@ export function UserPage() {
               <button className="user-submit" type="submit">{ui(language, 'usChangePw')}</button>
             </div>
           </form>
+          {!currentUser.isAdmin && (
+            <form className="user-form profile-form" onSubmit={(event) => { void onDeleteAccount(event) }}>
+              <h2 className="profile-address"><Trash2 size={16} /> {ui(language, 'usDeleteTitle')}</h2>
+              <p className="profile-address">{ui(language, 'usDeleteIntro')}</p>
+              <label>{ui(language, 'usCurrentPw')}
+                <input name="deletePassword" type="password" required minLength={8} autoComplete="current-password" />
+              </label>
+              <div className="profile-actions">
+                {deleteMessage && <p className="user-feedback" role="alert">{deleteMessage}</p>}
+                <button className="signout-button" type="submit" disabled={deleting}>
+                  <Trash2 size={15} /> {ui(language, deleting ? 'usDeleting' : 'usDeleteTitle')}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </section>
     )
@@ -255,6 +297,8 @@ function getAuthErrorMessage(error: unknown, language: Language) {
   }
   const status = error.status
   if (status === 401) return ui(language, 'usErr401')
+  if (status === 429) return ui(language, 'usErr429')
+  if (status === 403) return ui(language, 'usErrLocked')
   if (status === 409) return ui(language, 'usErr409')
   if (status === 422) return ui(language, 'usErr422')
   if (status === 404) return ui(language, 'usErr404')

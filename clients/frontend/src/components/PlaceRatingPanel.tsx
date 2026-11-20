@@ -1,13 +1,17 @@
 // Hiển thị số liệu địa điểm và biểu mẫu gửi/xem đánh giá từ backend.
 import { useEffect, useRef, useState } from 'react'
-import { LoaderCircle, Star } from 'lucide-react'
-import { getPlaceAnalytics, getPlaceRatings, getVisitorId, submitPlaceRating } from '../api'
+import { LoaderCircle, LogIn, Star } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { getMyPlaceRating, getPlaceAnalytics, getPlaceRatings, submitPlaceRating } from '../api'
 import type { PlaceAnalytics, PlaceRatingSummary } from '../api'
 import { useAppStore } from '../store'
 import { apiErrorMessage, localeOf, ui } from '../uiText'
 
 export function PlaceRatingPanel({ placeId }: { placeId: string }) {
   const language = useAppStore((state) => state.language)
+  const authToken = useAppStore((state) => state.authToken)
+  const location = useLocation()
+  const [hasOwnRating, setHasOwnRating] = useState(false)
   const languageRef = useRef(language)
   languageRef.current = language
   const [summary, setSummary] = useState<PlaceRatingSummary | null>(null)
@@ -48,13 +52,31 @@ export function PlaceRatingPanel({ placeId }: { placeId: string }) {
     }
   }, [placeId])
 
+  // Nạp lại đánh giá trước đó của tài khoản để người dùng sửa thay vì tạo mới.
+  useEffect(() => {
+    let active = true
+    setHasOwnRating(false)
+    setRating(5)
+    setReview('')
+    if (!authToken) return () => { active = false }
+    void getMyPlaceRating(placeId, authToken)
+      .then((own) => {
+        if (!active || own.rating === null) return
+        setHasOwnRating(true)
+        setRating(own.rating)
+        setReview(own.review)
+      })
+      .catch(() => undefined)
+    return () => { active = false }
+  }, [placeId, authToken])
+
   const submit = async () => {
+    if (!authToken) return
     setBusy(true)
     setMessage('')
     try {
-      const visitorId = await getVisitorId()
-      setSummary(await submitPlaceRating(placeId, visitorId, rating, review))
-      setReview('')
+      setSummary(await submitPlaceRating(placeId, rating, review, authToken))
+      setHasOwnRating(true)
       setMessage(ui(language, 'rtThanks'))
     } catch (error) {
       setMessage(apiErrorMessage(language, error, 'rtSendError'))
@@ -91,7 +113,20 @@ export function PlaceRatingPanel({ placeId }: { placeId: string }) {
           </article>
           ))}
       </div>
+      {!authToken ? (
+        <div className="rating-form">
+          <Link
+            className="rating-submit"
+            state={{ returnTo: `${location.pathname}${location.search}` }}
+            to="/login"
+          >
+            <LogIn size={14} aria-hidden="true" /> {ui(language, 'rtSignIn')}
+          </Link>
+          <small className="rating-privacy">{ui(language, 'rtPrivacy')}</small>
+        </div>
+      ) : (
       <div className="rating-form">
+        {hasOwnRating && <p className="rating-feedback">{ui(language, 'rtEditing')}</p>}
         <label htmlFor="place-rating">{ui(language, 'rtScore')}</label>
         <div className="rating-stars" id="place-rating">
           {[1, 2, 3, 4, 5].map((value) => (
@@ -116,11 +151,12 @@ export function PlaceRatingPanel({ placeId }: { placeId: string }) {
         />
         <button className="rating-submit" disabled={busy} onClick={() => void submit()}>
           {busy && <LoaderCircle className="loading-spinner" size={14} aria-hidden="true" />}
-          {ui(language, busy ? 'rtSending' : 'rtSubmit')}
+          {ui(language, busy ? 'rtSending' : hasOwnRating ? 'rtUpdate' : 'rtSubmit')}
         </button>
         <small className="rating-privacy">{ui(language, 'rtPrivacy')}</small>
         {message && <p className="rating-feedback" role="status">{message}</p>}
       </div>
+      )}
     </section>
   )
 }

@@ -1,6 +1,6 @@
 // Trang khám phá: tìm/lọc địa điểm, xem bản đồ, GPS, hành trình và thuyết minh.
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, BookmarkPlus, CalendarDays, Camera, ChefHat, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Clock3, Compass, Globe2, Headphones, Heart, Home, Landmark, Leaf, Lightbulb, LoaderCircle, LocateFixed, MapPin, Play, Plus, Search, Sparkles, Volume2 } from 'lucide-react'
+import { ArrowRight, BookmarkPlus, CalendarDays, Camera, ChefHat, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Clock3, Compass, Globe2, Headphones, Heart, Home, Landmark, Leaf, Lightbulb, LoaderCircle, LocateFixed, MapPin, Play, Plus, Search, Share2, Sparkles, Volume2, X } from 'lucide-react'
 import { distance, point } from '@turf/turf'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { getVisitorId, recordVisit } from '../api'
@@ -17,6 +17,7 @@ import { ui } from '../uiText'
 import { getNarrationAudioUrl, playNarration, speechAvailable, stopSpeaking } from '../speech'
 import { optimizeRouteOrder } from '../routeOptimization'
 import { useAppStore } from '../store'
+import { placeShareUrl, readSharedLink, shareLink } from '../share'
 import type { Category } from '../types'
 import './explore-home.css'
 import './place-detail.css'
@@ -57,6 +58,13 @@ export function ExplorePage() {
   const setLocation = useAppStore((state) => state.setLocation)
   const autoNarration = useAppStore((state) => state.autoNarration)
   const setAutoNarration = useAppStore((state) => state.setAutoNarration)
+  const favoriteIds = useAppStore((state) => state.favoriteIds)
+  const toggleFavorite = useAppStore((state) => state.toggleFavorite)
+  const setSuggestedRoute = useAppStore((state) => state.setSuggestedRoute)
+  const applySuggestedRoute = useAppStore((state) => state.applySuggestedRoute)
+  const [shareMessage, setShareMessage] = useState('')
+  const [sharedRouteIds, setSharedRouteIds] = useState<string[]>([])
+  const [sharedRouteMessage, setSharedRouteMessage] = useState('')
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<Category | 'all'>('all')
   const [placesExpanded, setPlacesExpanded] = useState(false)
@@ -261,6 +269,73 @@ export function ExplorePage() {
     document.getElementById('place-detail-audio')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  // Mở liên kết chia sẻ: ?place=<id> mở trang chi tiết, ?route=<id,id,…> hiện hành trình trên bản đồ.
+  useEffect(() => {
+    if (!routerLocation.search) return
+    const { placeId, routeIds: sharedIds } = readSharedLink(
+      routerLocation.search,
+      new Set(places.map((place) => place.id)),
+    )
+    if (!placeId && sharedIds.length === 0) return
+    if (placeId) {
+      setSelectedPlace(placeId)
+      requestAnimationFrame(() => {
+        const details = placeDetailsRef.current
+        if (details) {
+          details.open = true
+          details.scrollTop = 0
+        }
+      })
+    }
+    if (sharedIds.length > 0) {
+      setSuggestedRoute(sharedIds)
+      setSharedRouteIds(sharedIds)
+      setSharedRouteMessage('')
+      setSelectedPlace(sharedIds[0])
+      requestAnimationFrame(() => document.getElementById('explore-map')?.scrollIntoView({ behavior: 'smooth' }))
+    }
+    // Xóa tham số khỏi thanh địa chỉ để tải lại trang không mở lại liên kết.
+    navigate({ pathname: routerLocation.pathname, hash: routerLocation.hash }, { replace: true })
+  }, [routerLocation.search, routerLocation.pathname, routerLocation.hash, places, navigate, setSelectedPlace, setSuggestedRoute])
+
+  const isFavorite = favoriteIds.includes(selectedPlace.id)
+
+  const toggleSelectedFavorite = async () => {
+    if (!currentUser) {
+      navigate('/login', { state: { returnTo: `/explore?place=${encodeURIComponent(selectedPlace.id)}` } })
+      return
+    }
+    setShareMessage('')
+    if (!(await toggleFavorite(selectedPlace.id))) setShareMessage(ui(language, 'favError'))
+  }
+
+  const shareSelectedPlace = async () => {
+    const title = localizedTitle(selectedPlace, language)
+    const outcome = await shareLink(
+      title,
+      ui(language, 'shPlaceText', { title }),
+      placeShareUrl(selectedPlace.id),
+    )
+    setShareMessage(outcome === 'copied' ? ui(language, 'shCopied') : outcome === 'failed' ? ui(language, 'shFailed') : '')
+  }
+
+  const dismissSharedRoute = () => {
+    setSharedRouteIds([])
+    setSharedRouteMessage('')
+    setSuggestedRoute([])
+  }
+
+  const saveSharedRoute = async () => {
+    try {
+      if (await applySuggestedRoute('new')) {
+        setSharedRouteIds([])
+        setSharedRouteMessage(ui(language, 'shSaved'))
+      }
+    } catch {
+      navigate('/login', { state: { returnTo: '/explore' } })
+    }
+  }
+
   const viewSelectedPlaceOnMap = () => {
     closePlaceDetails()
     selectFeaturedPlace(selectedPlace.id)
@@ -330,6 +405,26 @@ export function ExplorePage() {
   return (
     <div className="explore-page">
       {narrationMessage && <p role="status">{narrationMessage}</p>}
+      {sharedRouteIds.length > 0 && (
+        <div className="shared-route-banner" role="status">
+          <Share2 size={16} aria-hidden="true" />
+          <span>{ui(language, 'shSharedRoute', { n: sharedRouteIds.length })}: {sharedRouteIds
+            .map((id) => places.find((place) => place.id === id))
+            .filter((place) => place !== undefined)
+            .map((place) => localizedTitle(place, language))
+            .join(' → ')}</span>
+          {currentUser ? (
+            <button type="button" className="shared-route-save" disabled={isSavingRoute} onClick={() => void saveSharedRoute()}>
+              {isSavingRoute ? <LoaderCircle className="loading-spinner" size={14} /> : <BookmarkPlus size={14} />}
+              {ui(language, 'shSaveRoute')}
+            </button>
+          ) : (
+            <NavLink className="shared-route-save" to="/login" state={{ returnTo: '/explore' }}>{ui(language, 'shSignInToSave')}</NavLink>
+          )}
+          <button type="button" className="shared-route-dismiss" aria-label={ui(language, 'shDismiss')} onClick={dismissSharedRoute}><X size={15} /></button>
+        </div>
+      )}
+      {sharedRouteMessage && <p className="shared-route-banner" role="status">{sharedRouteMessage}</p>}
       <section className="explore-hero" id="explore-home">
         <div className="explore-hero-inner">
           <div className="hero-copy">
@@ -608,7 +703,21 @@ export function ExplorePage() {
                 </button>
                 <button type="button" className="pd-btn pd-btn-primary" onClick={scrollToPlaceAudio}><Play size={13} fill="currentColor" />{ui(language, 'listenNow')}</button>
                 <button type="button" className="pd-btn pd-btn-ghost" onClick={viewSelectedPlaceOnMap}><MapPin size={15} />{ui(language, 'viewOnMap')}</button>
+                <button
+                  type="button"
+                  className={`pd-btn pd-btn-ghost${isFavorite ? ' is-favorite' : ''}`}
+                  aria-pressed={isFavorite}
+                  title={currentUser ? undefined : ui(language, 'favSignIn')}
+                  onClick={() => void toggleSelectedFavorite()}
+                >
+                  <Heart size={15} fill={isFavorite ? 'currentColor' : 'none'} />
+                  {ui(language, isFavorite ? 'favRemove' : 'favAdd')}
+                </button>
+                <button type="button" className="pd-btn pd-btn-ghost" onClick={() => void shareSelectedPlace()}>
+                  <Share2 size={15} />{ui(language, 'shShare')}
+                </button>
               </div>
+              {shareMessage && <p className="pd-share-feedback" role="status">{shareMessage}</p>}
             </div>
             <span className="pd-hero-index" aria-hidden="true">
               {String(places.findIndex((place) => place.id === selectedPlace.id) + 1).padStart(2, '0')}<small>/ {String(places.length).padStart(2, '0')}</small>

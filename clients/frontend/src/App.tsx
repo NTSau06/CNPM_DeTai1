@@ -2,7 +2,7 @@
 import type React from 'react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { AlertCircle, Bookmark, ChevronDown, Compass, House, Info, Map, MapPinned, Menu, Settings2, Smartphone, Ticket, X } from 'lucide-react'
+import { AlertCircle, Bookmark, ChevronDown, Compass, Heart, House, Info, Map, MapPinned, Menu, Settings2, Smartphone, Ticket, X } from 'lucide-react'
 import { translate } from './i18n'
 import { ui, type UiKey } from './uiText'
 import { languages } from './data/places'
@@ -17,6 +17,8 @@ const SavedPage = lazy(() => import('./pages/SavedPage').then((module) => ({ def
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })))
 const PairPage = lazy(() => import('./pages/PairPage').then((module) => ({ default: module.PairPage })))
 const UserPage = lazy(() => import('./pages/UserPage').then((module) => ({ default: module.UserPage })))
+const FavoritesPage = lazy(() => import('./pages/FavoritesPage').then((module) => ({ default: module.FavoritesPage })))
+const MockPaymentPage = lazy(() => import('./pages/MockPaymentPage').then((module) => ({ default: module.MockPaymentPage })))
 const TicketOrdersPage = lazy(() => import('./pages/TicketOrdersPage').then((module) => ({ default: module.TicketOrdersPage })))
 const OnlineDashboardPage = lazy(() => import('./pages/OnlineDashboardPage').then((module) => ({ default: module.OnlineDashboardPage })))
 const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage').then((module) => ({ default: module.AdminLoginPage })))
@@ -204,6 +206,7 @@ export default function App() {
   const items = [
     { to: '/explore', label: translate(language, 'explore'), icon: Compass, end: true },
     { to: '/saved', label: translate(language, 'saved'), icon: Bookmark },
+    { to: '/favorites', label: ui(language, 'favNav'), icon: Heart },
     { to: '/tickets', label: ui(language, 'tkHistoryTitle'), icon: Ticket },
     { to: '/offline', label: translate(language, 'offline'), icon: MapPinned },
     { to: '/settings', label: translate(language, 'settings'), icon: Settings2 },
@@ -313,7 +316,9 @@ export default function App() {
             <Route path="/pair" element={<PairPage />} />
             <Route path="/explore" element={<ExplorePage />} />
             <Route path="/saved" element={<SavedPage />} />
+            <Route path="/favorites" element={<FavoritesPage />} />
             <Route path="/tickets" element={<TicketOrdersPage />} />
+            <Route path="/payment/mock/:orderId" element={<MockPaymentPage />} />
             <Route path="/offline" element={<SettingsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/login" element={<UserPage />} />

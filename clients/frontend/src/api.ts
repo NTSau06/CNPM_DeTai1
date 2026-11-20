@@ -40,7 +40,24 @@ export interface OnlineVisitorCount {
   onlineVisitors: number
 }
 
+export interface AdminReview {
+  id: string
+  placeId: string
+  rating: number
+  review: string
+  createdAt: string
+}
+
+export interface OwnRating {
+  placeId: string
+  rating: number | null
+  review: string
+}
+
+export type StatsPeriod = 7 | 30 | 90 | 365
+
 export interface AdminOverview extends OnlineVisitorCount {
+  periodDays?: number
   accountCount: number
   activeAccountCount: number
   placeCount: number
@@ -52,12 +69,7 @@ export interface AdminOverview extends OnlineVisitorCount {
     totalRatings: number
     averageRating: number | null
     places: PlaceAnalytics[]
-    latestReviews: {
-      placeId: string
-      rating: number
-      review: string
-      createdAt: string
-    }[]
+    latestReviews: AdminReview[]
   }
 }
 
@@ -67,6 +79,7 @@ export interface AdminUser {
   email: string
   phone: string
   isAdmin: boolean
+  isLocked?: boolean
 }
 
 export interface TicketPrice {
@@ -76,16 +89,41 @@ export interface TicketPrice {
 
 export interface TicketOrder {
   id: string
+  ticketCode?: string
   placeId: string
   quantity: number
   unitPriceVnd: number
   totalPriceVnd: number
   createdAt: string
+  status?: TicketOrderStatus
+  cancelledAt?: string | null
+  paymentMethod?: PaymentMethod | null
+  paymentRef?: string | null
+  paidAt?: string | null
+  expiresAt?: string | null
+}
+
+export type TicketOrderStatus = 'pending' | 'paid' | 'cancelled' | 'expired'
+export type PaymentMethod = 'mock' | 'vnpay'
+
+export interface PaymentStartResult {
+  order: TicketOrder
+  redirectUrl: string
+  external: boolean
+}
+
+export interface FavoritePlace {
+  placeId: string
+  createdAt: string
 }
 
 export interface TicketSalesSummary {
+  periodDays?: number | null
   totalTicketsSold: number
   totalOrders: number
+  pendingOrders?: number
+  cancelledOrders?: number
+  expiredOrders?: number
   totalRevenueVnd: number
   places: { placeId: string; ticketsSold: number; revenueVnd: number }[]
   recentOrders: TicketOrder[]
@@ -240,6 +278,15 @@ export async function changePassword(
     body: JSON.stringify({ currentPassword, newPassword }),
   }, token)
 }
+
+/** Người dùng tự xóa tài khoản; backend yêu cầu nhập lại mật khẩu. */
+export async function deleteOwnAccount(token: string, password: string): Promise<void> {
+  await request<void>('/auth/me', {
+    method: 'DELETE',
+    body: JSON.stringify({ password }),
+  }, token)
+}
+
 export async function logoutAccount(token: string): Promise<void> {
   await request<void>('/auth/logout', { method: 'POST' }, token)
 }
@@ -259,8 +306,8 @@ export async function logoutAdmin(token: string): Promise<void> {
   await request<void>('/admin/logout', { method: 'POST' }, token)
 }
 
-export async function fetchAdminOverview(token: string): Promise<AdminOverview> {
-  return request<AdminOverview>('/admin/overview', undefined, token)
+export async function fetchAdminOverview(token: string, days: StatsPeriod = 30): Promise<AdminOverview> {
+  return request<AdminOverview>(`/admin/overview?days=${days}`, undefined, token)
 }
 
 export async function fetchTicketPrices(): Promise<TicketPrice[]> {
@@ -281,6 +328,52 @@ export async function createTicketOrder(
   return request<TicketOrder>('/tickets/orders', {
     method: 'POST',
     body: JSON.stringify({ placeId, quantity }),
+  }, token)
+}
+
+export async function fetchTicketOrder(orderId: string, token: string): Promise<TicketOrder> {
+  return request<TicketOrder>(`/tickets/orders/${encodeURIComponent(orderId)}`, undefined, token)
+}
+
+export async function fetchPaymentMethods(): Promise<PaymentMethod[]> {
+  return (await request<{ methods: PaymentMethod[] }>('/payments/methods')).methods
+}
+
+/** Bắt đầu thanh toán; máy chủ trả về địa chỉ cổng thanh toán (nội bộ hoặc VNPay). */
+export async function startTicketPayment(
+  orderId: string,
+  method: PaymentMethod,
+  locale: string,
+  token: string,
+): Promise<PaymentStartResult> {
+  return request<PaymentStartResult>(`/tickets/orders/${encodeURIComponent(orderId)}/pay`, {
+    method: 'POST',
+    body: JSON.stringify({ method, locale }),
+  }, token)
+}
+
+export async function completeMockPayment(orderId: string, success: boolean, token: string): Promise<TicketOrder> {
+  return request<TicketOrder>(`/tickets/orders/${encodeURIComponent(orderId)}/mock-payment`, {
+    method: 'POST',
+    body: JSON.stringify({ success }),
+  }, token)
+}
+
+export async function fetchFavorites(token: string): Promise<FavoritePlace[]> {
+  return (await request<ApiCollection<FavoritePlace>>('/favorites', undefined, token)).items
+}
+
+export async function addFavorite(placeId: string, token: string): Promise<FavoritePlace> {
+  return request<FavoritePlace>(`/favorites/${encodeURIComponent(placeId)}`, { method: 'PUT' }, token)
+}
+
+export async function removeFavorite(placeId: string, token: string): Promise<void> {
+  await request<void>(`/favorites/${encodeURIComponent(placeId)}`, { method: 'DELETE' }, token)
+}
+
+export async function cancelTicketOrder(orderId: string, token: string): Promise<TicketOrder> {
+  return request<TicketOrder>(`/tickets/orders/${encodeURIComponent(orderId)}/cancel`, {
+    method: 'POST',
   }, token)
 }
 
@@ -415,13 +508,37 @@ export async function getAdminOnlineVisitorCount(token: string): Promise<OnlineV
   return request('/admin/analytics/online', undefined, token)
 }
 
-export async function getAdminOverview(token: string): Promise<AdminOverview> {
-  return request('/admin/overview', undefined, token)
+export async function getAdminOverview(token: string, days: StatsPeriod = 30): Promise<AdminOverview> {
+  return request(`/admin/overview?days=${days}`, undefined, token)
 }
 
 export async function getAdminUsers(token: string): Promise<AdminUser[]> {
   const result = await request<ApiCollection<AdminUser>>('/admin/users', undefined, token)
   return result.items
+}
+
+export async function setAdminUserLocked(
+  userId: string,
+  locked: boolean,
+  token: string,
+): Promise<AdminUser> {
+  return request<AdminUser>(`/admin/users/${encodeURIComponent(userId)}/lock`, {
+    method: 'PUT',
+    body: JSON.stringify({ locked }),
+  }, token)
+}
+
+export async function getAdminReviews(token: string): Promise<AdminReview[]> {
+  const result = await request<ApiCollection<AdminReview>>('/admin/reviews', undefined, token)
+  return result.items
+}
+
+export async function deleteAdminReview(review: AdminReview, token: string): Promise<void> {
+  await request<void>(
+    `/admin/reviews/${encodeURIComponent(review.placeId)}/${encodeURIComponent(review.id)}`,
+    { method: 'DELETE' },
+    token,
+  )
 }
 
 export async function deleteAdminUser(userId: string, token: string): Promise<void> {
@@ -450,16 +567,21 @@ export async function getPlaceRatings(placeId: string): Promise<PlaceRatingSumma
   return request(`/places/${encodeURIComponent(placeId)}/ratings`)
 }
 
+export async function getMyPlaceRating(placeId: string, token: string): Promise<OwnRating> {
+  return request(`/places/${encodeURIComponent(placeId)}/ratings/mine`, undefined, token)
+}
+
+/** Đánh giá gắn với tài khoản đăng nhập: mỗi tài khoản một đánh giá cho mỗi địa điểm. */
 export async function submitPlaceRating(
   placeId: string,
-  visitorId: string,
   rating: number,
   review: string,
+  token: string,
 ): Promise<PlaceRatingSummary> {
   return request('/analytics/ratings', {
     method: 'POST',
-    body: JSON.stringify({ placeId, visitorId, rating, review }),
-  })
+    body: JSON.stringify({ placeId, rating, review }),
+  }, token)
 }
 
 export function mergeRemotePlaces(localPlaces: Place[], remotePlaces: ApiPlace[]): Place[] {

@@ -1,30 +1,60 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Navigate, NavLink, useNavigate } from 'react-router-dom'
-import { Activity, ArrowLeft, ArrowRight, BookOpen, ChartNoAxesColumn, Clock3, Home, Lightbulb, LogOut, Map, MapPin, Menu, Pencil, Plus, Ticket, Trash2, Users, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BookOpen, ChartNoAxesColumn, Clock3, Download, Home, Lightbulb, Lock, LockOpen, LogOut, Map, MapPin, Menu, MessageSquareWarning, Pencil, Plus, Ticket, Trash2, Users, X } from 'lucide-react'
 import {
   createAdminPlace,
   deleteAdminPlace,
+  deleteAdminReview,
   deleteAdminUser,
   BackendApiError,
   fetchCurrentUser,
   fetchPlaces,
   fetchTicketPrices,
   getAdminOverview,
+  getAdminReviews,
   getAdminUsers,
   getStoredAdminAuthToken,
   logoutAccount,
   mergeRemotePlaces,
+  setAdminUserLocked,
   storeAdminAuthToken,
   updateAdminPlace,
   updateAdminTicketPrice,
 } from '../api'
-import type { AdminOverview, AdminUser, ApiPlace } from '../api'
+import type { AdminOverview, AdminReview, AdminUser, ApiPlace, StatsPeriod } from '../api'
 import { languages, categoryLabels } from '../data/places'
 import { useAppStore } from '../store'
 import { getNarrationAudioUrl } from '../speech'
 import type { Language, Place, PlaceDetailSection, UserProfile } from '../types'
 
-type AdminTab = 'overview' | 'tickets' | 'users' | 'places'
+type AdminTab = 'overview' | 'tickets' | 'users' | 'places' | 'reviews'
+
+const PERIOD_OPTIONS: { value: StatsPeriod; label: string }[] = [
+  { value: 7, label: '7 ngày' },
+  { value: 30, label: '30 ngày' },
+  { value: 90, label: '90 ngày' },
+  { value: 365, label: '12 tháng' },
+]
+
+const MIN_TICKET_PRICE = 1_000
+const MAX_TICKET_PRICE = 10_000_000
+
+/** Tạo và tải tệp CSV (UTF-8 có BOM để Excel hiển thị đúng tiếng Việt). */
+function downloadCsv(filename: string, rows: (string | number)[][]) {
+  const escape = (value: string | number) => {
+    const text = String(value)
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+  }
+  const csv = rows.map((row) => row.map(escape).join(',')).join('\r\n')
+  const url = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
 type PlaceCopy = Place['copy'][Language]
 
 interface PlaceForm {
@@ -96,6 +126,8 @@ export function OnlineDashboardPage() {
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({})
   const [savingPricePlaceId, setSavingPricePlaceId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [period, setPeriod] = useState<StatsPeriod>(30)
+  const [reviews, setReviews] = useState<AdminReview[]>([])
   const refreshRevision = useRef(0)
 
   const refresh = useCallback(async () => {
@@ -105,16 +137,18 @@ export function OnlineDashboardPage() {
     setLoading(true)
     setMessage('')
     try {
-      const [nextOverview, nextUsers, remotePlaces, ticketPrices] = await Promise.all([
-        getAdminOverview(authToken),
+      const [nextOverview, nextUsers, remotePlaces, ticketPrices, nextReviews] = await Promise.all([
+        getAdminOverview(authToken, period),
         getAdminUsers(authToken),
         fetchPlaces(),
         fetchTicketPrices().catch(() => []),
+        getAdminReviews(authToken).catch(() => []),
       ])
       if (useAppStore.getState().placesRevision !== revision) return
       const mergedPlaces = mergeRemotePlaces(useAppStore.getState().places, remotePlaces)
       setOverview(nextOverview)
       setUsers(nextUsers)
+      setReviews(nextReviews)
       setPlacesList(remotePlaces)
       setPlaces(mergedPlaces, revision)
       setPriceDrafts((current) => Object.fromEntries(
@@ -131,7 +165,7 @@ export function OnlineDashboardPage() {
     } finally {
       if (refreshRevision.current === revision) setLoading(false)
     }
-  }, [authToken, setPlaces])
+  }, [authToken, period, setPlaces])
 
   useEffect(() => {
     void refresh()
@@ -202,6 +236,70 @@ export function OnlineDashboardPage() {
     }
   }
 
+  const toggleUserLock = async (user: AdminUser) => {
+    if (!authToken) return
+    const locking = !user.isLocked
+    if (locking && !window.confirm(`Khóa tài khoản ${user.email}? Người dùng sẽ bị đăng xuất khỏi mọi thiết bị.`)) return
+    setBusy(true)
+    setMessage('')
+    try {
+      const updated = await setAdminUserLocked(user.id, locking, authToken)
+      setUsers((current) => current.map((item) => (item.id === user.id ? { ...item, isLocked: updated.isLocked } : item)))
+      setMessage(locking ? 'Đã khóa tài khoản.' : 'Đã mở khóa tài khoản.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Không cập nhật được trạng thái tài khoản.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const removeReview = async (review: AdminReview) => {
+    if (!authToken || !window.confirm('Xóa đánh giá này? Điểm trung bình của địa điểm sẽ được tính lại.')) return
+    setBusy(true)
+    setMessage('')
+    try {
+      await deleteAdminReview(review, authToken)
+      setReviews((current) => current.filter((item) => !(item.id === review.id && item.placeId === review.placeId)))
+      await refresh()
+      setMessage('Đã xóa đánh giá.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Không xóa được đánh giá.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const exportTicketCsv = () => {
+    const tickets = overview?.tickets
+    if (!tickets) return
+    const rows: (string | number)[][] = [
+      ['Địa điểm', 'Mã địa điểm', 'Số vé', 'Doanh thu (VND)'],
+      ...tickets.places.map((item) => [placeNames[item.placeId] ?? item.placeId, item.placeId, item.ticketsSold, item.revenueVnd]),
+      [],
+      ['Tổng số vé', '', tickets.totalTicketsSold, tickets.totalRevenueVnd],
+      ['Số đơn đã thanh toán', tickets.totalOrders],
+      ['Số đơn chờ thanh toán', tickets.pendingOrders ?? 0],
+      ['Số đơn đã hủy', tickets.cancelledOrders ?? 0],
+      ['Số đơn hết hạn', tickets.expiredOrders ?? 0],
+    ]
+    downloadCsv(`thong-ke-ve-${period}-ngay.csv`, rows)
+  }
+
+  const exportVisitsCsv = () => {
+    if (!overview) return
+    const rows: (string | number)[][] = [
+      ['Địa điểm', 'Mã địa điểm', `Lượt ghé (${period} ngày)`, 'Điểm trung bình', 'Số đánh giá'],
+      ...overview.analytics.places.map((item) => [
+        placeNames[item.placeId] ?? item.placeId,
+        item.placeId,
+        item.visits,
+        item.averageRating ?? '',
+        item.ratingCount,
+      ]),
+    ]
+    downloadCsv(`thong-ke-luot-ghe-${period}-ngay.csv`, rows)
+  }
+
   const savePlace = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!authToken || !form) return
@@ -252,8 +350,8 @@ export function OnlineDashboardPage() {
     if (!authToken) return
     const draft = priceDrafts[placeId]?.trim() ?? ''
     const priceVnd = draft ? Number(draft) : null
-    if (priceVnd !== null && (!Number.isSafeInteger(priceVnd) || priceVnd < 70_000 || priceVnd > 150_000)) {
-      setMessage('Giá vé phải từ 70.000 đến 150.000 VND, hoặc để trống để đóng bán.')
+    if (priceVnd !== null && (!Number.isSafeInteger(priceVnd) || priceVnd < MIN_TICKET_PRICE || priceVnd > MAX_TICKET_PRICE)) {
+      setMessage(`Giá vé phải từ ${MIN_TICKET_PRICE.toLocaleString('vi-VN')} đến ${MAX_TICKET_PRICE.toLocaleString('vi-VN')} VND, hoặc để trống để đóng bán.`)
       return
     }
     setSavingPricePlaceId(placeId)
@@ -279,6 +377,19 @@ export function OnlineDashboardPage() {
     setMessage('')
   }
 
+  const periodLabel = PERIOD_OPTIONS.find((option) => option.value === period)?.label ?? `${period} ngày`
+  const periodSelect = (
+    <label className="admin-period-select">
+      Khoảng thời gian{' '}
+      <select
+        disabled={loading}
+        value={period}
+        onChange={(event) => setPeriod(Number(event.target.value) as StatsPeriod)}
+      >
+        {PERIOD_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label} gần nhất</option>)}
+      </select>
+    </label>
+  )
   const placeNames = Object.fromEntries(places.map((place) => [place.id, place.copy.vi?.title ?? place.id]))
   const popularPlaces = (overview?.analytics.places ?? [])
     .filter((place) => place.visits > 0)
@@ -301,6 +412,7 @@ export function OnlineDashboardPage() {
             ['places', 'Quản lý địa điểm', MapPin, 'Thêm, sửa và xóa địa điểm'],
             ['tickets', 'Quản lý vé', Ticket, 'Cập nhật giá và theo dõi vé'],
             ['users', 'Quản lý người dùng', Users, 'Xem và quản lý tài khoản'],
+            ['reviews', 'Kiểm duyệt đánh giá', MessageSquareWarning, 'Xem và xóa đánh giá vi phạm'],
           ] as const).map(([key, label, Icon, description]) => (
             <button
               className={`admin-sidebar-link${tab === key ? ' active' : ''}`}
@@ -351,6 +463,7 @@ export function OnlineDashboardPage() {
           </div>
           <div className="admin-welcome-actions">
             <span><Clock3 size={15} /> Cập nhật khi làm mới dữ liệu</span>
+            {periodSelect}
             <button className="admin-refresh" disabled={loading || busy} onClick={() => void refresh()} type="button">
               {loading ? 'Đang tải…' : 'Làm mới dữ liệu'}
             </button>
@@ -359,7 +472,7 @@ export function OnlineDashboardPage() {
       ) : (
         <header className="admin-page-heading">
           <span className="user-eyebrow">QUẢN TRỊ HỆ THỐNG</span>
-          <h1>{tab === 'places' ? 'Quản lý địa điểm' : tab === 'tickets' ? 'Quản lý vé tham quan' : 'Quản lý tài khoản'}</h1>
+          <h1>{tab === 'places' ? 'Quản lý địa điểm' : tab === 'tickets' ? 'Quản lý vé tham quan' : tab === 'reviews' ? 'Kiểm duyệt đánh giá' : 'Quản lý tài khoản'}</h1>
           <p>Quản lý dữ liệu và nội dung trên nền tảng du lịch số Quảng Trị.</p>
           <button className="admin-refresh" disabled={loading || busy} onClick={() => void refresh()} type="button">
             {loading ? 'Đang tải…' : 'Làm mới dữ liệu'}
@@ -374,17 +487,17 @@ export function OnlineDashboardPage() {
             <div className="admin-stat-grid">
               <article className="admin-stat-card stat-places"><span className="admin-stat-icon"><MapPin size={20} /></span><span className="admin-stat-label">Địa điểm</span><strong>{overview.placeCount.toLocaleString('vi-VN')}</strong><small>Điểm đến đang được quản lý</small></article>
               <article className="admin-stat-card stat-users"><span className="admin-stat-icon"><Users size={20} /></span><span className="admin-stat-label">Người dùng</span><strong>{overview.accountCount.toLocaleString('vi-VN')}</strong><small>{overview.activeAccountCount.toLocaleString('vi-VN')} phiên đang hoạt động</small></article>
-              <article className="admin-stat-card stat-visits"><span className="admin-stat-icon"><MapPin size={20} /></span><span className="admin-stat-label">Lượt ghé</span><strong>{overview.visits.toLocaleString('vi-VN')}</strong><small>Ghi nhận trong 30 ngày gần nhất</small></article>
+              <article className="admin-stat-card stat-visits"><span className="admin-stat-icon"><MapPin size={20} /></span><span className="admin-stat-label">Lượt ghé</span><strong>{overview.visits.toLocaleString('vi-VN')}</strong><small>Ghi nhận trong {periodLabel} gần nhất</small></article>
               <article className="admin-stat-card stat-ratings"><span className="admin-stat-icon"><BookOpen size={20} /></span><span className="admin-stat-label">Đánh giá</span><strong>{overview.ratingCount.toLocaleString('vi-VN')}</strong><small>Đánh giá của du khách</small></article>
             </div>
             <div className="admin-overview-grid">
               <section className="admin-panel admin-analytics-panel">
                 <div className="admin-panel-heading">
-                  <div className="admin-overview-title"><span className="admin-panel-icon"><ChartNoAxesColumn size={17} /></span><div><h2>Điểm đến được quan tâm</h2><small>Lượt ghé theo địa điểm · 30 ngày gần nhất</small></div></div>
-                  <button className="admin-panel-link" type="button" onClick={() => setTab('places')}>Quản lý địa điểm <ArrowRight size={14} /></button>
+                  <div className="admin-overview-title"><span className="admin-panel-icon"><ChartNoAxesColumn size={17} /></span><div><h2>Điểm đến được quan tâm</h2><small>Lượt ghé theo địa điểm · {periodLabel} gần nhất</small></div></div>
+                  <button className="admin-panel-link" type="button" onClick={exportVisitsCsv}><Download size={14} /> Xuất CSV</button>
                 </div>
                 {popularPlaces.length > 0 ? (
-                  <div className="admin-visit-chart" aria-label="Lượt ghé theo địa điểm trong 30 ngày gần nhất">
+                  <div className="admin-visit-chart" aria-label={`Lượt ghé theo địa điểm trong ${periodLabel} gần nhất`}>
                     {popularPlaces.map((place, index) => (
                       <div className="admin-visit-row" key={place.placeId}>
                         <span className="admin-visit-name" title={placeNames[place.placeId] ?? place.placeId}>{placeNames[place.placeId] ?? place.placeId}</span>
@@ -393,12 +506,12 @@ export function OnlineDashboardPage() {
                       </div>
                     ))}
                   </div>
-                ) : <p className="admin-empty-state">Chưa có lượt ghé được ghi nhận trong 30 ngày gần nhất.</p>}
+                ) : <p className="admin-empty-state">Chưa có lượt ghé được ghi nhận trong {periodLabel} gần nhất.</p>}
               </section>
               <section className="admin-panel admin-reviews-panel">
                 <div className="admin-panel-heading">
                   <div className="admin-overview-title"><span className="admin-panel-icon review-icon"><BookOpen size={17} /></span><div><h2>Đánh giá gần đây</h2><small>Phản hồi mới từ du khách</small></div></div>
-                  <span className="admin-review-count">{overview.analytics.latestReviews.length}</span>
+                  <button className="admin-panel-link" type="button" onClick={() => setTab('reviews')}>Kiểm duyệt <ArrowRight size={14} /></button>
                 </div>
                 {overview.analytics.latestReviews.length > 0 ? (
                   <div className="admin-recent-reviews">
@@ -424,7 +537,16 @@ export function OnlineDashboardPage() {
             <section className="admin-panel">
               <div className="admin-panel-heading">
                 <h2>Giá vé và lượt bán <span>{places.length}</span></h2>
+                <div className="admin-row-actions">
+                  {periodSelect}
+                  <button className="admin-secondary-button" disabled={!overview?.tickets} onClick={exportTicketCsv} type="button"><Download size={14} /> Xuất CSV</button>
+                </div>
               </div>
+              {overview?.tickets && (
+                <p className="admin-message">
+                  {periodLabel} gần nhất: {overview.tickets.totalTicketsSold.toLocaleString('vi-VN')} vé · {overview.tickets.totalOrders.toLocaleString('vi-VN')} đơn · {overview.tickets.totalRevenueVnd.toLocaleString('vi-VN')} ₫ doanh thu đã thanh toán · {(overview.tickets.pendingOrders ?? 0).toLocaleString('vi-VN')} đơn chờ thanh toán · {(overview.tickets.cancelledOrders ?? 0).toLocaleString('vi-VN')} đơn đã hủy · {(overview.tickets.expiredOrders ?? 0).toLocaleString('vi-VN')} đơn hết hạn
+                </p>
+              )}
               <div className="admin-place-list">
                 {places.map((place) => {
                   const sale = overview?.tickets?.places.find((item) => item.placeId === place.id)
@@ -439,8 +561,8 @@ export function OnlineDashboardPage() {
                         <input
                           aria-label={`Giá vé ${placeName} bằng VND`}
                           type="number"
-                          min="70000"
-                          max="150000"
+                          min={MIN_TICKET_PRICE}
+                          max={MAX_TICKET_PRICE}
                           step="1000"
                           inputMode="numeric"
                           placeholder="Chưa mở bán"
@@ -468,13 +590,41 @@ export function OnlineDashboardPage() {
               <h2>Tài khoản người dùng <span>{users.length}</span></h2>
               {users.length === 0 ? <p>Chưa có tài khoản.</p> : (
                 <div className="admin-table-wrap"><table className="admin-table">
-                  <thead><tr><th>Họ tên</th><th>Email</th><th>Vai trò</th><th /></tr></thead>
+                  <thead><tr><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th /></tr></thead>
                   <tbody>{users.map((user) => (
                     <tr key={user.id}>
                       <td>{user.fullName}</td>
                       <td>{user.email}</td>
                       <td>{user.isAdmin ? 'Quản trị viên' : 'Người dùng'}</td>
-                      <td><button className="admin-icon-button danger" disabled={busy || user.id === adminUser.id} onClick={() => void removeUser(user)} title={user.id === adminUser.id ? 'Không thể xóa tài khoản đang đăng nhập' : 'Xóa tài khoản'} type="button"><Trash2 size={15} /></button></td>
+                      <td>{user.isLocked ? 'Đã khóa' : 'Hoạt động'}</td>
+                      <td className="admin-row-actions">
+                        {!user.isAdmin && (
+                          <button className="admin-icon-button" disabled={busy} onClick={() => void toggleUserLock(user)} title={user.isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'} type="button">
+                            {user.isLocked ? <LockOpen size={15} /> : <Lock size={15} />}
+                          </button>
+                        )}
+                        <button className="admin-icon-button danger" disabled={busy || user.id === adminUser.id} onClick={() => void removeUser(user)} title={user.id === adminUser.id ? 'Không thể xóa tài khoản đang đăng nhập' : 'Xóa tài khoản'} type="button"><Trash2 size={15} /></button>
+                      </td>
+                    </tr>
+                  ))}</tbody>
+                </table></div>
+              )}
+            </section>
+          )}
+
+          {tab === 'reviews' && (
+            <section className="admin-panel">
+              <h2>Đánh giá của du khách <span>{reviews.length}</span></h2>
+              {reviews.length === 0 ? <p className="admin-empty-state">Chưa có đánh giá.</p> : (
+                <div className="admin-table-wrap"><table className="admin-table">
+                  <thead><tr><th>Địa điểm</th><th>Điểm</th><th>Nhận xét</th><th>Thời gian</th><th /></tr></thead>
+                  <tbody>{reviews.map((review) => (
+                    <tr key={`${review.placeId}-${review.id}`}>
+                      <td>{placeNames[review.placeId] ?? review.placeId}</td>
+                      <td>{review.rating}★</td>
+                      <td>{review.review || <em>(không có nhận xét)</em>}</td>
+                      <td>{formatAdminDate(review.createdAt)}</td>
+                      <td><button className="admin-icon-button danger" disabled={busy} onClick={() => void removeReview(review)} title="Xóa đánh giá" type="button"><Trash2 size={15} /></button></td>
                     </tr>
                   ))}</tbody>
                 </table></div>

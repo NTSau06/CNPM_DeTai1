@@ -781,6 +781,10 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .ticket-purchase-feedback a { margin-left: 4px; color: #435f48; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .ticket-history-list { display: grid; gap: 12px; }
 .ticket-history-card { padding: 18px 20px; border: 1px solid #e7e3d9; border-radius: 8px; background: #fffefa; }
+.ticket-history-card.is-cancelled { opacity: 0.6; }
+.ticket-cancel-button { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 7px 12px; border: 1px solid #c9a39a; border-radius: 6px; background: #fff; color: #8a3b2c; font: inherit; font-size: 13px; cursor: pointer; }
+.ticket-cancel-button:hover:not(:disabled) { background: #fbefec; }
+.ticket-cancel-button:disabled { opacity: 0.6; cursor: wait; }
 .ticket-history-card-heading { display: flex; align-items: center; gap: 11px; }
 .ticket-history-icon { width: 36px; height: 36px; display: grid; flex: 0 0 auto; place-items: center; border-radius: 7px; color: #547286; background: #edf2f4; }
 .ticket-history-card-heading h2 { margin: 0 0 5px; color: #435644; font-family: var(--serif); font-size: 18px; font-weight: 500; }
@@ -1143,3 +1147,58 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .narration-head-actions { justify-content: flex-start; }
   .topbar-explore .brand-copy small { max-width: 130px; font-size: 13px; line-height: 1.3; }
 }
+
+/* Bộ lọc khoảng thời gian trong trang quản trị */
+.admin-period-select { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.admin-period-select select { padding: 5px 8px; border: 1px solid #d9d4c7; border-radius: 6px; background: #fff; font: inherit; }
+
+/* Yêu thích */
+.favorite-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
+.favorite-card { display: flex; flex-direction: column; overflow: hidden; border: 1px solid #e7e3d9; border-radius: 10px; background: #fffefa; }
+.favorite-card-image { height: 150px; background: #dfe6dc center / cover no-repeat; }
+.favorite-card-body { display: flex; flex: 1; flex-direction: column; gap: 6px; padding: 16px 18px 18px; }
+.favorite-card-body h2 { margin: 0; font-size: 18px; }
+.favorite-card-body p { margin: 0; color: #6b756d; font-size: 13px; line-height: 1.5; }
+.favorite-card-meta { display: inline-flex; align-items: center; gap: 5px; color: #7d897f; font-size: 12px; }
+.favorite-card-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: auto; padding-top: 10px; }
+.favorite-card-actions a, .favorite-card-actions button { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; color: #2f5b45; background: transparent; font: inherit; font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer; }
+.favorite-card-actions .favorite-remove { color: #b04a3a; }
+
+/* Chia sẻ */
+.pd-btn.is-favorite { border-color: #ffb3a6; color: #ffd9d2; background: #ff6b5526; }
+.pd-share-feedback { margin: 10px 0 0; color: #e8f2ec; font-size: 13px; }
+.shared-route-banner { position: sticky; top: 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; padding: 10px 16px; border-bottom: 1px solid #cfe0d4; color: #24412f; background: #eef6f0; font-size: 14px; }
+.shared-route-banner > span { flex: 1; min-width: 200px; }
+.shared-route-save { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 0; border-radius: 6px; color: #fff; background: #2f5b45; font: inherit; font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer; }
+.shared-route-save:disabled { opacity: 0.6; cursor: wait; }
+.shared-route-dismiss { display: inline-flex; padding: 4px; border: 0; color: #4b6455; background: transparent; cursor: pointer; }
+
+/* Thanh toán */
+.ticket-status { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.ticket-status.is-pending { color: #8a5a00; background: #fff1cc; }
+.ticket-status.is-paid { color: #1f6a3b; background: #dcf2e3; }
+.ticket-status.is-cancelled, .ticket-status.is-expired { color: #6c6c6c; background: #ececec; }
+.ticket-history-card.is-highlighted { box-shadow: 0 0 0 2px #2f5b45; }
+.ticket-pay-button { display: inline-flex; align-items: center; gap: 6px; margin: 12px 10px 0 0; padding: 7px 14px; border: 0; border-radius: 6px; color: #fff; background: #2f5b45; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.ticket-pay-button:disabled { opacity: 0.6; cursor: wait; }
+.ticket-payment-result { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 12px 14px; border-radius: 8px; font-size: 14px; font-weight: 600; }
+.ticket-payment-result.is-success { color: #1f6a3b; background: #dcf2e3; }
+.ticket-payment-result.is-failed, .ticket-payment-result.is-invalid { color: #8a3b2c; background: #fbe7e2; }
+.payment-card { max-width: 560px; padding: 24px; border: 1px solid #e7e3d9; border-radius: 12px; background: #fffefa; }
+.payment-card-heading { display: flex; gap: 14px; margin-bottom: 18px; }
+.payment-card-heading h1 { margin: 0 0 4px; font-size: 22px; }
+.payment-card-heading p { display: flex; align-items: center; gap: 6px; margin: 0; color: #6b756d; font-size: 13px; }
+.payment-card-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 42px; height: 42px; border-radius: 10px; color: #fff; background: #2f5b45; }
+.payment-summary { display: grid; gap: 8px; margin: 0 0 18px; padding: 14px 16px; border-radius: 8px; background: #f4f2ec; }
+.payment-summary div { display: flex; justify-content: space-between; gap: 12px; }
+.payment-summary dt { display: inline-flex; align-items: center; gap: 5px; color: #6b756d; font-size: 13px; }
+.payment-summary dd { margin: 0; font-size: 14px; text-align: right; }
+.payment-summary .payment-total dd { font-size: 18px; font-weight: 800; }
+.payment-banks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 0 0 18px; padding: 0; border: 0; }
+.payment-banks legend { margin-bottom: 8px; font-size: 13px; font-weight: 700; }
+.payment-banks label { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid #d9d4c7; border-radius: 8px; background: #fff; font-size: 13px; cursor: pointer; }
+.payment-banks label.is-selected { border-color: #2f5b45; box-shadow: inset 0 0 0 1px #2f5b45; }
+.payment-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.payment-confirm { display: inline-flex; align-items: center; gap: 6px; padding: 11px 18px; border: 0; border-radius: 8px; color: #fff; background: #2f5b45; font: inherit; font-weight: 800; cursor: pointer; }
+.payment-cancel { padding: 11px 18px; border: 1px solid #c9a39a; border-radius: 8px; color: #8a3b2c; background: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.payment-confirm:disabled, .payment-cancel:disabled { opacity: 0.6; cursor: wait; }

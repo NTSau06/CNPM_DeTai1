@@ -131,6 +131,7 @@ function getAdminLoginError(error: unknown) {
   }
   const status = error.status
   if (status === 401) return 'Email hoặc mật khẩu quản trị không chính xác.'
+  if (status === 429) return 'Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.'
   if (status === 0) return 'Không kết nối được máy chủ. Hãy kiểm tra backend và thử lại.'
   return 'Không thể xác thực tài khoản quản trị. Vui lòng thử lại.'
 }

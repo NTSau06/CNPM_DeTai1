@@ -1,10 +1,12 @@
 // Liệt kê, mở và xóa các hành trình đã lưu.
-import { ArrowLeft, ArrowRight, Bookmark, Clock3, MapPin, Route, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowLeft, ArrowRight, Bookmark, Clock3, MapPin, Route, Share2, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { localizedTitle } from '../data/places'
 import { translate } from '../i18n'
 import { localeOf, ui } from '../uiText'
 import { useAppStore } from '../store'
+import { routeShareUrl, shareLink } from '../share'
 
 export function SavedPage() {
   const language = useAppStore((state) => state.language)
@@ -14,6 +16,13 @@ export function SavedPage() {
   const currentUser = useAppStore((state) => state.currentUser)
   const online = useAppStore((state) => state.online)
   const offline = !online || (typeof navigator !== 'undefined' && !navigator.onLine)
+  const [shareMessage, setShareMessage] = useState('')
+
+  const shareTour = async (placeIds: string[]) => {
+    const text = ui(language, 'shRouteText', { n: placeIds.length })
+    const outcome = await shareLink(text, text, routeShareUrl(placeIds))
+    setShareMessage(outcome === 'copied' ? ui(language, 'shCopied') : outcome === 'failed' ? ui(language, 'shFailed') : '')
+  }
 
   return (
     <div className="subpage">
@@ -23,6 +32,7 @@ export function SavedPage() {
         <h1>{translate(language, 'savedTitle')}</h1>
         <p>{translate(language, 'noSavedText')}</p>
       </div>
+      {shareMessage && <p className="ticket-history-status" role="status">{shareMessage}</p>}
       {currentUser && offline && <p className="saved-offline-note" id="saved-offline-note" role="status">{ui(language, 'svOfflineNote')}</p>}
       {!currentUser ? (
         <section className="empty-state">
@@ -62,6 +72,11 @@ export function SavedPage() {
                       disabled={offline}
                       title={offline ? ui(language, 'svOfflineNote') : undefined}
                     ><Trash2 size={15} /> {translate(language, 'delete')}</button>
+                    {tour.placeIds.length > 0 && (
+                      <button type="button" onClick={() => void shareTour(tour.placeIds)}>
+                        <Share2 size={15} /> {ui(language, 'shShare')}
+                      </button>
+                    )}
                   </div>
                 </div>
               </article>
