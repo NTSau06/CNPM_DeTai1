@@ -73,7 +73,7 @@ class RatingSubmission(BaseModel):
 class QrPaymentConfirm(BaseModel):
     """Mã thanh toán của đơn, lấy từ mã QR, để không ai đoán được đường dẫn xác nhận."""
 
-    code: Annotated[str, Field(pattern=r"^QT[0-9A-Fa-f]{10}$")]
+    code: Annotated[str, Field(pattern=r"^[Qq][Tt][0-9A-Fa-f]{10}$")]
 
 
 class AccountDeletion(BaseModel):

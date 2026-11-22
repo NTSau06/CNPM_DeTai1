@@ -395,7 +395,7 @@ def _qr_payment_view(order: dict) -> dict:
 def get_qr_payment(
     order_id: str,
     request: Request,
-    code: str = Query(pattern=r"^QT[0-9A-Fa-f]{10}$"),
+    code: str = Query(pattern=r"^[Qq][Tt][0-9A-Fa-f]{10}$"),
 ) -> dict:
     return _qr_payment_view(_qr_payment_order(request, order_id, code))
 
