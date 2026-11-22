@@ -101,15 +101,16 @@ export interface TicketOrder {
   paymentRef?: string | null
   paidAt?: string | null
   expiresAt?: string | null
+  paymentCode?: string | null
 }
 
 export type TicketOrderStatus = 'pending' | 'paid' | 'cancelled' | 'expired'
-export type PaymentMethod = 'mock' | 'vnpay'
+// Đơn mới thanh toán bằng mã QR ('qr'); đơn cũ có thể mang giá trị khác.
+export type PaymentMethod = string
 
-export interface PaymentStartResult {
+export interface TicketPaymentInfo {
+  /** Đơn kèm paymentCode dùng để tạo mã QR mở trang xác nhận thanh toán. */
   order: TicketOrder
-  redirectUrl: string
-  external: boolean
 }
 
 export interface FavoritePlace {
@@ -335,28 +336,35 @@ export async function fetchTicketOrder(orderId: string, token: string): Promise<
   return request<TicketOrder>(`/tickets/orders/${encodeURIComponent(orderId)}`, undefined, token)
 }
 
-export async function fetchPaymentMethods(): Promise<PaymentMethod[]> {
-  return (await request<{ methods: PaymentMethod[] }>('/payments/methods')).methods
+/** Đơn cần thanh toán kèm mã thanh toán (tạo mã cho đơn cũ nếu chưa có). */
+export async function fetchTicketPayment(orderId: string, token: string): Promise<TicketPaymentInfo> {
+  return request<TicketPaymentInfo>(`/tickets/orders/${encodeURIComponent(orderId)}/payment`, undefined, token)
 }
 
-/** Bắt đầu thanh toán; máy chủ trả về địa chỉ cổng thanh toán (nội bộ hoặc VNPay). */
-export async function startTicketPayment(
-  orderId: string,
-  method: PaymentMethod,
-  locale: string,
-  token: string,
-): Promise<PaymentStartResult> {
-  return request<PaymentStartResult>(`/tickets/orders/${encodeURIComponent(orderId)}/pay`, {
-    method: 'POST',
-    body: JSON.stringify({ method, locale }),
-  }, token)
+/** Thông tin tối thiểu của đơn hiển thị trên trang xác nhận thanh toán mở từ mã QR (không cần đăng nhập). */
+export interface QrPaymentOrder {
+  orderId: string
+  ticketCode: string
+  placeId: string
+  quantity: number
+  totalPriceVnd: number
+  status: TicketOrderStatus
 }
 
-export async function completeMockPayment(orderId: string, success: boolean, token: string): Promise<TicketOrder> {
-  return request<TicketOrder>(`/tickets/orders/${encodeURIComponent(orderId)}/mock-payment`, {
+/** Đường dẫn trang xác nhận thanh toán mà mã QR trỏ tới. */
+export function qrPaymentPath(orderId: string, code: string): string {
+  return `/pay/${encodeURIComponent(orderId)}?code=${encodeURIComponent(code)}`
+}
+
+export async function fetchQrPayment(orderId: string, code: string): Promise<QrPaymentOrder> {
+  return request<QrPaymentOrder>(`/payments/qr/${encodeURIComponent(orderId)}?code=${encodeURIComponent(code)}`)
+}
+
+export async function confirmQrPayment(orderId: string, code: string): Promise<QrPaymentOrder> {
+  return request<QrPaymentOrder>(`/payments/qr/${encodeURIComponent(orderId)}/confirm`, {
     method: 'POST',
-    body: JSON.stringify({ success }),
-  }, token)
+    body: JSON.stringify({ code }),
+  })
 }
 
 export async function fetchFavorites(token: string): Promise<FavoritePlace[]> {

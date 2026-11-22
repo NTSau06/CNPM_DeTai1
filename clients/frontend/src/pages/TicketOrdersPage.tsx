@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, CircleCheck, CircleX, Clock3, CreditCard, LoaderCircle, Ticket } from 'lucide-react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { cancelTicketOrder, fetchMyTicketOrders, fetchPaymentMethods } from '../api'
-import type { PaymentMethod, TicketOrder, TicketOrderStatus } from '../api'
-import { redirectToPayment } from '../payment'
+import { ArrowLeft, ArrowRight, CircleCheck, CircleX, Clock3, QrCode, Ticket } from 'lucide-react'
+import { Link, Navigate, useLocation } from 'react-router-dom'
+import { cancelTicketOrder, fetchMyTicketOrders } from '../api'
+import type { TicketOrder, TicketOrderStatus } from '../api'
+import { paymentPath } from '../payment'
 import { localizedTitle } from '../data/places'
 import { apiErrorMessage, localeOf, ui, type UiKey } from '../uiText'
 import { useAppStore } from '../store'
@@ -36,33 +36,9 @@ export function TicketOrdersPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [cancellingId, setCancellingId] = useState<string | null>(null)
-  const [payingId, setPayingId] = useState<string | null>(null)
-  const [methods, setMethods] = useState<PaymentMethod[]>([])
-  const navigate = useNavigate()
   const routerLocation = useLocation()
   const paymentResult = new URLSearchParams(routerLocation.search).get('payment') ?? ''
   const paymentOrderId = new URLSearchParams(routerLocation.search).get('order') ?? ''
-
-  useEffect(() => {
-    let active = true
-    void fetchPaymentMethods()
-      .then((available) => { if (active) setMethods(available) })
-      .catch(() => { if (active) setMethods([]) })
-    return () => { active = false }
-  }, [])
-
-  const payOrder = async (order: TicketOrder) => {
-    if (!authToken || methods.length === 0) return
-    const method = order.paymentMethod && methods.includes(order.paymentMethod) ? order.paymentMethod : methods[0]
-    setPayingId(order.id)
-    setNotice('')
-    try {
-      await redirectToPayment(order.id, method, language, authToken, navigate)
-    } catch (reason) {
-      setNotice(apiErrorMessage(language, reason, 'payError'))
-      setPayingId(null)
-    }
-  }
 
   const cancelOrder = async (order: TicketOrder) => {
     if (!authToken) return
@@ -184,16 +160,11 @@ export function TicketOrdersPage() {
                     <dd>{formatVnd(order.totalPriceVnd, language)}</dd>
                   </div>
                 </dl>
-                {status === 'pending' && methods.length > 0 && (
-                  <button
-                    className="ticket-pay-button"
-                    disabled={payingId === order.id}
-                    onClick={() => void payOrder(order)}
-                    type="button"
-                  >
-                    {payingId === order.id ? <LoaderCircle className="loading-spinner" size={15} /> : <CreditCard size={15} aria-hidden="true" />}
-                    {ui(language, payingId === order.id ? 'payRedirecting' : 'payContinue')}
-                  </button>
+                {status === 'pending' && (
+                  <Link className="ticket-pay-button" to={paymentPath(order.id)}>
+                    <QrCode size={15} aria-hidden="true" />
+                    {ui(language, 'payContinue')}
+                  </Link>
                 )}
                 {!inactive && (
                   <button

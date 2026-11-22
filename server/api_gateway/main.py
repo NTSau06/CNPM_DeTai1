@@ -12,7 +12,6 @@ from api_gateway.api import router
 from api_gateway.auth import AuthRepository
 from api_gateway.favorites import FavoriteRepository
 from api_gateway.pairing import PairingRepository
-from api_gateway.payments import PaymentSettings
 from api_gateway.rate_limit import LoginRateLimiter
 from api_gateway.tickets import TicketRepository
 from services.common.database import Database
@@ -23,7 +22,6 @@ def create_app(
     database: Database | None = None,
     admin_email: str | None = None,
     admin_password: str | None = None,
-    payment_settings: PaymentSettings | None = None,
 ) -> FastAPI:
     urls = service_urls or {
         "poi": os.getenv("POI_SERVICE_URL", "http://localhost:8001"),
@@ -76,7 +74,6 @@ def create_app(
     app.state.ticket_repository = ticket_repository
     app.state.pairing_repository = pairing_repository
     app.state.favorite_repository = favorite_repository
-    app.state.payment_settings = payment_settings or PaymentSettings.from_env()
     app.state.login_limiter = LoginRateLimiter(
         max_failures=int(os.getenv("LOGIN_MAX_FAILURES", "5")),
         window_seconds=int(os.getenv("LOGIN_LOCK_SECONDS", str(15 * 60))),

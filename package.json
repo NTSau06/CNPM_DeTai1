@@ -2,10 +2,14 @@
   "name": "quang-tri-local",
   "private": true,
   "scripts": {
+    "codex": "codex",
     "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\run-local.ps1",
     "stop:local": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\stop-local.ps1",
     "backend:start": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\server\\backend.ps1 start",
     "backend:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\server\\backend.ps1 stop",
     "mobile:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\run-mobile.ps1"
+  },
+  "devDependencies": {
+    "@openai/codex": "^0.170.0"
   }
 }

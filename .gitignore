@@ -18,6 +18,7 @@ out/
 .next/
 .nuxt/
 .cache/
+/.task-artifacts/
 
 # Coverage & testing
 coverage/

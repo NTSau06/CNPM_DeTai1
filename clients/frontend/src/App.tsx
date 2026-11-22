@@ -18,7 +18,8 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => 
 const PairPage = lazy(() => import('./pages/PairPage').then((module) => ({ default: module.PairPage })))
 const UserPage = lazy(() => import('./pages/UserPage').then((module) => ({ default: module.UserPage })))
 const FavoritesPage = lazy(() => import('./pages/FavoritesPage').then((module) => ({ default: module.FavoritesPage })))
-const MockPaymentPage = lazy(() => import('./pages/MockPaymentPage').then((module) => ({ default: module.MockPaymentPage })))
+const PaymentPage = lazy(() => import('./pages/PaymentPage').then((module) => ({ default: module.PaymentPage })))
+const QrPaymentPage = lazy(() => import('./pages/QrPaymentPage').then((module) => ({ default: module.QrPaymentPage })))
 const TicketOrdersPage = lazy(() => import('./pages/TicketOrdersPage').then((module) => ({ default: module.TicketOrdersPage })))
 const OnlineDashboardPage = lazy(() => import('./pages/OnlineDashboardPage').then((module) => ({ default: module.OnlineDashboardPage })))
 const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage').then((module) => ({ default: module.AdminLoginPage })))
@@ -318,7 +319,8 @@ export default function App() {
             <Route path="/saved" element={<SavedPage />} />
             <Route path="/favorites" element={<FavoritesPage />} />
             <Route path="/tickets" element={<TicketOrdersPage />} />
-            <Route path="/payment/mock/:orderId" element={<MockPaymentPage />} />
+            <Route path="/payment/:orderId" element={<PaymentPage />} />
+            <Route path="/pay/:orderId" element={<QrPaymentPage />} />
             <Route path="/offline" element={<SettingsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/login" element={<UserPage />} />

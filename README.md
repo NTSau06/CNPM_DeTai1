@@ -212,3 +212,6 @@ Nhấn `Ctrl+C` để dừng Expo và các backend do lệnh khởi tạo. Nếu
   - Khởi chạy SQL Server, chạy unit/API tests (`pytest`), kiểm thử tích hợp toàn stack qua Docker Compose (`smoke_api.py`) và đóng gói image lên GitHub Container Registry (GHCR).
 - **React Native CI/CD** ([`.github/workflows/mobile-ci-cd.yml`](.github/workflows/mobile-ci-cd.yml)):
   - Kiểm tra tương thích Expo, kiểm tra kiểu TypeScript (`typecheck`), xuất bản web preview artifact và tùy chọn build native qua Expo EAS.
+2 lệnh để dứng và chạy backend
+.\stop-local.ps1
+.\run-local.ps1

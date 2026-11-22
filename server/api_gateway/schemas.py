@@ -70,13 +70,10 @@ class RatingSubmission(BaseModel):
     review: Annotated[str, Field(max_length=500)] = ""
 
 
-class PaymentStart(BaseModel):
-    method: Literal["mock", "vnpay"]
-    locale: Annotated[str, Field(max_length=10)] = "vi"
+class QrPaymentConfirm(BaseModel):
+    """Mã thanh toán của đơn, lấy từ mã QR, để không ai đoán được đường dẫn xác nhận."""
 
-
-class MockPaymentResult(BaseModel):
-    success: bool
+    code: Annotated[str, Field(pattern=r"^QT[0-9A-Fa-f]{10}$")]
 
 
 class AccountDeletion(BaseModel):

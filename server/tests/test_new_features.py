@@ -6,12 +6,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api_gateway.main import create_app as create_gateway_app
-from api_gateway.payments import (
-    PaymentSettings,
-    build_vnpay_url,
-    verify_vnpay_params,
-    vnpay_signature,
-)
 from api_gateway.rate_limit import LoginRateLimiter
 from services.analytics_service.main import create_app as create_analytics_app
 from services.common.database import Database
@@ -24,22 +18,12 @@ SERVICE_URLS = {
 }
 
 
-VNPAY_SETTINGS = PaymentSettings(
-    mock_enabled=True,
-    vnpay_tmn_code="TESTCODE",
-    vnpay_hash_secret="TESTSECRET",
-    public_api_url="http://gateway.test/api/v1",
-    frontend_url="http://web.test",
-)
-
-
-def _gateway(database: Database, payments: PaymentSettings | None = None) -> TestClient:
+def _gateway(database: Database) -> TestClient:
     app = create_gateway_app(
         SERVICE_URLS,
         database,
         admin_email="admin@example.com",
         admin_password="long-admin-password",
-        payment_settings=payments or PaymentSettings(),
     )
     return TestClient(app)
 
@@ -283,36 +267,38 @@ def _pending_order(client: TestClient, headers: dict[str, str], quantity: int = 
     return response.json()
 
 
-def test_mock_payment_flow_marks_order_paid_once(
+def test_qr_payment_page_confirms_order(
     database: Database,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _place_lookup(monkeypatch)
     with _gateway(database) as client:
-        assert client.get("/api/v1/payments/methods").json() == {"methods": ["mock"]}
-        user = _register(client, "payer@example.com")
-        other = _register(client, "not-payer@example.com")
+        user = _register(client, "qr-user@example.com")
         admin = _admin(client)
         order = _pending_order(client, user)
-        assert order["status"] == "pending" and order["expiresAt"]
+        info = client.get(f"/api/v1/tickets/orders/{order['id']}/payment", headers=user)
+        assert info.status_code == 200
+        code = info.json()["order"]["paymentCode"]
+        assert code.startswith("QT")
 
-        pay = f"/api/v1/tickets/orders/{order['id']}/pay"
-        assert client.post(pay, headers=user, json={"method": "vnpay"}).status_code == 422
-        assert client.post(pay, headers=other, json={"method": "mock"}).status_code == 404
-        started = client.post(pay, headers=user, json={"method": "mock"}).json()
-        assert started["external"] is False
+        # Trang xác nhận mở trên điện thoại không cần đăng nhập nhưng phải có đúng mã của đơn.
+        wrong = client.get(f"/api/v1/payments/qr/{order['id']}", params={"code": "QT0000000000"})
+        assert wrong.status_code == 404
+        assert client.get(f"/api/v1/payments/qr/{order['id']}", params={"code": "bad"}).status_code == 422
+        view = client.get(f"/api/v1/payments/qr/{order['id']}", params={"code": code}).json()
+        assert view["status"] == "pending" and view["totalPriceVnd"] == order["totalPriceVnd"]
+        assert "paymentCode" not in view
 
-        mock = f"/api/v1/tickets/orders/{order['id']}/mock-payment"
-        declined = client.post(mock, headers=user, json={"success": False}).json()
-        assert declined["status"] == "pending"
-        paid = client.post(mock, headers=user, json={"success": True}).json()
-        assert paid["status"] == "paid" and paid["paymentRef"].startswith("MOCK-")
-        assert client.post(mock, headers=user, json={"success": True}).status_code == 409
-        assert client.post(pay, headers=user, json={"method": "mock"}).status_code == 409
-
+        confirm = f"/api/v1/payments/qr/{order['id']}/confirm"
+        assert client.post(confirm, json={"code": "QT0000000000"}).status_code == 404
+        paid = client.post(confirm, json={"code": code.lower()}).json()
+        assert paid["status"] == "paid"
+        again = client.post(confirm, json={"code": code})
+        assert again.status_code == 200 and again.json()["status"] == "paid"
+        latest = client.get(f"/api/v1/tickets/orders/{order['id']}", headers=user).json()
+        assert latest["status"] == "paid" and latest["paymentMethod"] == "qr"
         sales = client.get("/api/v1/admin/tickets", headers=admin).json()
         assert sales["totalTicketsSold"] == 2
-        assert sales["pendingOrders"] == 0
 
 
 def test_unpaid_orders_expire_and_cannot_be_paid(
@@ -323,75 +309,13 @@ def test_unpaid_orders_expire_and_cannot_be_paid(
     with _gateway(database) as client:
         user = _register(client, "late@example.com")
         order = _pending_order(client, user)
+        code = client.get(f"/api/v1/tickets/orders/{order['id']}/payment", headers=user).json()["order"]["paymentCode"]
         with database.connect() as connection:
             connection.execute(
                 "UPDATE ticket_orders SET expires_at = '2000-01-01T00:00:00Z' WHERE id = ?",
                 order["id"],
             )
         assert client.get(f"/api/v1/tickets/orders/{order['id']}", headers=user).json()["status"] == "expired"
-        assert client.post(
-            f"/api/v1/tickets/orders/{order['id']}/pay", headers=user, json={"method": "mock"}
-        ).status_code == 409
-
-
-def test_vnpay_signature_round_trip_and_tampering() -> None:
-    url = build_vnpay_url(
-        VNPAY_SETTINGS,
-        order_id="abc123",
-        amount_vnd=150_000,
-        client_ip="1.2.3.4",
-        order_info="Thanh toan ve QT-ABC",
-    )
-    assert url.startswith("https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?")
-    from urllib.parse import parse_qsl, urlsplit
-
-    params = dict(parse_qsl(urlsplit(url).query))
-    assert params["vnp_Amount"] == "15000000"
-    assert params["vnp_ReturnUrl"] == "http://gateway.test/api/v1/payments/vnpay/return"
-    assert verify_vnpay_params(VNPAY_SETTINGS, params)
-    assert not verify_vnpay_params(VNPAY_SETTINGS, {**params, "vnp_Amount": "100"})
-    assert not verify_vnpay_params(PaymentSettings(), params)
-
-
-def _signed(params: dict[str, str]) -> dict[str, str]:
-    return {**params, "vnp_SecureHash": vnpay_signature(params, VNPAY_SETTINGS.vnpay_hash_secret)}
-
-
-def test_vnpay_ipn_and_return_confirm_payment(
-    database: Database,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _place_lookup(monkeypatch)
-    with _gateway(database, VNPAY_SETTINGS) as client:
-        assert client.get("/api/v1/payments/methods").json() == {"methods": ["mock", "vnpay"]}
-        user = _register(client, "vnpay@example.com")
-        order = _pending_order(client, user)
-        started = client.post(
-            f"/api/v1/tickets/orders/{order['id']}/pay", headers=user, json={"method": "vnpay"}
-        ).json()
-        assert started["external"] is True and "vnp_SecureHash=" in started["redirectUrl"]
-
-        base = {
-            "vnp_TxnRef": order["id"],
-            "vnp_Amount": str(order["totalPriceVnd"] * 100),
-            "vnp_ResponseCode": "00",
-            "vnp_TransactionStatus": "00",
-            "vnp_TransactionNo": "14123456",
-        }
-        assert client.get("/api/v1/payments/vnpay/ipn", params={**base, "vnp_SecureHash": "bad"}).json()["RspCode"] == "97"
-        assert client.get(
-            "/api/v1/payments/vnpay/ipn", params=_signed({**base, "vnp_Amount": "100"})
-        ).json()["RspCode"] == "04"
-        assert client.get(
-            "/api/v1/payments/vnpay/ipn", params=_signed({**base, "vnp_TxnRef": "missing"})
-        ).json()["RspCode"] == "01"
-        assert client.get("/api/v1/payments/vnpay/ipn", params=_signed(base)).json()["RspCode"] == "00"
-        assert client.get("/api/v1/payments/vnpay/ipn", params=_signed(base)).json()["RspCode"] == "02"
-
-        returned = client.get(
-            "/api/v1/payments/vnpay/return", params=_signed(base), follow_redirects=False
-        )
-        assert returned.status_code == 302
-        assert returned.headers["location"] == f"http://web.test/tickets?payment=success&order={order['id']}"
-        paid = client.get(f"/api/v1/tickets/orders/{order['id']}", headers=user).json()
-        assert paid["status"] == "paid" and paid["paymentRef"] == "14123456"
+        confirm = client.post(f"/api/v1/payments/qr/{order['id']}/confirm", json={"code": code})
+        assert confirm.status_code == 409
+        assert client.get(f"/api/v1/tickets/orders/{order['id']}", headers=user).json()["status"] == "expired"

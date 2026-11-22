@@ -1,28 +1,23 @@
 ﻿"""Cung cấp API công khai và điều phối yêu cầu giữa các backend service."""
 import math
-import secrets
-import urllib.parse
 import uuid
 from typing import Annotated
 
 import pyodbc
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
-from fastapi.responses import RedirectResponse
 
 from api_gateway.auth import AccountLockedError
 from api_gateway.pairing import PAIRING_TTL_SECONDS
-from api_gateway.payments import build_vnpay_url, verify_vnpay_params, vnpay_succeeded
 from api_gateway.proxy import request_service
 from api_gateway.tickets import PaymentError
 from api_gateway.schemas import (
     AccountDeletion,
     LoginRequest,
-    MockPaymentResult,
     PairingCreate,
     PasswordChange,
-    PaymentStart,
     ProfileUpdate,
+    QrPaymentConfirm,
     RatingSubmission,
     RegisterRequest,
     TicketOrderCreate,
@@ -362,142 +357,65 @@ def _payment_http_error(error: PaymentError) -> HTTPException:
     return HTTPException(status_code=PAYMENT_ERROR_STATUS.get(error.code, 409), detail=str(error))
 
 
-@router.get("/payments/methods")
-def get_payment_methods(request: Request) -> dict:
-    return {"methods": request.app.state.payment_settings.methods()}
-
-
-@router.post("/tickets/orders/{order_id}/pay")
-def start_ticket_payment(
+@router.get("/tickets/orders/{order_id}/payment")
+def get_ticket_payment(
     order_id: str,
-    payload: PaymentStart,
     request: Request,
     authorization: str | None = Header(default=None),
 ) -> dict:
-    """Bắt đầu thanh toán; trả về địa chỉ chuyển hướng tới cổng thanh toán."""
+    """Đơn kèm mã thanh toán để web tạo mã QR mở trang xác nhận thanh toán trên điện thoại."""
     user = authenticated_user(request, authorization)
-    settings = request.app.state.payment_settings
-    if payload.method not in settings.methods():
-        raise HTTPException(status_code=422, detail="This payment method is not enabled.")
-    try:
-        order = request.app.state.ticket_repository.start_payment(
-            user["id"], order_id, payload.method
-        )
-    except PaymentError as error:
-        raise _payment_http_error(error) from error
-    if payload.method == "mock":
-        return {
-            "order": order,
-            "redirectUrl": f"/payment/mock/{urllib.parse.quote(order_id)}",
-            "external": False,
-        }
+    order = request.app.state.ticket_repository.ensure_payment_code(user["id"], order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Ticket order not found.")
+    return {"order": order}
+
+
+def _qr_payment_order(request: Request, order_id: str, code: str) -> dict:
+    """Đơn của trang xác nhận mở từ mã QR; mã thanh toán phải khớp đúng đơn."""
+    order = request.app.state.ticket_repository.get_by_payment_code(code.upper())
+    if order is None or order["id"] != order_id:
+        raise HTTPException(status_code=404, detail="Ticket order not found.")
+    return order
+
+
+def _qr_payment_view(order: dict) -> dict:
+    # Trang này mở trên điện thoại chưa đăng nhập nên chỉ trả thông tin tối thiểu.
     return {
-        "order": order,
-        "redirectUrl": build_vnpay_url(
-            settings,
-            order_id=order_id,
-            amount_vnd=order["totalPriceVnd"],
-            client_ip=_client_ip(request),
-            order_info=f"Thanh toan ve {order['ticketCode']}",
-            locale=payload.locale,
-        ),
-        "external": True,
+        "orderId": order["id"],
+        "ticketCode": order["ticketCode"],
+        "placeId": order["placeId"],
+        "quantity": order["quantity"],
+        "totalPriceVnd": order["totalPriceVnd"],
+        "status": order["status"],
     }
 
 
-@router.post("/tickets/orders/{order_id}/mock-payment")
-def complete_mock_payment(
+@router.get("/payments/qr/{order_id}")
+def get_qr_payment(
     order_id: str,
-    payload: MockPaymentResult,
     request: Request,
-    authorization: str | None = Header(default=None),
+    code: str = Query(pattern=r"^QT[0-9A-Fa-f]{10}$"),
 ) -> dict:
-    """Cổng thanh toán mô phỏng: người dùng bấm xác nhận hoặc hủy giao dịch."""
-    user = authenticated_user(request, authorization)
-    if not request.app.state.payment_settings.mock_enabled:
-        raise HTTPException(status_code=404, detail="Mock payment is disabled.")
-    repository = request.app.state.ticket_repository
-    if not payload.success:
-        order = repository.get_order(order_id, user["id"])
-        if order is None:
-            raise HTTPException(status_code=404, detail="Ticket order not found.")
-        return order
-    order = repository.get_order(order_id, user["id"])
-    if order is None:
-        raise HTTPException(status_code=404, detail="Ticket order not found.")
+    return _qr_payment_view(_qr_payment_order(request, order_id, code))
+
+
+@router.post("/payments/qr/{order_id}/confirm")
+def confirm_qr_payment(order_id: str, payload: QrPaymentConfirm, request: Request) -> dict:
+    """Xác nhận thanh toán từ trang mở bằng mã QR (thanh toán mô phỏng, không chuyển tiền thật)."""
+    order = _qr_payment_order(request, order_id, payload.code)
+    if order["status"] == "paid":
+        return _qr_payment_view(order)
     if order["status"] != "pending":
-        raise HTTPException(status_code=409, detail="This ticket order is not awaiting payment.")
+        # Đơn đã hủy hoặc quá 15 phút thì phải đặt đơn mới.
+        raise HTTPException(status_code=409, detail="This ticket order is no longer awaiting payment.")
     try:
-        return repository.mark_paid(
-            order_id,
-            method="mock",
-            reference=f"MOCK-{secrets.token_hex(6).upper()}",
-            user_id=user["id"],
+        paid = request.app.state.ticket_repository.mark_paid(
+            order["id"], method="qr", reference=f"QR-{payload.code.upper()}"
         )
     except PaymentError as error:
         raise _payment_http_error(error) from error
-
-
-def _vnpay_amount(query: dict[str, str]) -> int | None:
-    try:
-        return int(query.get("vnp_Amount", "")) // 100
-    except ValueError:
-        return None
-
-
-@router.get("/payments/vnpay/return", include_in_schema=False)
-def vnpay_return(request: Request) -> RedirectResponse:
-    """VNPay chuyển trình duyệt về đây; xác minh chữ ký rồi chuyển sang trang web."""
-    settings = request.app.state.payment_settings
-    query = dict(request.query_params)
-    order_id = query.get("vnp_TxnRef", "")
-    result = "invalid"
-    if verify_vnpay_params(settings, query):
-        result = "failed"
-        if vnpay_succeeded(query):
-            try:
-                request.app.state.ticket_repository.mark_paid(
-                    order_id,
-                    method="vnpay",
-                    reference=query.get("vnp_TransactionNo", ""),
-                    amount_vnd=_vnpay_amount(query),
-                )
-                result = "success"
-            except PaymentError as error:
-                result = "success" if error.code == "already_paid" else "failed"
-    target = urllib.parse.urlencode({"payment": result, "order": order_id})
-    return RedirectResponse(f"{settings.frontend_url}/tickets?{target}", status_code=302)
-
-
-@router.get("/payments/vnpay/ipn", include_in_schema=False)
-def vnpay_ipn(request: Request) -> dict:
-    """VNPay gọi máy chủ-máy chủ để xác nhận kết quả (theo mã phản hồi chuẩn VNPay)."""
-    settings = request.app.state.payment_settings
-    query = dict(request.query_params)
-    if not verify_vnpay_params(settings, query):
-        return {"RspCode": "97", "Message": "Invalid signature"}
-    order_id = query.get("vnp_TxnRef", "")
-    order = request.app.state.ticket_repository.get_order(order_id)
-    if order is None:
-        return {"RspCode": "01", "Message": "Order not found"}
-    if _vnpay_amount(query) != order["totalPriceVnd"]:
-        return {"RspCode": "04", "Message": "Invalid amount"}
-    if order["status"] == "paid":
-        return {"RspCode": "02", "Message": "Order already confirmed"}
-    if not vnpay_succeeded(query):
-        return {"RspCode": "00", "Message": "Confirm Success"}
-    try:
-        request.app.state.ticket_repository.mark_paid(
-            order_id,
-            method="vnpay",
-            reference=query.get("vnp_TransactionNo", ""),
-            amount_vnd=_vnpay_amount(query),
-        )
-    except PaymentError as error:
-        if error.code == "already_paid":
-            return {"RspCode": "02", "Message": "Order already confirmed"}
-        return {"RspCode": "99", "Message": str(error)}
-    return {"RspCode": "00", "Message": "Confirm Success"}
+    return _qr_payment_view(paid)
 
 
 @router.get("/favorites")

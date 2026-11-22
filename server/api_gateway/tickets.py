@@ -27,13 +27,12 @@ DEFAULT_TICKET_PRICES_VND = {
 
 ORDER_COLUMNS = (
     "id, place_id, quantity, unit_price_vnd, total_price_vnd, created_at, status, cancelled_at, "
-    "payment_method, payment_ref, paid_at, expires_at"
+    "payment_method, payment_ref, paid_at, expires_at, payment_code"
 )
 
 # Vòng đời đơn vé: pending (chờ thanh toán) -> paid | cancelled | expired.
 # Đơn tạo trước khi có thanh toán mang trạng thái cũ 'booked' và được chuyển thành 'paid'.
 PAYMENT_TIMEOUT = timedelta(minutes=15)
-PAYMENT_METHODS = ("mock", "vnpay")
 
 
 class PaymentError(Exception):
@@ -76,7 +75,8 @@ class TicketRepository:
                     payment_method NVARCHAR(16) NULL,
                     payment_ref NVARCHAR(100) NULL,
                     paid_at NVARCHAR(40) NULL,
-                    expires_at NVARCHAR(40) NULL
+                    expires_at NVARCHAR(40) NULL,
+                    payment_code NVARCHAR(16) NULL
                 )
                 """
             )
@@ -94,6 +94,8 @@ class TicketRepository:
                 ("payment_ref", "NVARCHAR(100) NULL"),
                 ("paid_at", "NVARCHAR(40) NULL"),
                 ("expires_at", "NVARCHAR(40) NULL"),
+                # Mã thanh toán ghi trong nội dung chuyển khoản VietQR, dùng để đối chiếu webhook.
+                ("payment_code", "NVARCHAR(16) NULL"),
             ):
                 connection.execute(
                     f"""
@@ -150,6 +152,7 @@ class TicketRepository:
         """Tạo đơn ở trạng thái chờ thanh toán, giữ chỗ trong PAYMENT_TIMEOUT."""
         # Mã đơn chỉ gồm chữ số hex để dùng trực tiếp làm vnp_TxnRef của VNPay.
         order_id = secrets.token_hex(8)
+        payment_code = _new_payment_code()
         now = datetime.now(timezone.utc)
         created_at = _iso(now)
         expires_at = _iso(now + PAYMENT_TIMEOUT)
@@ -166,8 +169,8 @@ class TicketRepository:
                 """
                 INSERT INTO ticket_orders (
                     id, user_id, place_id, quantity, unit_price_vnd,
-                    total_price_vnd, created_at, status, expires_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+                    total_price_vnd, created_at, status, expires_at, payment_code
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
                 """,
                 order_id,
                 user_id,
@@ -177,11 +180,12 @@ class TicketRepository:
                 total_price_vnd,
                 created_at,
                 expires_at,
+                payment_code,
             )
         return _order_record(
             (
                 order_id, place_id, quantity, unit_price_vnd, total_price_vnd,
-                created_at, "pending", None, None, None, None, expires_at,
+                created_at, "pending", None, None, None, None, expires_at, payment_code,
             )
         )
 
@@ -214,14 +218,12 @@ class TicketRepository:
                 f"SELECT {ORDER_COLUMNS}, user_id FROM ticket_orders WHERE id = ?",
                 order_id,
             ).fetchone()
-        if row is None or (user_id is not None and row[12] != user_id):
+        if row is None or (user_id is not None and row[13] != user_id):
             return None
         return _order_record(row)
 
-    def start_payment(self, user_id: str, order_id: str, method: str) -> dict:
-        """Ghi nhận phương thức thanh toán người dùng chọn cho đơn đang chờ."""
-        if method not in PAYMENT_METHODS:
-            raise PaymentError("invalid_method", "Unsupported payment method.")
+    def ensure_payment_code(self, user_id: str, order_id: str) -> dict | None:
+        """Trả đơn của người dùng, cấp mã thanh toán nếu đơn cũ chưa có."""
         with self.database.connect() as connection:
             self._expire_stale(connection)
             row = connection.execute(
@@ -231,13 +233,23 @@ class TicketRepository:
                 user_id,
             ).fetchone()
             if row is None:
-                raise PaymentError("not_found", "Ticket order not found.")
-            if row[6] != "pending":
-                raise PaymentError("not_pending", _not_pending_message(row[6]))
+                return None
+            if row[12] or row[6] != "pending":
+                return _order_record(row)
+            payment_code = _new_payment_code()
             connection.execute(
-                "UPDATE ticket_orders SET payment_method = ? WHERE id = ?", method, order_id
+                "UPDATE ticket_orders SET payment_code = ? WHERE id = ?", payment_code, order_id
             )
-        return _order_record((*tuple(row)[:8], method, *tuple(row)[9:12]))
+        return _order_record((*tuple(row)[:12], payment_code))
+
+    def get_by_payment_code(self, payment_code: str) -> dict | None:
+        with self.database.connect() as connection:
+            self._expire_stale(connection)
+            row = connection.execute(
+                f"SELECT {ORDER_COLUMNS} FROM ticket_orders WHERE payment_code = ?",
+                payment_code,
+            ).fetchone()
+        return None if row is None else _order_record(row)
 
     def mark_paid(
         self,
@@ -257,9 +269,10 @@ class TicketRepository:
                 "WHERE id = ?",
                 order_id,
             ).fetchone()
-            if row is None or (user_id is not None and row[12] != user_id):
+            if row is None or (user_id is not None and row[13] != user_id):
                 raise PaymentError("not_found", "Ticket order not found.")
-            if amount_vnd is not None and amount_vnd != row[4]:
+            # Chuyển thiếu thì không xác nhận; chuyển dư vẫn nhận (giống hướng dẫn của SePay).
+            if amount_vnd is not None and amount_vnd < row[4]:
                 raise PaymentError("invalid_amount", "Paid amount does not match the order.")
             if row[6] == "paid":
                 raise PaymentError("already_paid", "This ticket order has already been paid.")
@@ -278,7 +291,9 @@ class TicketRepository:
                 reference[:100],
                 order_id,
             )
-        return _order_record((*tuple(row)[:6], "paid", None, method, reference[:100], paid_at, row[11]))
+        return _order_record(
+            (*tuple(row)[:6], "paid", None, method, reference[:100], paid_at, row[11], row[12])
+        )
 
     def cancel_order(self, user_id: str, order_id: str) -> dict | None:
         """Hủy đơn đang chờ hoặc đã thanh toán (hoàn tiền mô phỏng).
@@ -311,7 +326,7 @@ class TicketRepository:
                 cancelled_at,
                 order_id,
             )
-        return _order_record((*tuple(row)[:6], "cancelled", cancelled_at, *tuple(row)[8:12]))
+        return _order_record((*tuple(row)[:6], "cancelled", cancelled_at, *tuple(row)[8:13]))
 
     def sales_summary(self, period_days: int | None = None) -> dict:
         """Tổng hợp vé đã thanh toán, có thể lọc theo số ngày gần nhất."""
@@ -386,6 +401,11 @@ def _utc_now() -> str:
     return _iso(datetime.now(timezone.utc))
 
 
+def _new_payment_code() -> str:
+    """Mã khó đoán, không tăng dần: QT + 10 ký tự hex in hoa (vừa nội dung chuyển khoản)."""
+    return "QT" + secrets.token_hex(5).upper()
+
+
 def _not_pending_message(status: str) -> str:
     return {
         "cancelled": "This ticket order has been cancelled.",
@@ -410,4 +430,5 @@ def _order_record(row: tuple) -> dict:
         "paymentRef": row[9],
         "paidAt": row[10],
         "expiresAt": row[11],
+        "paymentCode": row[12] if len(row) > 12 else None,
     }

@@ -1,4 +1,7 @@
 .git
+.task-artifacts
+venvs
+.audio-venv
 .venv
 **/node_modules
 **/dist
