@@ -5,6 +5,8 @@ import { distance, point } from '@turf/turf'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { getVisitorId, recordVisit } from '../api'
 import { NarrationCard } from '../components/NarrationCard'
+import { AudioPlayer } from '../components/AudioPlayer'
+import welcomeAudio from '../data/welcomeAudio.json'
 import { PlaceRatingPanel } from '../components/PlaceRatingPanel'
 import { TicketPurchasePanel } from '../components/TicketPurchasePanel'
 import { RitualGuidancePanel } from '../components/RitualGuidancePanel'
@@ -449,6 +451,21 @@ export function ExplorePage() {
       </section>
 
       <div className="explore-content">
+        {language === 'vi' && (
+          <details className="welcome-audio">
+            <summary><Headphones size={17} aria-hidden="true" />Nghe lời chào mừng · Tiếng Việt</summary>
+            <p>{welcomeAudio.text}</p>
+            <AudioPlayer
+              text={welcomeAudio.text}
+              vietnameseText={welcomeAudio.text}
+              language="vi"
+              speechLanguage="vi"
+              audioSrc={`${import.meta.env.BASE_URL}assets/audio/welcome-vi.mp3?v=${welcomeAudio.audioSha256.slice(0, 12)}`}
+              estimatedDurationSeconds={welcomeAudio.durationSeconds}
+              onPlayingChange={() => {}}
+            />
+          </details>
+        )}
         <form className="home-search" role="search" onSubmit={(event) => {
           event.preventDefault()
           if (!search.trim()) {

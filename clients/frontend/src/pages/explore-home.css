@@ -212,6 +212,20 @@
   .about-visual { grid-template-columns: 1fr 1fr; grid-template-rows: 160px 110px; height: auto; }
   .about-photo-main { grid-row: auto; grid-column: 1 / 3; }
 }
+.welcome-audio {
+  margin: 24px 0;
+  padding: 16px;
+  border: 1px solid #d8e2dc;
+  border-radius: 12px;
+  background: #fff;
+}
+.welcome-audio summary {
+  cursor: pointer;
+  color: #245d4b;
+  font-weight: 600;
+}
+.welcome-audio summary svg { margin-right: 8px; vertical-align: middle; }
+.welcome-audio > p { line-height: 1.7; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .explore-page *, .explore-page *::before, .explore-page *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

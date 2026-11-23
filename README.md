@@ -151,7 +151,8 @@ Thêm ít nhất hai điểm vào hành trình để hiện nút **Tối ưu l�
 
 14 địa điểm có đủ 7 ngôn ngữ: Việt, Anh, Trung giản thể, Hàn, Pháp, Nhật và Tây Ban Nha (98 MP3). Thời lượng 3–5 phút tính ở tốc độ phát **1x**. Bản lời dài được dùng chung cho giọng đọc dự phòng trên web và API thuyết minh cho mobile; các nội dung admin đã sửa được giữ nguyên. Mobile vẫn đọc bằng Expo Speech nên thời lượng phụ thuộc giọng cài trên thiết bị.
 
-- MP3: `clients/frontend/public/audio/<place-id>/<locale>.mp3`.
+- MP3: `clients/frontend/public/assets/audio/<place-id>/<locale>.mp3` (URL: `/assets/audio/<place-id>/<locale>.mp3`).
+- Audio chào mừng tiếng Việt (~30 giây): `clients/frontend/public/assets/audio/welcome-vi.mp3`, mở mục **Nghe lời chào mừng · Tiếng Việt** ở trang khám phá khi chọn tiếng Việt. Lời đọc và thông tin file nằm trong `clients/frontend/src/data/welcomeAudio.json`; tạo lại bằng `.\.audio-venv\Scripts\python.exe scripts/build_welcome_audio.py` (Google TTS).
 - Lời đọc: `clients/frontend/src/data/narrationScripts.json`, đồng bộ sang `server/services/narration_service/data/narrationScripts.json`.
 - Thời lượng đo, mã kiểm tra nội dung và MP3: `clients/frontend/src/data/narrationAudio.json`.
 - Bản dịch tự động sử dụng Google; giọng đọc tổng hợp dùng Google TTS hoặc Microsoft Edge TTS. Cần rà soát ngôn ngữ bản địa trước khi dùng làm thuyết minh chính thức.

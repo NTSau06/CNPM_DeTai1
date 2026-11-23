@@ -33,7 +33,7 @@ export function getNarrationAudioUrl(place: { id: string; copy: Partial<Place['c
   const placeId = place.id
   const metadata = narrationAudio[placeId]?.[language]
   if (!metadata || !getBundledScript(place, language)) return undefined
-  return `${import.meta.env.BASE_URL}audio/${placeId}/${language}.mp3?v=${metadata.audioSha256.slice(0, 12)}`
+  return `${import.meta.env.BASE_URL}assets/audio/${placeId}/${language}.mp3?v=${metadata.audioSha256.slice(0, 12)}`
 }
 
 export function getNarrationAudioLanguage(place: Place, preferredLanguage: Language): Language {
