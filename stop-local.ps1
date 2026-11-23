@@ -38,6 +38,14 @@ foreach ($endpoint in $endpoints) {
   }
 }
 
+# Cloudflare Tunnel started by run-local.ps1 -Tunnel (matched by its command line).
+$tunnels = @(Get-CimInstance Win32_Process -Filter "Name = 'cloudflared.exe'" -ErrorAction SilentlyContinue |
+  Where-Object { $_.CommandLine -match 'tunnel.*--url\s+http://localhost:5173' })
+foreach ($tunnel in $tunnels) {
+  Stop-Process -Id $tunnel.ProcessId -ErrorAction SilentlyContinue
+  Write-Host "Stopped Cloudflare Tunnel (PID $($tunnel.ProcessId))."
+}
+
 if (-not $foundListener) {
   Write-Host "No local app services are listening on ports 8000-8004 or 5173."
 }

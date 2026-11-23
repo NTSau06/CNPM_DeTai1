@@ -222,21 +222,48 @@ class AuthRepository:
         birth_date: str,
         gender: str,
         address: str,
+        email: str | None = None,
     ) -> dict | None:
         with self.database.connect() as connection:
-            cursor = connection.execute(
-                """
-                UPDATE users
-                SET full_name = ?, phone = ?, birth_date = ?, gender = ?, address = ?
-                WHERE id = ?
-                """,
-                full_name,
-                phone,
-                birth_date,
-                gender,
-                address,
-                user_id,
-            )
+            if email is not None:
+                conflict = connection.execute(
+                    "SELECT id FROM users WHERE LOWER(email) = ? AND id <> ?",
+                    email,
+                    user_id,
+                ).fetchone()
+                if conflict is not None:
+                    raise ValueError("An account with this email already exists.")
+                try:
+                    cursor = connection.execute(
+                        """
+                        UPDATE users
+                        SET full_name = ?, email = ?, phone = ?, birth_date = ?, gender = ?, address = ?
+                        WHERE id = ?
+                        """,
+                        full_name,
+                        email,
+                        phone,
+                        birth_date,
+                        gender,
+                        address,
+                        user_id,
+                    )
+                except pyodbc.IntegrityError as error:
+                    raise ValueError("An account with this email already exists.") from error
+            else:
+                cursor = connection.execute(
+                    """
+                    UPDATE users
+                    SET full_name = ?, phone = ?, birth_date = ?, gender = ?, address = ?
+                    WHERE id = ?
+                    """,
+                    full_name,
+                    phone,
+                    birth_date,
+                    gender,
+                    address,
+                    user_id,
+                )
             if cursor.rowcount == 0:
                 return None
         return self._get_user(user_id)

@@ -1,4 +1,4 @@
-﻿"""Cung cấp API công khai và điều phối yêu cầu giữa các backend service."""
+"""Cung cấp API công khai và điều phối yêu cầu giữa các backend service."""
 import math
 import uuid
 from typing import Annotated
@@ -179,14 +179,18 @@ def update_current_user(
     full_name = payload.full_name.strip()
     if not full_name:
         raise HTTPException(status_code=422, detail="Enter your name.")
-    updated = request.app.state.auth_repository.update_profile(
-        user["id"],
-        full_name,
-        payload.phone.strip(),
-        payload.birth_date,
-        payload.gender,
-        payload.address.strip(),
-    )
+    try:
+        updated = request.app.state.auth_repository.update_profile(
+            user["id"],
+            full_name,
+            payload.phone.strip(),
+            payload.birth_date,
+            payload.gender,
+            payload.address.strip(),
+            email=payload.email,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
     if updated is None:
         raise HTTPException(status_code=404, detail="User not found.")
     return updated

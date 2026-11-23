@@ -80,11 +80,44 @@ export async function fetchProfile(token: string): Promise<UserProfile> {
   return api<UserProfile>('/auth/me', undefined, token)
 }
 
+const EMAIL_LOCAL_PATTERN = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+$/
+const EMAIL_LABEL_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
+const EMAIL_TLD_PATTERN = /^(?:[a-z]{2,63}|xn--[a-z0-9]{1,59}(?:-[a-z0-9]+)*)$/
+
+export function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+export function isValidEmail(value: string): boolean {
+  const normalized = normalizeEmail(value)
+  if (!normalized || normalized.length > 254) return false
+  const atIndex = normalized.indexOf('@')
+  if (atIndex <= 0 || atIndex !== normalized.lastIndexOf('@')) return false
+  const local = normalized.slice(0, atIndex)
+  const domain = normalized.slice(atIndex + 1)
+  if (
+    local.length > 64 ||
+    local.startsWith('.') ||
+    local.endsWith('.') ||
+    local.includes('..') ||
+    !EMAIL_LOCAL_PATTERN.test(local)
+  ) {
+    return false
+  }
+  if (!domain || domain.length > 253 || !domain.includes('.')) return false
+  const labels = domain.split('.')
+  if (labels.length < 2 || labels.some((label) => !EMAIL_LABEL_PATTERN.test(label))) {
+    return false
+  }
+  return EMAIL_TLD_PATTERN.test(labels[labels.length - 1])
+}
+
 export async function updateProfile(token: string, profile: UserProfile): Promise<UserProfile> {
   return api<UserProfile>('/auth/me', {
     method: 'PUT',
     body: JSON.stringify({
       fullName: profile.fullName,
+      email: normalizeEmail(profile.email),
       phone: profile.phone,
       birthDate: profile.birthDate,
       gender: profile.gender,

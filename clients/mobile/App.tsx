@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Crypto from 'expo-crypto'
 import * as Location from 'expo-location'
 import * as Speech from 'expo-speech'
-import { ApiError, api } from './src/api'
+import { ApiError, api, isValidEmail } from './src/api'
 import { StatusBar } from 'expo-status-bar'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -498,6 +498,10 @@ export default function App() {
     setAuthError('')
     if (authMode === 'register' && !authName.trim()) {
       setAuthError(mt(language, 'nameRequired'))
+      return
+    }
+    if (!isValidEmail(authEmail)) {
+      setAuthError(mt(language, 'emailInvalid'))
       return
     }
     if (authPassword.length < 8) {

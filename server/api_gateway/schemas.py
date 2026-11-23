@@ -1,4 +1,4 @@
-﻿"""Kiểm tra dữ liệu yêu cầu trước khi chuyển vào xử lý nghiệp vụ."""
+"""Kiểm tra dữ liệu yêu cầu trước khi chuyển vào xử lý nghiệp vụ."""
 from __future__ import annotations
 
 import re
@@ -6,6 +6,35 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+_EMAIL_LOCAL_RE = re.compile(r"^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+$")
+_EMAIL_LABEL_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+_EMAIL_TLD_RE = re.compile(r"^(?:[a-z]{2,63}|xn--[a-z0-9]{1,59}(?:-[a-z0-9]+)*)$")
+
+
+def validate_strict_email(value: str) -> str:
+    """Kiểm tra chặt định dạng email và chuẩn hóa về chữ thường."""
+    normalized = value.strip().lower()
+    if not normalized or len(normalized) > 254 or normalized.count("@") != 1:
+        raise ValueError("Enter a valid email address.")
+    local, domain = normalized.split("@", 1)
+    if (
+        not local
+        or len(local) > 64
+        or local.startswith(".")
+        or local.endswith(".")
+        or ".." in local
+        or _EMAIL_LOCAL_RE.fullmatch(local) is None
+    ):
+        raise ValueError("Enter a valid email address.")
+    if not domain or len(domain) > 253 or "." not in domain:
+        raise ValueError("Enter a valid email address.")
+    labels = domain.split(".")
+    if len(labels) < 2 or any(_EMAIL_LABEL_RE.fullmatch(label) is None for label in labels):
+        raise ValueError("Enter a valid email address.")
+    if _EMAIL_TLD_RE.fullmatch(labels[-1]) is None:
+        raise ValueError("Enter a valid email address.")
+    return normalized
 
 
 class VisitSubmission(BaseModel):
@@ -31,9 +60,7 @@ class RegisterRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def validate_email(cls, value: str) -> str:
-        if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value.strip()) is None:
-            raise ValueError("Enter a valid email address.")
-        return value.strip().lower()
+        return validate_strict_email(value)
 
 
 class LoginRequest(BaseModel):
@@ -85,10 +112,18 @@ class UserLockUpdate(BaseModel):
 
 class ProfileUpdate(BaseModel):
     full_name: Annotated[str, Field(alias="fullName", min_length=1, max_length=80)]
+    email: Annotated[str | None, Field(default=None, max_length=254)] = None
     phone: Annotated[str, Field(default="", max_length=20)]
     birth_date: Annotated[str, Field(alias="birthDate", default="", max_length=10)]
     gender: Literal["female", "male", "other", "prefer-not-to-say", ""] = ""
     address: Annotated[str, Field(default="", max_length=160)]
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return validate_strict_email(value)
 
     @field_validator("birth_date")
     @classmethod

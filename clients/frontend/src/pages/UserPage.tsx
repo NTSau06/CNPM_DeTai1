@@ -1,8 +1,8 @@
-﻿// Đăng ký, đăng nhập và quản lý hồ sơ tài khoản.
+// Đăng ký, đăng nhập và quản lý hồ sơ tài khoản.
 import { useState, type FormEvent } from 'react'
 import { Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, KeyRound, LogOut, Mail, MapPin, Phone, Trash2, UserRound } from 'lucide-react'
-import { changePassword, deleteOwnAccount, loginAccount, registerAccount } from '../api'
+import { changePassword, deleteOwnAccount, isValidEmail, loginAccount, normalizeEmail, registerAccount } from '../api'
 import { translate } from '../i18n'
 import { useAppStore } from '../store'
 import type { Language, UserProfile } from '../types'
@@ -36,8 +36,12 @@ export function UserPage() {
     event.preventDefault()
     setFeedback('')
     const values = new FormData(event.currentTarget)
-    const email = String(values.get('email') ?? '').trim().toLowerCase()
+    const email = normalizeEmail(String(values.get('email') ?? ''))
     const password = String(values.get('password') ?? '')
+    if (!isValidEmail(email)) {
+      setFeedback(ui(language, 'usEmailInvalid'))
+      return
+    }
     if (password.length < 8) {
       setFeedback(ui(language, 'usPwShort'))
       return
@@ -87,11 +91,18 @@ export function UserPage() {
     event.preventDefault()
     if (!currentUser) return
     const values = new FormData(event.currentTarget)
+    const email = normalizeEmail(String(values.get('email') ?? ''))
     setProfileError('')
+    setSaved(false)
+    if (!isValidEmail(email)) {
+      setProfileError(ui(language, 'usEmailInvalid'))
+      return
+    }
     try {
       await updateCurrentUser({
         ...currentUser,
         fullName: String(values.get('fullName') ?? '').trim(),
+        email,
         phone: String(values.get('phone') ?? '').trim(),
         birthDate: String(values.get('birthDate') ?? ''),
         gender: values.get('gender') as UserProfile['gender'],
@@ -99,8 +110,13 @@ export function UserPage() {
       })
       setSaved(true)
       window.setTimeout(() => setSaved(false), 2500)
-    } catch {
-      setProfileError(ui(language, 'usProfileSaveError'))
+    } catch (error) {
+      const status = typeof error === 'object' && error !== null && 'status' in error ? error.status : undefined
+      setProfileError(
+        status === 409 ? ui(language, 'usEmailTaken')
+          : status === 422 ? ui(language, 'usEmailInvalid')
+          : ui(language, 'usProfileSaveError'),
+      )
     }
   }
 
@@ -182,7 +198,7 @@ export function UserPage() {
               <span className="input-with-icon"><UserRound size={16} /><input name="fullName" required maxLength={80} defaultValue={currentUser.fullName} autoComplete="name" /></span>
             </label>
             <label>{ui(language, 'usEmail')}
-              <span className="input-with-icon"><Mail size={16} /><input type="email" value={currentUser.email} readOnly /></span>
+              <span className="input-with-icon"><Mail size={16} /><input key={currentUser.email} name="email" type="email" required maxLength={254} defaultValue={currentUser.email} autoComplete="email" placeholder={ui(language, 'usEmailPh')} /></span>
             </label>
             <label>{ui(language, 'usPhone')}
               <span className="input-with-icon"><Phone size={16} /><input name="phone" type="tel" maxLength={20} defaultValue={currentUser.phone} autoComplete="tel" /></span>

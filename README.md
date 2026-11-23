@@ -70,7 +70,7 @@ npm run dev
 - Lệnh này tự động khởi chạy đủ 5 service Backend (`8000`–`8004`) và Frontend (`http://localhost:5173`).
 - Frontend chờ cả 5 backend sẵn sàng rồi mới mở cổng `5173`, tránh lỗi `ECONNREFUSED` khi SQL Server còn đang khởi tạo. Có thể chờ tối đa 120 giây; nếu quá thời gian, kiểm tra log backend và dịch vụ `SQL Server (SQLEXPRESS)`.
 - Lệnh chạy kiểm tra SQL trước khi mở các service. Database dự án được đặt `AUTO_CLOSE OFF` và backend tái sử dụng kết nối ODBC, tránh đóng/mở database giữa các lần gọi API. Xem [khuyến nghị AUTO_CLOSE của Microsoft](https://learn.microsoft.com/en-us/sql/relational-databases/policy-based-management/set-the-auto-close-database-option-to-off?view=sql-server-ver17).
-- Để quét mã QR từ điện thoại khi chạy bản cục bộ, chỉ cần kết nối máy tính và điện thoại vào cùng mạng Wi-Fi; ứng dụng sẽ tự tạo mã QR trỏ tới địa chỉ IP LAN của máy tính.
+- Để quét mã QR từ điện thoại khi chạy bản cục bộ, chỉ cần kết nối máy tính và điện thoại vào cùng mạng Wi-Fi; ứng dụng sẽ tự tạo mã QR trỏ tới địa chỉ IP LAN của máy tính. Muốn dùng GPS trên điện thoại hoặc mở từ mạng khác, chạy bằng HTTPS theo **Cách 4**.
 - Để dừng toàn bộ frontend và các backend cục bộ, chạy từ thư mục gốc:
   ```powershell
   npm run stop:local
@@ -108,6 +108,61 @@ docker compose -f server/compose.yml up --build
 ```
 
 _(Nếu có file `.env` tùy chỉnh cấu hình, dùng `docker compose --env-file .env -f server/compose.yml up --build`)._
+
+### Cách 4: Chạy bằng đường dẫn HTTPS (mở trên điện thoại ở mọi mạng)
+
+Trình duyệt chỉ cho phép dùng GPS (hướng dẫn tự động) và cài PWA khi trang chạy trên **HTTPS** (hoặc `localhost`). Khi mở bằng địa chỉ LAN `http://192.168.x.x:5173`, điện thoại sẽ không cấp quyền vị trí. Dự án hỗ trợ sẵn hai cách để có đường dẫn `https://`.
+
+#### 4.1. Dùng Cloudflare Tunnel (khuyên dùng, miễn phí, không cần tài khoản)
+
+**Cài đặt một lần:**
+
+```powershell
+winget install --id Cloudflare.cloudflared
+```
+
+Sau khi cài, **đóng và mở lại PowerShell**, kiểm tra bằng `cloudflared --version`. Nếu máy không có `winget`, tải bản Windows tại trang [cloudflared releases](https://github.com/cloudflare/cloudflared/releases), đổi tên thành `cloudflared.exe` và đặt vào một thư mục nằm trong biến `PATH`.
+
+**Chạy ứng dụng kèm đường dẫn HTTPS** (tại thư mục gốc dự án):
+
+```powershell
+npm run dev:https
+```
+
+- Script khởi động đủ 5 backend và frontend như `npm run dev`, đồng thời mở một đường hầm Cloudflare và in ra địa chỉ dạng:
+  ```
+  HTTPS address: https://ten-ngau-nhien.trycloudflare.com
+  ```
+- Mở địa chỉ này trên điện thoại hoặc máy khác (không cần cùng Wi-Fi). Mã QR "Mở trên điện thoại" và mã QR thanh toán vé cũng tự trỏ tới địa chỉ HTTPS này.
+- Trên máy tính vẫn có thể dùng `http://localhost:5173` như bình thường.
+- Địa chỉ `trycloudflare.com` **thay đổi mỗi lần chạy**; tắt ứng dụng (`Ctrl + C` hoặc `npm run stop:local`) thì đường hầm cũng được tắt.
+- Nếu ứng dụng đang chạy bằng `npm run dev`, hãy chạy `npm run stop:local` trước rồi mới chạy `npm run dev:https`.
+
+#### 4.2. Dùng ngrok hoặc tên miền HTTPS có sẵn
+
+Nếu đã có đường dẫn HTTPS trỏ về cổng `5173` của máy (ví dụ ngrok), truyền đường dẫn đó vào script để mã QR dùng đúng địa chỉ:
+
+```powershell
+# Cửa sổ 1: tạo đường hầm ngrok (cần đăng ký tài khoản và chạy "ngrok config add-authtoken <token>" một lần)
+ngrok http 5173
+
+# Cửa sổ 2: chạy ứng dụng với địa chỉ ngrok vừa nhận được
+npm run dev -- -PublicUrl https://abc-123.ngrok-free.app
+```
+
+Các tên miền `*.trycloudflare.com` và `*.ngrok-free.app` (cùng các tên miền ngrok khác) đã được cho phép trong `clients/frontend/vite.config.ts` (`server.allowedHosts`). Tên miền riêng truyền qua `-PublicUrl` được script tự thêm vào danh sách này.
+
+#### 4.3. Xử lý lỗi thường gặp
+
+| Hiện tượng | Cách xử lý |
+| --- | --- |
+| `cloudflared not found` | Cài `cloudflared` như mục 4.1 rồi mở PowerShell mới. |
+| `Cloudflare Tunnel did not return an HTTPS address within 45 seconds` | Kiểm tra kết nối Internet/tường lửa; xem log tại `%TEMP%\quangtri-cloudflared.log` rồi chạy lại. |
+| Trình duyệt báo `Blocked request. This host is not allowed` | Đường dẫn không thuộc danh sách cho phép: dùng `npm run dev:https` hoặc truyền đúng `-PublicUrl`. |
+| Mở được trang nhưng mã QR trên điện thoại vẫn là `http://192.168...` | Ứng dụng được khởi động không kèm HTTPS: chạy `npm run stop:local` rồi khởi động lại bằng `npm run dev:https`. |
+| Trang mở chậm ở lần đầu | Vite đang biên dịch lần đầu qua đường hầm; chờ vài giây rồi tải lại. |
+
+> **Lưu ý:** đường dẫn HTTPS này công khai trên Internet trong thời gian ứng dụng chạy, ai có link đều truy cập được. Chỉ dùng để demo/kiểm thử; khi triển khai thật nên đưa ứng dụng lên máy chủ có tên miền và chứng chỉ (ví dụ Caddy/Nginx với Let's Encrypt).
 
 ---
 

@@ -319,3 +319,110 @@ def test_unpaid_orders_expire_and_cannot_be_paid(
         confirm = client.post(f"/api/v1/payments/qr/{order['id']}/confirm", json={"code": code})
         assert confirm.status_code == 409
         assert client.get(f"/api/v1/tickets/orders/{order['id']}", headers=user).json()["status"] == "expired"
+
+
+@pytest.mark.parametrize(
+    "bad_email",
+    [
+        "",
+        "not-an-email",
+        "a@.com",
+        "a@b..c",
+        "a@b..com",
+        "a@b.",
+        ".a@b.com",
+        "a.@b.com",
+        "a..b@c.com",
+        "a@-domain.com",
+        "a@domain-.com",
+        "a@domain.c",
+        "a@domain.123",
+        "a@dom_ain.com",
+        "a@b!c.com",
+        "a b@gmail.com",
+        "a@b@c.com",
+    ],
+)
+def test_strict_email_validation_rejects_invalid_addresses(
+    database: Database,
+    bad_email: str,
+) -> None:
+    with _gateway(database) as client:
+        reg = client.post(
+            "/api/v1/auth/register",
+            json={"fullName": "Bad Email", "email": bad_email, "password": "valid-password"},
+        )
+        assert reg.status_code == 422
+
+        user = _register(client, "valid-user@example.com")
+        upd = client.put(
+            "/api/v1/auth/me",
+            headers=user,
+            json={"fullName": "Valid User", "email": bad_email},
+        )
+        assert upd.status_code == 422
+
+
+def test_user_can_update_email_uniquely_and_admin_sees_it(database: Database) -> None:
+    with _gateway(database) as client:
+        user_a = _register(client, "alice@example.com")
+        _register(client, "bob@example.com")
+        admin = _admin(client)
+
+        # Trùng email của tài khoản khác -> 409 Conflict.
+        duplicate = client.put(
+            "/api/v1/auth/me",
+            headers=user_a,
+            json={"fullName": "Alice", "email": "BOB@example.com"},
+        )
+        assert duplicate.status_code == 409
+
+        # Đổi sang email hợp lệ mới -> 200 OK và chuẩn hóa chữ thường.
+        updated = client.put(
+            "/api/v1/auth/me",
+            headers=user_a,
+            json={
+                "fullName": "Alice Nguyen",
+                "email": "  Alice.New+tag@Sub.Domain.vn  ",
+                "phone": "0901234567",
+            },
+        )
+        assert updated.status_code == 200
+        assert updated.json()["email"] == "alice.new+tag@sub.domain.vn"
+
+        # Giữ nguyên email của chính mình hoặc bỏ qua trường email vẫn hợp lệ.
+        keep_same = client.put(
+            "/api/v1/auth/me",
+            headers=user_a,
+            json={"fullName": "Alice Nguyen", "email": "alice.new+tag@sub.domain.vn"},
+        )
+        assert keep_same.status_code == 200
+        omit_email = client.put(
+            "/api/v1/auth/me",
+            headers=user_a,
+            json={"fullName": "Alice Updated"},
+        )
+        assert omit_email.status_code == 200
+        assert omit_email.json()["email"] == "alice.new+tag@sub.domain.vn"
+
+        # Danh sách tài khoản bên Admin phản ánh email mới ngay lập tức.
+        admin_users = client.get("/api/v1/admin/users", headers=admin).json()["items"]
+        emails = {item["email"] for item in admin_users}
+        assert "alice.new+tag@sub.domain.vn" in emails
+        assert "alice@example.com" not in emails
+
+        # Đăng nhập bằng email cũ thất bại, email mới thành công.
+        assert (
+            client.post(
+                "/api/v1/auth/login",
+                json={"email": "alice@example.com", "password": "valid-password"},
+            ).status_code
+            == 401
+        )
+        assert (
+            client.post(
+                "/api/v1/auth/login",
+                json={"email": "alice.new+tag@sub.domain.vn", "password": "valid-password"},
+            ).status_code
+            == 200
+        )

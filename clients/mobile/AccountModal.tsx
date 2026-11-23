@@ -21,6 +21,8 @@ import {
   fetchMyTicketOrders,
   fetchProfile,
   formatVnd,
+  isValidEmail,
+  normalizeEmail,
   updateProfile,
   type TicketOrder,
   type UserProfile,
@@ -99,6 +101,11 @@ export function AccountModal({
 
   const saveProfile = async () => {
     if (!token || !profile) return
+    const normalizedEmail = normalizeEmail(profile.email)
+    if (!isValidEmail(normalizedEmail)) {
+      setProfileMessage(mt(language, 'emailInvalid'))
+      return
+    }
     if (profile.birthDate && !BIRTH_DATE_PATTERN.test(profile.birthDate)) {
       setProfileMessage(mt(language, 'acBirthInvalid'))
       return
@@ -109,12 +116,22 @@ export function AccountModal({
     }
     setBusy(true)
     try {
-      const updated = await updateProfile(token, { ...profile, fullName: profile.fullName.trim() })
+      const updated = await updateProfile(token, {
+        ...profile,
+        fullName: profile.fullName.trim(),
+        email: normalizedEmail,
+      })
       setProfile(updated)
       onProfileUpdated(updated)
       setProfileMessage(mt(language, 'acSaved'))
-    } catch {
-      setProfileMessage(mt(language, 'acSaveError'))
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setProfileMessage(mt(language, 'emailTaken'))
+      } else if (error instanceof ApiError && error.status === 422) {
+        setProfileMessage(mt(language, 'emailInvalid'))
+      } else {
+        setProfileMessage(mt(language, 'acSaveError'))
+      }
     } finally {
       setBusy(false)
     }
@@ -203,7 +220,7 @@ export function AccountModal({
             <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
               <Text style={styles.section}>{mt(language, 'acProfile')}</Text>
               <Text style={styles.label}>Email</Text>
-              <Text style={styles.readonly}>{profile.email}</Text>
+              <TextInput autoCapitalize="none" autoComplete="email" keyboardType="email-address" maxLength={254} onChangeText={(value) => update('email', value)} placeholder="Email" style={styles.input} value={profile.email} />
               <TextInput onChangeText={(value) => update('fullName', value)} placeholder={mt(language, 'fullName')} style={styles.input} value={profile.fullName} maxLength={80} />
               <TextInput keyboardType="phone-pad" onChangeText={(value) => update('phone', value)} placeholder={mt(language, 'acPhone')} style={styles.input} value={profile.phone} maxLength={20} />
               <TextInput onChangeText={(value) => update('birthDate', value)} placeholder={mt(language, 'acBirthDate')} style={styles.input} value={profile.birthDate} maxLength={10} />
@@ -278,7 +295,6 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: 20, paddingBottom: 36, gap: 8 },
   section: { marginTop: 14, color: '#28483A', fontSize: 15, fontWeight: '800' },
   label: { color: '#7D897F', fontSize: 11, fontWeight: '700' },
-  readonly: { color: '#24352D', fontSize: 14 },
   input: { height: 46, paddingHorizontal: 13, borderWidth: 1, borderColor: '#D7DED3', borderRadius: 12, color: '#24352D', backgroundColor: '#FFFFFF' },
   primary: { padding: 13, borderRadius: 12, alignItems: 'center', backgroundColor: '#28483A' },
   primaryText: { color: '#FFFDF7', fontSize: 13, fontWeight: '800' },

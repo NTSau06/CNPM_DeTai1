@@ -1,4 +1,10 @@
 # Chạy các backend và frontend web cục bộ, đồng thời tạo URL LAN cho mã QR.
+# -Tunnel: mở thêm đường dẫn HTTPS công khai qua Cloudflare Tunnel (cần cài cloudflared).
+# -PublicUrl https://...: dùng đường dẫn HTTPS có sẵn (ngrok, tên miền riêng) cho mã QR.
+param(
+  [switch]$Tunnel,
+  [string]$PublicUrl = ""
+)
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 
@@ -16,6 +22,23 @@ if ($LASTEXITCODE -ne 0) {
 
 if (-not (Test-Path $frontendModules)) {
   throw "Frontend dependencies not found. Run: npm ci --prefix clients\frontend"
+}
+
+if ($Tunnel -and $PublicUrl) {
+  throw "Use either -Tunnel or -PublicUrl, not both."
+}
+if ($PublicUrl) {
+  $PublicUrl = $PublicUrl.Trim().TrimEnd('/')
+  if ($PublicUrl -notmatch '^https://[^/\s]+$') {
+    throw "-PublicUrl must be an HTTPS origin without a path, for example https://abc.ngrok-free.app"
+  }
+}
+$cloudflared = $null
+if ($Tunnel) {
+  $cloudflared = Get-Command cloudflared -ErrorAction SilentlyContinue
+  if (-not $cloudflared) {
+    throw "cloudflared not found. Install it with: winget install --id Cloudflare.cloudflared (then open a new PowerShell window). See README.md."
+  }
 }
 
 $requiredEndpoints = @(
@@ -52,6 +75,9 @@ $occupiedEndpoints = @(
 )
 
 if ($occupiedEndpoints.Count -eq $requiredEndpoints.Count -and @($occupiedEndpoints | Where-Object { -not $_.Healthy }).Count -eq 0) {
+  if ($Tunnel -or $PublicUrl) {
+    throw "The local app is already running without the HTTPS address. Run 'npm run stop:local' first, then start again with -Tunnel or -PublicUrl."
+  }
   Write-Host "The local app is already running at http://localhost:5173/. No second instance was started."
   exit 0
 }
@@ -92,8 +118,49 @@ else {
   Write-Warning "Could not find a default network route. The phone QR code may not be reachable."
 }
 
+$tunnelProcess = $null
+if ($Tunnel) {
+  # Quick tunnel: Cloudflare cấp một địa chỉ https://*.trycloudflare.com trỏ về Vite cổng 5173.
+  $tunnelLog = Join-Path $env:TEMP "quangtri-cloudflared.log"
+  Remove-Item -LiteralPath $tunnelLog -ErrorAction SilentlyContinue
+  $tunnelProcess = Start-Process -FilePath $cloudflared.Source `
+    -ArgumentList @('tunnel', '--no-autoupdate', '--url', 'http://localhost:5173') `
+    -RedirectStandardError $tunnelLog -WindowStyle Hidden -PassThru
+  $tunnelDeadline = (Get-Date).AddSeconds(45)
+  while (-not $PublicUrl -and (Get-Date) -lt $tunnelDeadline -and -not $tunnelProcess.HasExited) {
+    Start-Sleep -Milliseconds 500
+    if (Test-Path $tunnelLog) {
+      try {
+        $logText = Get-Content -LiteralPath $tunnelLog -Raw -ErrorAction Stop
+      }
+      catch {
+        $logText = ""
+      }
+      $found = [regex]::Matches([string]$logText, 'https://[a-z0-9-]+\.trycloudflare\.com') |
+        Where-Object { $_.Value -ne 'https://api.trycloudflare.com' } |
+        Select-Object -First 1
+      if ($found) { $PublicUrl = $found.Value }
+    }
+  }
+  if (-not $PublicUrl) {
+    if (-not $tunnelProcess.HasExited) { Stop-Process -Id $tunnelProcess.Id -ErrorAction SilentlyContinue }
+    throw "Cloudflare Tunnel did not return an HTTPS address within 45 seconds. Check your Internet connection and the log at $tunnelLog"
+  }
+}
+
+if ($PublicUrl) {
+  # Mã QR (mở trên điện thoại, thanh toán vé) trỏ tới đường dẫn HTTPS; Vite cho phép tên miền này.
+  $env:VITE_MOBILE_URL = $PublicUrl
+  $env:PUBLIC_HOSTS = ([Uri]$PublicUrl).Host
+  Write-Host ""
+  Write-Host "HTTPS address: $PublicUrl" -ForegroundColor Green
+  Write-Host "Open this address on any device once the frontend is ready (local: http://localhost:5173)." -ForegroundColor Green
+  Write-Host ""
+}
+
 $python = "`"$pythonPath`" -m uvicorn"
 
+try {
 & npx --yes concurrently --kill-others --names "poi,tour,narration,analytics,gateway,frontend" `
   "$python services.poi_service.main:app --port 8001" `
   "$python services.tour_service.main:app --port 8002" `
@@ -101,3 +168,10 @@ $python = "`"$pythonPath`" -m uvicorn"
   "$python services.analytics_service.main:app --port 8004" `
   "$python api_gateway.main:app --port 8000" `
   "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-frontend.ps1"
+}
+finally {
+  if ($tunnelProcess -and -not $tunnelProcess.HasExited) {
+    Stop-Process -Id $tunnelProcess.Id -ErrorAction SilentlyContinue
+    Write-Host "Stopped Cloudflare Tunnel."
+  }
+}

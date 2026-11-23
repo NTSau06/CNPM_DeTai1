@@ -3,6 +3,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Tên miền HTTPS được phép truy cập dev server: đường hầm Cloudflare/ngrok và tên miền do
+// run-local.ps1 truyền qua PUBLIC_HOSTS (ví dụ khi chạy với -PublicUrl https://ten-mien-rieng).
+// Đọc qua globalThis để không cần cài @types/node khi `tsc -b` kiểm tra tệp này.
+const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {}
+const publicHosts = (env.PUBLIC_HOSTS ?? '')
+  .split(',')
+  .map((host) => host.trim())
+  .filter(Boolean)
+
 export default defineConfig({
   plugins: [
     react(),
@@ -34,6 +43,7 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
+    allowedHosts: ['.trycloudflare.com', '.ngrok-free.app', '.ngrok-free.dev', '.ngrok.app', '.ngrok.io', ...publicHosts],
     proxy: {
       '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
       '/static': { target: 'http://127.0.0.1:8000', changeOrigin: true },

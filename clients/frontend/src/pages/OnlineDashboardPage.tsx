@@ -172,6 +172,39 @@ export function OnlineDashboardPage() {
   }, [refresh])
 
   useEffect(() => {
+    if (!authToken || tab !== 'users') return
+    let active = true
+    const syncUsers = async () => {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const nextUsers = await getAdminUsers(authToken)
+        if (!active) return
+        setUsers(nextUsers)
+        setAdminUser((current) => {
+          if (!current) return current
+          const self = nextUsers.find((item) => item.id === current.id)
+          return self && (self.email !== current.email || self.fullName !== current.fullName)
+            ? { ...current, email: self.email, fullName: self.fullName }
+            : current
+        })
+      } catch {
+        // Bỏ qua lỗi mạng tạm thời trong lần đồng bộ nền.
+      }
+    }
+    void syncUsers()
+    const interval = window.setInterval(() => { void syncUsers() }, 10_000)
+    const onVisible = () => { void syncUsers() }
+    window.addEventListener('focus', onVisible)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      active = false
+      window.clearInterval(interval)
+      window.removeEventListener('focus', onVisible)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [authToken, tab])
+
+  useEffect(() => {
     let active = true
     const token = getStoredAdminAuthToken()
     if (!token) {

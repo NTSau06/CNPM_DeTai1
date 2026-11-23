@@ -4,6 +4,7 @@
   "scripts": {
     "codex": "codex",
     "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\run-local.ps1",
+    "dev:https": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\run-local.ps1 -Tunnel",
     "stop:local": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\stop-local.ps1",
     "backend:start": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\server\\backend.ps1 start",
     "backend:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\server\\backend.ps1 stop",
