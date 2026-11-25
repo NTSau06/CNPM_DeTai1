@@ -365,7 +365,10 @@ export function OnlineDashboardPage() {
   }
 
   const removePlace = async (place: ApiPlace) => {
-    if (!authToken || !window.confirm(`Xóa địa điểm "${place.copy.vi?.title ?? place.id}"? Các hành trình cũ có thể còn tham chiếu địa điểm này.`)) return
+    if (!authToken) return
+    console.log('hello')
+    window.alert('hello')
+    if (!window.confirm(`Xóa địa điểm "${place.copy.vi?.title ?? place.id}"? Các hành trình cũ có thể còn tham chiếu địa điểm này.`)) return
     setBusy(true)
     setMessage('')
     try {
@@ -716,7 +719,7 @@ export function OnlineDashboardPage() {
                   <div><strong>{place.copy.vi?.title ?? place.id}</strong><small>{place.id} · {categoryLabels.vi[place.category]} · {place.duration} phút</small></div>
                   <div className="admin-row-actions">
                     <button className="admin-icon-button" disabled={busy} onClick={() => openEdit(place)} title="Chỉnh sửa" type="button"><Pencil size={15} /></button>
-                    <button className="admin-icon-button danger" disabled={busy || places.length <= 1} onClick={() => void removePlace(place)} title={places.length <= 1 ? 'Cần giữ lại ít nhất một địa điểm' : 'Xóa địa điểm'} type="button"><Trash2 size={15} /></button>
+                    <button className="admin-icon-button danger" disabled={busy || places.length <= 1} onClick={() => void removePlace(place)} title={places.length <= 1 ? 'Cần giữ lại ít nhất một địa điểm' : 'Hello'} type="button"><Trash2 size={15} /></button>
                   </div>
                 </article>
               ))}</div>
