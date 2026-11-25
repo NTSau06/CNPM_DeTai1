@@ -757,7 +757,7 @@ function LocalizedFields({
       <label>{label} · Phụ đề<input maxLength={240} value={value.subtitle} onChange={(event) => update('subtitle', event.target.value)} /></label>
       <label className="admin-form-wide">{label} · Thuyết minh<textarea required={required} rows={3} value={value.narration} onChange={(event) => update('narration', event.target.value)} /></label>
       <label className="admin-form-wide">{label} · Audio thuyết minh
-        <input value={audioUrl} maxLength={2048} placeholder="https://example.com/audio.mp3 hoặc /audio/diem-den/vi.mp3" pattern="https?://.+|/[^/].*" onChange={(event) => update('audioUrl', event.target.value.trim())} />
+        <input value={audioUrl} maxLength={2048} placeholder="https://example.com/audio.mp3 hoặc /assets/audio/diem-den/vi.mp3" pattern="https?://.+|/[^/].*" onChange={(event) => update('audioUrl', event.target.value.trim())} />
         <small>Nhập đường dẫn trực tiếp tới file âm thanh. Xóa đường dẫn để dùng giọng đọc tự động. Bấm Lưu địa điểm để áp dụng.</small>
       </label>
       {audioUrl && <div className="admin-form-wide"><audio key={audioUrl} controls preload="none" src={audioUrl} aria-label={`Nghe thử audio ${label}`} style={{ width: '100%' }} /></div>}

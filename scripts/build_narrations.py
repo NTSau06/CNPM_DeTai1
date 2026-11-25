@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SEED = ROOT / "server/services/poi_service/data/places.json"
 SCRIPTS = ROOT / "clients/frontend/src/data/narrationScripts.json"
 MANIFEST = ROOT / "clients/frontend/src/data/narrationAudio.json"
-AUDIO = ROOT / "clients/frontend/public/audio"
+AUDIO = ROOT / "clients/frontend/public/assets/audio"
 WORK = ROOT / ".audio-work"
 LOCALES = ("vi", "en", "ja", "fr", "zh-CN", "ko-KR", "es")
 

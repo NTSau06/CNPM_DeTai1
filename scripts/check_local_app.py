@@ -22,7 +22,7 @@ def main():
         narration.raise_for_status()
         assert len(narration.json()["text"]) > 1000
         for language in ("vi", "ja"):
-            audio = client.head(f"http://127.0.0.1:5173/audio/cua-tung-beach/{language}.mp3")
+            audio = client.head(f"http://127.0.0.1:5173/assets/audio/cua-tung-beach/{language}.mp3")
             audio.raise_for_status()
             assert int(audio.headers["content-length"]) > 1_000_000
         print(f"PASS: {places['total']} places, long narration, and MP3 assets.")

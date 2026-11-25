@@ -48,7 +48,7 @@ for (const place of [...places, ...defaultData.exports.places]) {
     assert.equal(speech.getNarrationText(place, locale), scripts[place.id][locale].text)
     assert.equal(speech.getNarrationAudioLanguage(place, locale), locale)
     assert.equal(speech.getNarrationDurationSeconds(place, locale), metadata.durationSeconds)
-    assert.equal(speech.getNarrationAudioUrl(place, locale), `/demo/audio/${place.id}/${locale}.mp3?v=${metadata.audioSha256.slice(0, 12)}`)
+    assert.equal(speech.getNarrationAudioUrl(place, locale), `/demo/assets/audio/${place.id}/${locale}.mp3?v=${metadata.audioSha256.slice(0, 12)}`)
   }
 }
 const edited = structuredClone(places[0])
